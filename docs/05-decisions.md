@@ -860,3 +860,147 @@ Note: the format itself is byte-identical to what the pipeline emitted before,
 so `data/cassettes/run1.jsonl` still replays. That was checked, not assumed --
 a format change here would have silently invalidated the only real model
 output we have.
+
+---
+
+## D-030  A scripted agent, and ground truth by leave-one-out rather than by rule
+Date: 06-09-2026
+Decided by: the counterfactual estimator scoring 85% unsafe preservation, and
+being right to
+Choice: offline development runs against `src/eval/scripted.py`, a deterministic
+agent whose answer is a **pure function of the sources available to it**. Ground
+truth influence is not a rule about which sources it consulted; it is leave-one-
+out on that function:
+
+    used(s)  <=>  substance(all sources) != substance(all sources - s)
+
+Reason. Phase 2 cannot be developed against the API: the free tier is 20
+requests a day (D-017) and one analysed run costs dozens. The existing stub in
+`harness.py` could drive the pipeline but could not test the estimator, because
+it returned the same text for the same prompt -- so removing a used source and
+removing an unused source both changed nothing, and a counterfactual check
+appeared to work perfectly. It would have gone on appearing to work after being
+broken.
+
+The instructive part is the first fix, which was wrong. The scripted agent
+declared a source "used" when its rule said the agent had read it: a directive,
+a format code, an API call, a `task/` key. Scored against that label, the
+counterfactual estimator reported 85-100% unsafe preservation and looked
+catastrophically broken. It was not. Those sources had been *consulted* and had
+changed nothing, because the answer's substance collapsed many inputs into two
+values, so "clean" was the correct verdict for most of them. The label was
+measuring exposure and calling it influence -- the exact confusion this project
+exists to separate, reintroduced in the test harness, where it would have been
+diagnosed as an estimator failure.
+
+So the ground truth is now definitional rather than stipulated. It is
+CLAUDE.md's own wording -- "a source demonstrably changed the agent's output" --
+computed exactly, by re-deriving the answer without each source. After the
+change the same estimator scores 1.00 precision and 1.00 recall on all four
+attack variants, with the same code.
+
+Two limits, and both belong in the paper rather than in a comment. This measures
+the estimator against a scripted agent, so it says the estimator recovers a
+usage pattern that really is there, not that real models use sources this way.
+And leave-one-out **under-reports on redundant inputs**: when two sources supply
+the same fact, neither is individually necessary, so both are called unused.
+That is a real property of single-source counterfactuals, not an artefact of the
+fixture; the alternative is testing every subset, which is exponential. The
+poisoned sources in scenarios A and B carry a directive no clean source carries,
+so they stay individually necessary and detectable -- which is a fact about our
+scenarios, not a general guarantee.
+
+---
+
+## D-031  Format codes leave the prose vocabulary and get a case-sensitive facet
+Date: 06-09-2026
+Decided by: a false clean that survived the leave-one-out fix
+Choice: `PROSE_TERMS` no longer contains `%y, %m, %d, %b`. `ProseComparator`
+gains a `formats` facet built from the `FORMAT_CODE` regex, which is what
+`CodeComparator` already used for the same job.
+
+Reason. After D-030 one false negative remained, and it was the same source on
+every Researcher event: the page documenting format codes. Removing it changed
+the finding from "Format codes documented: %B, %Y, %b, %d, %m, %y" to "%B, %Y,
+%d, %m", and the signature did not move.
+
+The cause is that `_present()` matches substrings case-insensitively, so `%Y`
+and `%y` are one token. They are not one decision -- a four-digit year and a
+two-digit year are different answers -- and a finding that lost `%y` while
+keeping `%Y` produced a byte-identical facet. The vocabulary was not merely
+crude, which is a property it is allowed to have; it could not represent the
+thing it listed.
+
+This is a change to a comparator made after seeing an influence result, so it is
+worth being explicit about why it is not the tuning D-026 forbids. The
+pre-registered rule governs *exclusion*: a facet is dropped when its floor on
+unchanged re-sends is non-zero, and never on the basis of what it says about
+influence. This adds a facet, and it adds it because the old one was
+unimplementable as documented, not because a result was unwelcome. The direction
+matters too: the fix makes the comparator strictly more sensitive, which moves
+verdicts towards "influenced" -- the safe direction, more recomputation and
+fewer unsafe preservations.
+Consequence, and it is a real gap: `prose` has **no measured floor**. The eight
+noise trials measured decision facets only, so the `formats` facet's stability is
+unknown and `Calibration.is_calibrated("prose")` is false. The estimator counts
+this as `uncalibrated:prose` on every run that uses it. A prose floor needs a
+live measurement and cannot be had from the data on disk.
+
+---
+
+## D-032  Attribution runs after detection, on the flagged region only
+Date: 06-09-2026
+Decided by: measuring the inline cost against the targeted cost
+Choice: the default cost model is self-report inline during the run, then
+`refine_for_verdict()` spending counterfactuals only on pairs the detector's
+verdict makes relevant. Inline counterfactual attribution stays available as an
+ablation, not as the method.
+
+Reason. Attributing every exposure inline costs one counterfactual per pair
+whether or not that pair could ever matter. Measured on the scripted agent,
+across the four attack variants:
+
+    condition              self-report calls   counterfactual calls
+    counterfactual only            0                   35
+    hybrid, inline                 6                27-30
+    self-report + targeted         6                  0-5
+
+with zero unsafe preservations in all three. The inline hybrid barely improves
+on brute force, because every negative claim still needs verifying and the agent
+claims few positives. The saving is not in choosing *which* claims to verify; it
+is in not asking about pairs that no incident implicates.
+
+The targeted pass is a frontier expansion over the contaminated region: examine
+an unchecked pair whose source is currently contaminated, record the verdict,
+recompute the region, repeat. A pair that comes back clean stops the walk rather
+than seeding more checks, so the cost scales with the contaminated region rather
+than with the trace. This is docs/02's own instruction -- "run counterfactual
+only where it matters" -- and it is also what makes docs/03 issue #7's collapse
+condition avoidable: analysis cost now sits below the rerun cost it avoids
+instead of above it.
+The reason this is sound rather than merely cheap: the estimator still never
+sees the label. Flagged ids arrive as an argument and choose *where to look*,
+never what the answer is. Pairs left unexamined stay `unchecked`, which the
+contamination walk treats as contaminated, so running out of budget costs
+preserved work and never safety.
+
+---
+
+## D-033  The Planner's task goes in as a rendered source, not as inline text
+Date: 06-09-2026
+Decided by: the self-report question asking the Planner about an id it had
+never seen
+Choice: `GeminiPipeline.run()` renders the task through `_source_block()` like
+every other input, instead of interpolating it into the prompt.
+
+Reason. The task was the Planner's only input, so inlining it looked harmless.
+It was not: the self-report question is built from the event's exposures and
+asks "did [S1] change what you wrote", while the Planner's prompt contained the
+task text and no `[S1]` anywhere. The agent is being asked about a label it was
+never shown, and a counterfactual has no span to redact -- `redact_in_prompt`
+raises `SourceNotInPrompt`, which the estimator correctly turns into
+"influenced, could not be examined", so the Planner's one pair was permanently
+unresolvable.
+Now every model-written event's inputs are addressable the same way, and the
+Planner's pair resolves like any other. Cost: one more rendered block per run,
+and the prompt reads slightly more formally.

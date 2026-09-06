@@ -301,11 +301,17 @@ class GeminiPipeline:
         self.expose("planner", task_source.id)
 
         # --- planner ---------------------------------------------------------
+        # The task goes in as a labelled source rather than inline text. It is
+        # the Planner's only input, so inlining it looked harmless -- but then
+        # the self-report question asks the Planner about [S1] while its prompt
+        # never contained that id, and a counterfactual has no span to redact.
+        # Every model-written event's inputs are addressable the same way now.
+        planner_block = self._source_block(self.context["planner"])
         plan_event, plan_response = self._call(
             "planner",
             "plan",
             prompt=(
-                f"Task:\n{self.task}\n\n"
+                f"Task:\n{planner_block}\n\n"
                 "Reply with JSON: {\"brief\": str, \"questions\": [str, str, str]}. "
                 "Exactly three research questions, each answerable from "
                 "documentation about parsing dates in Python."
@@ -313,6 +319,7 @@ class GeminiPipeline:
             system=PLANNER_SYSTEM,
             parents=[user_event.id],
             json_output=True,
+            source_block=planner_block,
         )
         plan = plan_response.json()
         questions = [str(q) for q in plan.get("questions", [])][:3] or [self.task]

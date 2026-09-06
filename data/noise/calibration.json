@@ -1,0 +1,20 @@
+{
+  "model": "gemini-3.6-flash",
+  "excluded": {
+    "decision": [
+      "strategy",
+      "dependency"
+    ]
+  },
+  "floors": {
+    "decision": {
+      "library": 0.0,
+      "output_format": 0.0,
+      "strategy": 0.75,
+      "dependency": 0.125
+    }
+  },
+  "trials": {
+    "decision": 8
+  }
+}
