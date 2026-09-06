@@ -27,6 +27,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from src.common.content import ContentStore, content_path_for
+
 CHECKPOINT_SUFFIX = ".checkpoints.jsonl"
 
 
@@ -215,19 +217,77 @@ def memory_rollback_plan(
 
 
 def overhead(trace_path: str | Path) -> dict[str, Any]:
-    """Storage cost of tracing, split into what we always keep and what we
-    only keep at checkpoints. Reported as bytes and as a percentage."""
+    """Storage cost of tracing, split by what we keep and where.
+
+    Three files now, not two (D-027): the trace, the checkpoint payloads, and
+    the content store. The split is the point -- the trace grows with event
+    count, the content store grows with model verbosity, and checkpoints under
+    the v1 policy used to grow with the *square* of run length because each one
+    re-serialised every output before it (D-022 measured 56% of stored bytes).
+    """
     trace_path = Path(trace_path)
     sidecar = checkpoint_path_for(trace_path)
+    content_file = content_path_for(trace_path)
     trace_bytes = trace_path.stat().st_size if trace_path.exists() else 0
     checkpoint_bytes = sidecar.stat().st_size if sidecar.exists() else 0
-    total = trace_bytes + checkpoint_bytes
+    content_bytes = content_file.stat().st_size if content_file.exists() else 0
+    total = trace_bytes + checkpoint_bytes + content_bytes
     return {
         "trace_bytes": trace_bytes,
         "checkpoint_bytes": checkpoint_bytes,
+        "content_bytes": content_bytes,
         "total_bytes": total,
         "checkpoint_share": (checkpoint_bytes / total) if total else 0.0,
+        "content_share": (content_bytes / total) if total else 0.0,
         "checkpoints": len(CheckpointStore.load(sidecar)),
+    }
+
+
+def payload_comparison(trace_path: str | Path) -> dict[str, Any]:
+    """What checkpoints would cost if they still carried output text inline.
+
+    The measurement behind D-028. A checkpoint's `state` holds every output
+    produced so far, so under the v1 policy of one checkpoint per agent
+    boundary the *k*th checkpoint re-serialises all *k-1* previous outputs --
+    quadratic in run length, and D-022 measured the result at 56% of stored
+    bytes on an 18-event run. Storing content refs instead makes each output
+    appear once, in the content store, however many checkpoints mention it.
+
+    Returns both numbers so the ratio can be reported rather than asserted. On
+    a trace written before D-028 (`state["outputs"]` rather than
+    `state["output_refs"]`) `with_refs` and `with_text` come out equal, which
+    is the correct answer for that trace.
+    """
+    trace_path = Path(trace_path)
+    checkpoints = CheckpointStore.load(checkpoint_path_for(trace_path))
+    content_file = content_path_for(trace_path)
+    store = ContentStore.load(content_file) if content_file.exists() else None
+
+    with_refs = sum(c.bytes_stored for c in checkpoints)
+    with_text = 0
+    resolvable = True
+    for checkpoint in checkpoints:
+        state = dict(checkpoint.state)
+        refs = state.pop("output_refs", None)
+        if refs and store is not None:
+            try:
+                state["outputs"] = {eid: store.get(ref) for eid, ref in refs.items()}
+            except KeyError:
+                resolvable = False
+                state["output_refs"] = refs
+        elif refs:
+            resolvable = False
+            state["output_refs"] = refs
+        with_text += len(
+            json.dumps({"state": state, "memory": checkpoint.memory}).encode("utf-8")
+        )
+    return {
+        "checkpoints": len(checkpoints),
+        "with_refs_bytes": with_refs,
+        "with_text_bytes": with_text,
+        "ratio": (with_text / with_refs) if with_refs else 0.0,
+        "content_bytes": content_file.stat().st_size if content_file.exists() else 0,
+        "resolvable": resolvable,
     }
 
 
@@ -251,3 +311,13 @@ if __name__ == "__main__":
         print(f"  {c.id} after {c.event_id} ({c.agent_id}) {c.bytes_stored} bytes")
     print()
     print("storage overhead:", json.dumps(overhead(path), indent=2))
+    print()
+    comparison = payload_comparison(path)
+    print(f"checkpoint payloads, refs vs inline text (D-028):")
+    print(f"  with content refs  {comparison['with_refs_bytes']:>8} B")
+    print(f"  with text inline   {comparison['with_text_bytes']:>8} B"
+          f"   ({comparison['ratio']:.1f}x)")
+    print(f"  content store      {comparison['content_bytes']:>8} B"
+          f"   (one copy of each output, however many checkpoints name it)")
+    if not comparison["resolvable"]:
+        print("  (some refs did not resolve, so the inline figure is a floor)")

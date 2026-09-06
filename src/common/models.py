@@ -1,11 +1,20 @@
 """
 Shared data models for agent-recovery.
 
-A trace is made of three record types:
+A trace is made of three core record types:
 
     Source          an incoming unit of information ("S1", "S2", ...)
     Event           one recorded operation ("e0001", "e0002", ...)
     InfluenceEdge   a source demonstrably changed the output of an event
+
+and two additive ones, added after the week-1 freeze without touching the
+three above (the precedent D-024 relies on):
+
+    UsageRecord     tokens spent on one API call, tagged with what it was for
+    CheckRecord     a (source, event) pair was examined, and the verdict.
+                    Absence of a CheckRecord is what "unchecked" means, and
+                    telling that apart from "checked and clean" is what D-024
+                    exists to fix.
 
 Field names come from docs/02-architecture.md. Every subsystem (tracing,
 provenance, recovery, eval) depends on these, so they are frozen after
@@ -74,10 +83,24 @@ SOURCE_KINDS: frozenset[str] = frozenset(
 # How an influence edge was established (docs/02-architecture.md):
 # self_report is a claim, counterfactual is evidence, assumed is the
 # conservative fallback -- unknown provenance is treated as influenced.
-InfluenceMethod = Literal["self_report", "counterfactual", "assumed"]
+# `structural` was added later and is the strongest of the four: the event's
+# output was computed by our own code rather than by the model, so which
+# inputs reached it is read off the code path instead of estimated. It applies
+# to tool calls, tool responses and memory operations, and to nothing the
+# model wrote. Additive to the vocabulary, so traces written before it still
+# parse (D-027).
+InfluenceMethod = Literal["self_report", "counterfactual", "structural", "assumed"]
 INFLUENCE_METHODS: frozenset[str] = frozenset(
-    {"self_report", "counterfactual", "assumed"}
+    {"self_report", "counterfactual", "structural", "assumed"}
 )
+
+# The verdict a `check` record carries, and the third value the *lookup*
+# returns when there is no record at all. "unchecked" is never stored: it is
+# precisely the absence of a record, and storing it would create a second way
+# to spell the same thing (D-024, D-027).
+CheckVerdict = Literal["clean", "tainted", "unchecked"]
+CHECK_VERDICTS: frozenset[str] = frozenset({"clean", "tainted", "unchecked"})
+STORED_CHECK_VERDICTS: frozenset[str] = frozenset({"clean", "tainted"})
 
 # What an API call was spent on. The cost metric in docs/04 splits recovery
 # cost into analysis and replay, so every call has to declare which it is at
@@ -314,6 +337,114 @@ class InfluenceEdge:
 
 
 @dataclass
+class CheckRecord:
+    """A (source, event) pair was examined, and this is what came back.
+
+    The record D-024 asked for, and the reason the trace can finally tell
+    "we looked and it is fine" apart from "nobody ever looked".
+
+    Why this has to exist at all: a counterfactual check that finds **no**
+    influence records nothing. So an absent influence edge means one of two
+    opposite things, and the conservative fallback (docs/02: anything not
+    confidently established is treated as contaminated) has to assume the
+    worse one. Every cleared pair was therefore re-contaminated by the very
+    policy meant to protect us -- measured at seventeen points of the headline
+    metric on `data/runs/fake.jsonl`.
+
+    An edge is a positive claim and there is no edge to hang a negative on, so
+    the *examination* is what gets recorded. Examined plus an edge means
+    influenced; examined without an edge means cleared; no record at all means
+    unknown and the policy decides.
+
+    verdict     clean | tainted. Never "unchecked" -- that is the absence of a
+                record, not a value (see CheckVerdict).
+    method      how the examination was done. `counterfactual` is evidence,
+                `self_report` is a claim, `structural` is code-level fact,
+                `assumed` is the conservative fallback recording that we
+                declined to look and defaulted to contaminated.
+    confidence  0..1. Read by the estimator to decide whether a self-report
+                needs a counterfactual to back it up, and by the planner to
+                decide how much a `clean` verdict is worth.
+    signature_before / signature_after
+                the canonicalised decision signatures compared to reach a
+                counterfactual verdict. Kept because a verdict without the two
+                signatures behind it cannot be re-examined afterwards, and
+                D-026 requires the floor to be reported beside every influence
+                result under the comparator that produced it.
+    comparator  which signature function produced those two strings. A verdict
+                is only meaningful relative to one.
+    repeats     how many times the counterfactual was run. Non-determinism is
+                real (D-026), so one trial and three trials are different
+                strengths of evidence and the record says which it was.
+    """
+
+    source_id: str
+    target_event: str
+    verdict: CheckVerdict
+    method: InfluenceMethod
+    confidence: float = 1.0
+    signature_before: str | None = None
+    signature_after: str | None = None
+    comparator: str | None = None
+    repeats: int = 0
+    notes: str = ""
+    timestamp: float = field(default_factory=time.time)
+
+    def __post_init__(self) -> None:
+        if not self.source_id:
+            raise ValueError("CheckRecord.source_id must be non-empty")
+        if not self.target_event:
+            raise ValueError("CheckRecord.target_event must be non-empty")
+        if self.verdict not in STORED_CHECK_VERDICTS:
+            raise ValueError(
+                f"CheckRecord.verdict {self.verdict!r} not one of "
+                f"{sorted(STORED_CHECK_VERDICTS)}. 'unchecked' is the absence "
+                "of a record and must not be written as one."
+            )
+        if self.method not in INFLUENCE_METHODS:
+            raise ValueError(
+                f"CheckRecord.method {self.method!r} not one of "
+                f"{sorted(INFLUENCE_METHODS)}"
+            )
+        if not 0.0 <= float(self.confidence) <= 1.0:
+            raise ValueError(
+                f"CheckRecord.confidence must be in 0..1, got {self.confidence!r}"
+            )
+        if self.repeats < 0:
+            raise ValueError("CheckRecord.repeats must not be negative")
+
+    @property
+    def pair(self) -> tuple[str, str]:
+        return (self.source_id, self.target_event)
+
+    @property
+    def is_evidence(self) -> bool:
+        """Whether this verdict rests on something observed rather than
+        claimed. A `clean` verdict is only worth preserving work on if it does
+        -- that is the whole of docs/03 issue #1."""
+        return self.method in ("counterfactual", "structural")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "source_id": self.source_id,
+            "target_event": self.target_event,
+            "verdict": self.verdict,
+            "method": self.method,
+            "confidence": self.confidence,
+            "signature_before": self.signature_before,
+            "signature_after": self.signature_after,
+            "comparator": self.comparator,
+            "repeats": self.repeats,
+            "notes": self.notes,
+            "timestamp": self.timestamp,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "CheckRecord":
+        return cls(**_check_keys(cls, data))
+
+
+@dataclass
 class UsageRecord:
     """Tokens spent on one API call.
 
@@ -385,7 +516,9 @@ class UsageRecord:
 # --- JSON convenience --------------------------------------------------------
 
 
-def to_json(obj: Event | Source | InfluenceEdge, **kwargs: Any) -> str:
+def to_json(
+    obj: Event | Source | InfluenceEdge | CheckRecord | UsageRecord, **kwargs: Any
+) -> str:
     """Serialise one model to a JSON string."""
     return json.dumps(obj.to_dict(), **kwargs)
 

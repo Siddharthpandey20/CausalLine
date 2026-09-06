@@ -13,7 +13,13 @@ Trace file format: one JSON object per line, tagged by a "record" key.
     {"record": "source",    "id": "S1", ...}
     {"record": "event",     "id": "e0001", ...}
     {"record": "influence", "source_id": "S1", "target_event": "e0004", ...}
+    {"record": "check",     "source_id": "S1", "target_event": "e0004", ...}
     {"record": "usage",     "call_id": "c0001", "purpose": "pipeline", ...}
+
+The `check` record is the one that makes the trace able to say "we examined
+this pair and it came back clean", as opposed to "nobody looked" (D-024).
+Everything downstream -- the contamination walk, the recovery planner, the
+work-preserved metric -- reads it.
 
 Lines are written and flushed as they happen, so a run that crashes still
 leaves a readable trace up to the crash.
@@ -28,11 +34,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
 
+from src.common.content import ContentStore, content_path_for
 from src.common.models import (
     SCHEMA_VERSION,
+    CheckRecord,
+    CheckVerdict,
     Event,
     EventKind,
     InfluenceEdge,
+    InfluenceMethod,
     Source,
     SourceKind,
     UsagePurpose,
@@ -45,6 +55,7 @@ RECORD_CLASSES: dict[str, type] = {
     "event": Event,
     "source": Source,
     "influence": InfluenceEdge,
+    "check": CheckRecord,
     "usage": UsageRecord,
 }
 
@@ -85,9 +96,14 @@ class TraceLogger:
         self.events: list[Event] = []
         self.sources: list[Source] = []
         self.influence: list[InfluenceEdge] = []
+        self.checks: list[CheckRecord] = []
         self.usage: list[UsageRecord] = []
         # last event id per agent, for automatic parent links
         self._last_by_agent: dict[str, str] = {}
+        # Prompts and outputs, in the sidecar D-010 deferred until replay
+        # needed it. Opened alongside the trace so a caller cannot end up with
+        # a trace whose refs point at a file that was never created.
+        self.content = ContentStore(content_path_for(self.path), append=append)
 
         header = {
             "record": "meta",
@@ -211,6 +227,56 @@ class TraceLogger:
         self._write({"record": "influence", **edge.to_dict()})
         return edge
 
+    def log_check(
+        self,
+        source_id_: str,
+        target_event: str,
+        verdict: CheckVerdict,
+        method: InfluenceMethod,
+        confidence: float = 1.0,
+        signature_before: str | None = None,
+        signature_after: str | None = None,
+        comparator: str | None = None,
+        repeats: int = 0,
+        notes: str = "",
+    ) -> CheckRecord:
+        """Record that a (source, event) pair was examined (D-024).
+
+        Write one of these for **both** outcomes. The negative is the one that
+        matters and the one the old code could not express: an examined pair
+        with no influence edge is cleared, an unexamined pair is unknown, and
+        without this record those two are the same absence.
+
+        A `clean` verdict here is what lets the contamination walk stop. That
+        is also what makes it the dangerous direction of error, so `method` and
+        `confidence` are not decoration -- the planner is entitled to weigh a
+        counterfactual `clean` differently from a self-reported one.
+        """
+        record = CheckRecord(
+            source_id=source_id_,
+            target_event=target_event,
+            verdict=verdict,
+            method=method,
+            confidence=confidence,
+            signature_before=signature_before,
+            signature_after=signature_after,
+            comparator=comparator,
+            repeats=repeats,
+            notes=notes,
+        )
+        self.checks.append(record)
+        self._write({"record": "check", **record.to_dict()})
+        return record
+
+    # --- content ------------------------------------------------------------
+
+    def put_content(
+        self, text: str, kind: str = "output", meta: dict[str, Any] | None = None
+    ) -> str:
+        """Store event content and return the ref to put in inputs_ref /
+        output_ref. See src/common/content.py for why refs are hashes."""
+        return self.content.put(text, kind=kind, meta=meta)
+
     # --- helpers ----------------------------------------------------------
 
     def _resolve_parents(self, agent_id: str, parents: list[str] | None) -> list[str]:
@@ -232,6 +298,7 @@ class TraceLogger:
     def close(self) -> None:
         if not self._fh.closed:
             self._fh.close()
+        self.content.close()
 
     def __enter__(self) -> "TraceLogger":
         return self
@@ -248,17 +315,102 @@ class Trace:
     events: list[Event] = field(default_factory=list)
     sources: list[Source] = field(default_factory=list)
     influence: list[InfluenceEdge] = field(default_factory=list)
+    checks: list[CheckRecord] = field(default_factory=list)
     usage: list[UsageRecord] = field(default_factory=list)
+    # Populated by read_trace() when the content sidecar exists beside the
+    # trace. None means the refs in this trace cannot be resolved, which is a
+    # legitimate state (the graphs never need content) and one that replay has
+    # to refuse to guess around.
+    content: ContentStore | None = None
+    path: Path | None = None
 
     def __post_init__(self) -> None:
         self._events_by_id = {e.id: e for e in self.events}
         self._sources_by_id = {s.id: s for s in self.sources}
+        self._checks_by_pair = {c.pair: c for c in self.checks}
 
     def event(self, eid: str) -> Event:
         return self._events_by_id[eid]
 
     def source(self, sid: str) -> Source:
         return self._sources_by_id[sid]
+
+    def has_event(self, eid: str) -> bool:
+        return eid in self._events_by_id
+
+    # --- checked(event, source), the D-024 lookup --------------------------
+
+    def checked(self, event_id_: str, source_id_: str) -> CheckVerdict:
+        """clean | tainted | unchecked, for one (event, source) pair.
+
+        `unchecked` is returned for the absence of a record, which is the
+        distinction the trace could not previously make. Step 0 of the recovery
+        algorithm defaults `unchecked` into the taint set but keeps it
+        distinguishable from a confirmed `tainted`, because the two cost
+        different amounts to resolve.
+        """
+        record = self._checks_by_pair.get((source_id_, event_id_))
+        return record.verdict if record else "unchecked"
+
+    def check_record(self, event_id_: str, source_id_: str) -> CheckRecord | None:
+        return self._checks_by_pair.get((source_id_, event_id_))
+
+    def checked_pairs(self) -> set[tuple[str, str]]:
+        """Every (source, event) pair that was actually examined.
+
+        This is the honest version of `metrics.all_exposure_pairs()`, which
+        asserted that everything had been examined and could turn "no analysis
+        has run" into "nothing was influenced" (D-025 point 3). Here the set is
+        read off records that exist.
+        """
+        return set(self._checks_by_pair)
+
+    def unchecked_pairs(self) -> set[tuple[str, str]]:
+        """Exposures nobody examined. What the conservative fallback taints."""
+        return {
+            (sid, e.id)
+            for e in self.events
+            for sid in e.exposures
+            if (sid, e.id) not in self._checks_by_pair
+        }
+
+    def content_of(self, ref: str | None) -> str | None:
+        """Resolve a content ref, or None if there is nothing to resolve."""
+        if ref is None:
+            return None
+        if self.content is None:
+            raise ValueError(
+                f"trace has no content sidecar, so {ref} cannot be resolved. "
+                "Expected a .content.jsonl beside the trace file."
+            )
+        return self.content.get(ref)
+
+    def output_text(self, eid: str) -> str | None:
+        """What an event produced, or None for events with no output."""
+        return self.content_of(self.event(eid).output_ref)
+
+    def prompt_text(self, eid: str) -> str | None:
+        """The prompt that produced an event, or None if it was not an LLM call."""
+        return self._input_of_kind(eid, "prompt")
+
+    def system_text(self, eid: str) -> str | None:
+        return self._input_of_kind(eid, "system")
+
+    def source_block_text(self, eid: str) -> str | None:
+        """The rendered source list inside this event's prompt.
+
+        Stored separately from the prompt so that redacting one source never
+        requires inferring where the source list ends -- see the docstring of
+        src/common/prompts.py. Absent for events with no sources in context.
+        """
+        return self._input_of_kind(eid, "source_block")
+
+    def _input_of_kind(self, eid: str, kind: str) -> str | None:
+        for ref in self.event(eid).inputs_ref:
+            if self.content is not None and self.content.has(ref):
+                if self.content.record(ref).kind == kind:
+                    return self.content.get(ref)
+        return None
 
     def children(self, eid: str) -> list[Event]:
         """Events that list `eid` as a parent."""
@@ -377,14 +529,56 @@ class Trace:
                 )
             if edge.source_id not in self._sources_by_id:
                 raise ValueError(f"influence edge from unknown source {edge.source_id}")
+        if len(self._checks_by_pair) != len(self.checks):
+            # Two verdicts on one pair means one of them is stale, and which
+            # one wins would be decided by dict order. A pair is examined once
+            # per run; an escalated re-examination belongs to the new trace
+            # that replay appends, not to this one.
+            counts: dict[tuple[str, str], int] = {}
+            for c in self.checks:
+                counts[c.pair] = counts.get(c.pair, 0) + 1
+            duplicated = sorted(p for p, n in counts.items() if n > 1)
+            raise ValueError(f"trace has two check records for pair(s) {duplicated[:5]}")
+        for check in self.checks:
+            if check.target_event not in self._events_by_id:
+                raise ValueError(
+                    f"check record targets unknown event {check.target_event}"
+                )
+            if check.source_id not in self._sources_by_id:
+                raise ValueError(f"check record for unknown source {check.source_id}")
+            # A verdict about a pair that was never an exposure is either a
+            # typo or an analysis run against the wrong trace. Both produce
+            # confident-looking nonsense downstream.
+            if check.source_id not in self.event(check.target_event).exposures:
+                raise ValueError(
+                    f"check record says {check.source_id} was examined against "
+                    f"{check.target_event}, but that source was never in that "
+                    "event's context"
+                )
+        # An influence edge is a positive claim, so the pair it names must not
+        # also carry a `clean` verdict. Contradicting records would let the
+        # contamination walk and the metric disagree about the same pair.
+        for edge in self.influence:
+            record = self._checks_by_pair.get((edge.source_id, edge.target_event))
+            if record is not None and record.verdict == "clean":
+                raise ValueError(
+                    f"({edge.source_id}, {edge.target_event}) has an influence "
+                    f"edge and a 'clean' check record. One of them is wrong."
+                )
 
 
-def read_trace(path: str | Path) -> Trace:
-    """Read a JSONL trace file written by TraceLogger."""
+def read_trace(path: str | Path, content: bool = True) -> Trace:
+    """Read a JSONL trace file written by TraceLogger.
+
+    `content=True` attaches the content sidecar if one exists beside the trace,
+    so `trace.output_text(eid)` works. Set it False to read metadata only,
+    which is all the graphs need and is cheaper on a verbose run.
+    """
     meta: dict[str, Any] = {}
     events: list[Event] = []
     sources: list[Source] = []
     influence: list[InfluenceEdge] = []
+    checks: list[CheckRecord] = []
     usage: list[UsageRecord] = []
     for line_no, record in enumerate(_read_records(Path(path)), start=1):
         kind = record.get("record")
@@ -396,16 +590,28 @@ def read_trace(path: str | Path) -> Trace:
             sources.append(Source.from_dict(record))
         elif kind == "influence":
             influence.append(InfluenceEdge.from_dict(record))
+        elif kind == "check":
+            checks.append(CheckRecord.from_dict(record))
         elif kind == "usage":
             usage.append(UsageRecord.from_dict(record))
         else:
             raise ValueError(f"{path}:{line_no}: unknown record type {kind!r}")
+
+    store: ContentStore | None = None
+    if content:
+        sidecar = content_path_for(path)
+        if sidecar.exists():
+            store = ContentStore.load(sidecar)
+
     return Trace(
         meta=meta,
         events=events,
         sources=sources,
         influence=influence,
+        checks=checks,
         usage=usage,
+        content=store,
+        path=Path(path),
     )
 
 

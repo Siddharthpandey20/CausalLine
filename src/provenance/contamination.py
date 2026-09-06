@@ -38,6 +38,7 @@ from dataclasses import dataclass, field
 from typing import Iterable
 
 from src.common.models import sort_source_ids
+from src.provenance.checks import CheckLedger
 from src.tracing.logger import Trace
 
 
@@ -69,15 +70,29 @@ class ContaminatedRegion:
 
     `events` is the answer. Work is counted in events, never sources (D-012),
     so every metric in docs/04 starts from this set.
+
+    `precautionary` is the subset of `events` that is in there only because
+    nobody examined the pair, as opposed to because influence was established.
+    Both are contaminated and both get recovered, so the safety of the answer
+    does not depend on the split -- but the two cost different amounts to
+    *resolve*, and that is what Step 2 of the recovery algorithm chooses
+    between. A precautionary event can be cleared by spending one
+    counterfactual check; a confirmed one can only be recomputed.
     """
 
     seeds: frozenset[str]
     sources: frozenset[str]
     events: frozenset[str]
+    precautionary: frozenset[str] = frozenset()
     # id -> why it ended up in here. Kept because "these events are
     # contaminated" is not usable in a paper without "and this is why this
     # one" -- and because a wrong answer is unreadable without it.
     reasons: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def confirmed(self) -> frozenset[str]:
+        """Events an established influence edge put here."""
+        return frozenset(self.events - self.precautionary)
 
     def clean_events(self, trace: Trace) -> list[str]:
         """Everything the run did that survives. The work we preserve."""
@@ -88,6 +103,8 @@ class ContaminatedRegion:
             f"seeds     {sort_source_ids(list(self.seeds))}",
             f"sources   {sort_source_ids(list(self.sources))}",
             f"events    {sorted(self.events)}",
+            f"  of which {len(self.precautionary)} precautionary "
+            f"(unchecked, not established): {sorted(self.precautionary)}",
         ]
         for key in sort_source_ids(list(self.sources)) + sorted(self.events):
             if key in self.reasons:
@@ -100,21 +117,31 @@ def contaminate(
     malicious: Iterable[str],
     policy: Policy | None = None,
     checked: set[tuple[str, str]] | None = None,
+    ledger: CheckLedger | None = None,
 ) -> ContaminatedRegion:
     """Propagate contamination from the sources the detector flagged.
 
-    `checked` is the set of (source id, event id) pairs that provenance
-    analysis actually examined. It matters only when
-    `policy.assume_unchecked_exposures` is on: a pair nobody looked at is
-    assumed to be influence, a pair that was looked at is trusted.
+    `checked` is the set of (source id, event id) pairs that were examined and
+    cleared. It matters only when `policy.assume_unchecked_exposures` is on: a
+    pair nobody looked at is assumed to be influence, a cleared pair is not.
 
-    Passing None falls back to "a pair counts as checked if it has an
-    influence edge". That fallback is **wrong, in the safe direction, and
-    should not survive week 2**: a counterfactual check that finds no
-    influence records nothing at all, so a pair that was cleared looks
-    identical to a pair nobody examined, and both get assumed contaminated.
-    It costs work preserved and can never cause an unsafe preservation. See
-    D-024.
+    Where that set comes from, in order of preference:
+
+      1. `ledger`, a CheckLedger, which applies a clearance policy to the
+         trace's `check` records -- how much a `clean` verdict is worth is
+         itself a decision, and one docs/04 wants an ablation over.
+      2. `checked`, passed explicitly.
+      3. the trace's own `check` records under the default clearance policy.
+
+    What it no longer does is infer the checked set from the influence edges.
+    That was the D-024 defect: a counterfactual check that finds **no**
+    influence recorded nothing at all, so a pair that had been tested and
+    cleared looked identical to a pair nobody had examined, and both were
+    assumed contaminated. It cost 17 points of work preserved on
+    `data/runs/fake.jsonl` and could never cause an unsafe preservation, which
+    is why it survived unnoticed -- it made the method look worse than it is.
+    A trace with no `check` records now clears nothing, which is the correct
+    reading of "nothing was examined".
     """
     policy = policy or Policy()
 
@@ -131,8 +158,10 @@ def contaminate(
         if edge.confident or policy.unconfident_edges_contaminate:
             influenced_events.setdefault(edge.source_id, set()).add(edge.target_event)
 
-    if checked is None:
-        checked = {(e.source_id, e.target_event) for e in trace.influence}
+    if ledger is not None:
+        checked = ledger.cleared_pairs()
+    elif checked is None:
+        checked = CheckLedger.from_trace(trace).cleared_pairs()
 
     exposed_events: dict[str, set[str]] = {}
     for event in trace.events:
@@ -148,6 +177,7 @@ def contaminate(
     seeds = frozenset(malicious)
     bad_sources: set[str] = set()
     bad_events: set[str] = set()
+    precautionary: set[str] = set()
     reasons: dict[str, str] = {sid: "flagged by the detector" for sid in seeds}
 
     # Alternating walk: contaminated source -> the events it influenced ->
@@ -160,17 +190,31 @@ def contaminate(
         bad_sources.add(sid)
 
         targets: dict[str, str] = {}
+        assumed: set[str] = set()
         for eid in influenced_events.get(sid, ()):
             targets[eid] = f"influenced by {sid}"
         if policy.assume_unchecked_exposures:
             for eid in exposed_events.get(sid, ()):
                 if eid not in targets and (sid, eid) not in checked:
-                    targets[eid] = f"exposed to {sid}, influence never checked"
+                    verdict = trace.checked(eid, sid)
+                    targets[eid] = (
+                        f"exposed to {sid}, influence never checked"
+                        if verdict == "unchecked"
+                        else f"exposed to {sid}, checked {verdict} but not accepted"
+                    )
+                    assumed.add(eid)
 
         for eid, why in targets.items():
             if eid in bad_events:
+                # An event already reached by an established edge stays
+                # confirmed: arriving a second time via a precautionary route
+                # must not downgrade it.
+                if eid not in assumed:
+                    precautionary.discard(eid)
                 continue
             bad_events.add(eid)
+            if eid in assumed:
+                precautionary.add(eid)
             reasons[eid] = why
             for derived in wraps.get(eid, ()):
                 if derived not in bad_sources:
@@ -181,6 +225,7 @@ def contaminate(
         seeds=seeds,
         sources=frozenset(bad_sources),
         events=frozenset(bad_events),
+        precautionary=frozenset(precautionary),
         reasons=reasons,
     )
 

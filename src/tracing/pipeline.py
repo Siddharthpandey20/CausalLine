@@ -24,6 +24,26 @@ One design point worth knowing before reading the code: the Researcher makes
 preserved is counted per event (D-012), so replay cost has to be countable
 per event too. A single call producing four outputs would make "the cost of
 recomputing one finding" undefined, and that number is half of open issue #7.
+
+Three things this module does that it did not before, all of them prerequisites
+for recovery rather than improvements to the run:
+
+  * **content is stored.** Every prompt, system instruction, output, tool
+    argument and memory value goes into the content sidecar and the event
+    carries the ref (D-027). `inputs_ref` and `output_ref` were schema fields
+    pointing at nothing (D-010); selective replay is what needed them, so they
+    now resolve.
+  * **influence is established during the run.** Each event is handed to an
+    attributor (`src/provenance/attribution.py`), which writes the influence
+    edges and `check` records. Before this the live pipeline wrote no influence
+    edges at all, so every trace it produced showed exposure and nothing else
+    -- and every downstream number was the conservative fallback's, not the
+    method's.
+  * **events the model did not write are attributed exactly.** Tool calls, tool
+    responses and memory operations are computed by this code, so which inputs
+    reached them is read off the code path rather than estimated. That is
+    roughly half the events in a run, and leaving them unchecked hands all of
+    them to the conservative fallback.
 """
 
 import json
@@ -36,6 +56,14 @@ from src.common.cassette import Cassette, CassetteClient
 from src.common.config import Settings, load_settings
 from src.common.llm import GeminiClient, LLMError, LLMResponse, QuotaExhausted
 from src.common.models import Event
+from src.common.prompts import render_sources
+from src.provenance.attribution import (
+    AttributionRequest,
+    Attributor,
+    NullAttributor,
+    record_carrier,
+    record_structural,
+)
 from src.tracing.checkpoints import CheckpointStore, checkpoint_path_for, overhead
 from src.tracing.logger import TraceLogger, read_trace
 from src.tracing.tools import Tools
@@ -87,14 +115,23 @@ class GeminiPipeline:
         tools: Tools,
         task: str = DEFAULT_TASK,
         checkpoints: CheckpointStore | None = None,
+        attributor: Attributor | None = None,
     ) -> None:
         self.log = log
         self.client = client
         self.tools = tools
         self.task = task
         self.checkpoints = checkpoints
-        # event id -> text produced, so a checkpoint can carry the work done
-        # so far and replay can resume from it
+        # Establishes influence edges for model-written events. Defaults to
+        # NullAttributor, which is what the pipeline did before it had one:
+        # exposure recorded, influence never established. That default is the
+        # honest one -- an attributor costs one extra call per event, and a
+        # caller should have to ask for that.
+        self.attributor: Attributor = attributor or NullAttributor()
+        # event id -> content ref of what it produced. Refs rather than text:
+        # a checkpoint carries this dict, and carrying the text made checkpoints
+        # grow with the square of run length (D-022 measured 56% of stored
+        # bytes). See D-028.
         self._outputs: dict[str, str] = {}
         # source ids currently in each agent's context -> Event.exposures
         self.context: dict[str, list[str]] = {}
@@ -111,6 +148,20 @@ class GeminiPipeline:
             if sid not in seen:
                 seen.append(sid)
 
+    def _label(self, source_id: str) -> str:
+        """One-line description of a source, for the self-report catalogue."""
+        s = self._sources[source_id]
+        where = s.metadata.get("url") or s.metadata.get("key") or s.kind
+        return f"{s.kind}, {where}"
+
+    def _influenced_by(self, event_id: str) -> list[str]:
+        """Source ids with an influence edge into `event_id`, so far.
+
+        Read back off the log rather than kept in a parallel dict, so a carrier
+        event can only ever inherit an edge that was actually recorded.
+        """
+        return [e.source_id for e in self.log.influence if e.target_event == event_id]
+
     def _call(
         self,
         agent: str,
@@ -119,12 +170,44 @@ class GeminiPipeline:
         system: str | None = None,
         parents: list[str] | None = None,
         json_output: bool = False,
+        source_block: str | None = None,
     ) -> tuple[Event, LLMResponse]:
-        """One API call, one event, one usage record. Kept together so a call
-        can never be made without its tokens being logged."""
+        """One API call, one event, one usage record, one attribution.
+
+        Kept together so a call can never be made without its tokens being
+        logged, its prompt and output being stored, and its influence being
+        established. Each of those three was a separate omission that cost the
+        project something: untracked tokens make open issue #7 unanswerable, an
+        unstored prompt makes counterfactual replay impossible, and unrecorded
+        influence makes every result the conservative fallback's.
+
+        `source_block` is the rendered source list embedded in `prompt`. Stored
+        separately so that a counterfactual redaction operates on a known span
+        instead of inferring where the source list ends -- some of our prompts
+        put instructions after it, and a redaction that removes only part of a
+        source reports "no influence" for the wrong reason.
+        """
         response = self.client.generate(prompt, system=system, json_output=json_output)
+        prompt_ref = self.log.put_content(prompt, kind="prompt", meta={"agent": agent})
+        refs = [prompt_ref]
+        if source_block:
+            refs.append(
+                self.log.put_content(
+                    source_block, kind="source_block", meta={"agent": agent}
+                )
+            )
+        if system:
+            refs.append(self.log.put_content(system, kind="system", meta={"agent": agent}))
+        output_ref = self.log.put_content(
+            response.text, kind="output", meta={"agent": agent, "event_kind": kind}
+        )
         event = self.log.log_event(
-            agent, kind, parents=parents, exposures=self.context.get(agent, [])
+            agent,
+            kind,
+            parents=parents,
+            inputs_ref=refs,
+            exposures=self.context.get(agent, []),
+            output_ref=output_ref,
         )
         self.log.log_usage(
             "pipeline",
@@ -139,7 +222,21 @@ class GeminiPipeline:
             latency_s=response.latency_s,
             slept_s=response.slept_s,
         )
-        self._outputs[event.id] = response.text
+        self._outputs[event.id] = output_ref
+        self.attributor.attribute(
+            AttributionRequest(
+                event_id=event.id,
+                agent_id=agent,
+                kind=kind,
+                output=response.text,
+                exposures=list(event.exposures),
+                labels={sid: self._label(sid) for sid in event.exposures},
+                prompt=prompt,
+                source_block=source_block,
+                system=system,
+            ),
+            self.log,
+        )
         return event, response
 
     def _checkpoint(self, event_id: str, agent_id: str) -> None:
@@ -153,7 +250,10 @@ class GeminiPipeline:
             state={
                 "task": self.task,
                 "context": {a: list(ids) for a, ids in self.context.items()},
-                "outputs": dict(self._outputs),
+                # Content refs, not text (D-028). Restoring resolves them
+                # against the content sidecar, which holds one copy of each
+                # output however many checkpoints mention it.
+                "output_refs": dict(self._outputs),
             },
             memory=dict(self.tools.memory),
         )
@@ -161,16 +261,25 @@ class GeminiPipeline:
     def _source_block(self, ids: list[str]) -> str:
         """Render sources for a prompt, labelled with their trace ids.
 
-        The ids are visible to the agent on purpose: week 2 asks each agent
-        which inputs it used (self-report), and it can only answer in ids if
-        it saw them. Cheap now, necessary later.
+        The ids are visible to the agent on purpose: self-report asks each agent
+        which inputs it used, and it can only answer in ids if it saw them.
+
+        The format itself lives in `src/common/prompts.py`, because a
+        counterfactual check has to take one of these blocks back *out* of a
+        stored prompt and a redaction that quietly removes the wrong text
+        reports "no influence" -- an unsafe preservation caused by a formatting
+        mismatch, and indistinguishable from a real verdict.
         """
-        lines = []
-        for sid in ids:
-            s = self._sources[sid]
-            where = s.metadata.get("url") or s.metadata.get("key") or s.kind
-            lines.append(f"[{sid}] ({s.kind}, {where})\n{s.content}")
-        return "\n\n".join(lines)
+        return render_sources(
+            [
+                (sid, self._sources[sid].kind, self._label_where(sid), self._sources[sid].content)
+                for sid in ids
+            ]
+        )
+
+    def _label_where(self, source_id: str) -> str:
+        s = self._sources[source_id]
+        return str(s.metadata.get("url") or s.metadata.get("key") or s.kind)
 
     # --- the run ------------------------------------------------------------
 
@@ -180,7 +289,12 @@ class GeminiPipeline:
             return source
 
         # --- user ----------------------------------------------------------
-        user_event = self.log.log_event("user", "message", parents=[])
+        user_event = self.log.log_event(
+            "user",
+            "message",
+            parents=[],
+            output_ref=self.log.put_content(self.task, kind="output", meta={"agent": "user"}),
+        )
         task_source = remember(
             self.log.log_source("user_input", self.task, origin_event=user_event.id)
         )
@@ -204,7 +318,23 @@ class GeminiPipeline:
         questions = [str(q) for q in plan.get("questions", [])][:3] or [self.task]
         brief = str(plan.get("brief", "")).strip() or self.task
 
-        handoff = self.log.log_event("planner", "message", parents=[plan_event.id])
+        handoff = self.log.log_event(
+            "planner",
+            "message",
+            parents=[plan_event.id],
+            exposures=self.context.get("planner", []),
+            output_ref=self.log.put_content(brief, kind="output", meta={"agent": "planner"}),
+        )
+        # The hand-off is a carrier: its text is a slice of the plan event's
+        # output, so it inherits that event's influence set rather than being
+        # attributed on its own.
+        record_carrier(
+            self.log,
+            handoff.id,
+            list(handoff.exposures),
+            self._influenced_by(plan_event.id),
+            plan_event.id,
+        )
         brief_source = remember(
             self.log.log_source(
                 "agent_message",
@@ -217,11 +347,50 @@ class GeminiPipeline:
         self._checkpoint(handoff.id, "planner")
 
         # --- researcher: tools -------------------------------------------------
-        self.log.log_event(
-            "researcher", "tool_call", parents=[handoff.id], tool_id="web"
+        web_query = " ".join(questions)
+        web_call = self.log.log_event(
+            "researcher",
+            "tool_call",
+            parents=[handoff.id],
+            tool_id="web",
+            exposures=self.context.get("researcher", []),
+            inputs_ref=[
+                self.log.put_content(
+                    json.dumps({"tool": "web", "query": web_query}, sort_keys=True),
+                    kind="tool_args",
+                    meta={"tool": "web"},
+                )
+            ],
         )
-        web_response = self.log.log_event("researcher", "tool_response", tool_id="web")
-        for page in self.tools.web_search(" ".join(questions)):
+        # The query is built from the Planner's questions, i.e. from the plan
+        # event's output, so this call carries that event's influence too.
+        record_carrier(
+            self.log,
+            web_call.id,
+            list(web_call.exposures),
+            self._influenced_by(plan_event.id),
+            plan_event.id,
+        )
+        pages = self.tools.web_search(web_query)
+        web_response = self.log.log_event(
+            "researcher",
+            "tool_response",
+            tool_id="web",
+            exposures=self.context.get("researcher", []),
+            output_ref=self.log.put_content(
+                json.dumps([p.to_dict() for p in pages], sort_keys=True),
+                kind="output",
+                meta={"tool": "web"},
+            ),
+        )
+        record_carrier(
+            self.log,
+            web_response.id,
+            list(web_response.exposures),
+            self._influenced_by(web_call.id),
+            web_call.id,
+        )
+        for page in pages:
             source = remember(
                 self.log.log_source(
                     "web",
@@ -232,13 +401,52 @@ class GeminiPipeline:
             )
             self.expose("researcher", source.id)
 
-        self.log.log_event("researcher", "tool_call", tool_id="db")
-        db_response = self.log.log_event("researcher", "tool_response", tool_id="db")
-        for key in ("environment/installed_packages", "task/date_samples", "task/day_first"):
+        db_keys = ("environment/installed_packages", "task/date_samples", "task/day_first")
+        db_call = self.log.log_event(
+            "researcher",
+            "tool_call",
+            tool_id="db",
+            exposures=self.context.get("researcher", []),
+            inputs_ref=[
+                self.log.put_content(
+                    json.dumps({"tool": "db", "keys": list(db_keys)}, sort_keys=True),
+                    kind="tool_args",
+                    meta={"tool": "db"},
+                )
+            ],
+        )
+        # The keys are literals in this code. Nothing in the agent's context
+        # reached them, and that is a fact about the code rather than an
+        # estimate -- which makes these the cheapest clean records in a trace.
+        record_structural(
+            self.log,
+            db_call.id,
+            list(db_call.exposures),
+            used=[],
+            why="database keys are literals in the pipeline, not derived from any source",
+        )
+        db_values = {key: self.tools.db_lookup(key) for key in db_keys}
+        db_response = self.log.log_event(
+            "researcher",
+            "tool_response",
+            tool_id="db",
+            exposures=self.context.get("researcher", []),
+            output_ref=self.log.put_content(
+                json.dumps(db_values, sort_keys=True), kind="output", meta={"tool": "db"}
+            ),
+        )
+        record_structural(
+            self.log,
+            db_response.id,
+            list(db_response.exposures),
+            used=[],
+            why="fixture lookup determined by literal keys",
+        )
+        for key in db_keys:
             source = remember(
                 self.log.log_source(
                     "database",
-                    json.dumps(self.tools.db_lookup(key)),
+                    json.dumps(db_values[key]),
                     origin_event=db_response.id,
                     metadata={"key": key},
                 )
@@ -249,19 +457,40 @@ class GeminiPipeline:
         findings: list[tuple[Event, str]] = []
         exposed = self.context["researcher"]
         for question in questions:
+            block = self._source_block(exposed)
             event, response = self._call(
                 "researcher",
                 "agent_output",
-                prompt=(
-                    f"Question: {question}\n\nSources:\n{self._source_block(exposed)}"
-                ),
+                prompt=f"Question: {question}\n\nSources:\n{block}",
                 system=RESEARCHER_SYSTEM,
                 parents=[db_response.id],
+                source_block=block,
             )
             findings.append((event, response.text.strip()))
 
         to_coder = self.log.log_event(
-            "researcher", "message", parents=[e.id for e, _ in findings]
+            "researcher",
+            "message",
+            parents=[e.id for e, _ in findings],
+            exposures=self.context.get("researcher", []),
+            output_ref=self.log.put_content(
+                json.dumps([text for _, text in findings], sort_keys=True),
+                kind="output",
+                meta={"agent": "researcher"},
+            ),
+        )
+        # Carries all the findings at once, so it inherits the union of their
+        # influence sets. A source that influenced none of the findings did not
+        # influence the message that hands them on.
+        inherited: list[str] = []
+        for event, _ in findings:
+            inherited.extend(self._influenced_by(event.id))
+        record_carrier(
+            self.log,
+            to_coder.id,
+            list(to_coder.exposures),
+            inherited,
+            ", ".join(e.id for e, _ in findings),
         )
         for event, text in findings:
             source = remember(
@@ -277,11 +506,41 @@ class GeminiPipeline:
         # --- coder ----------------------------------------------------------------
         self._checkpoint(to_coder.id, "researcher")
 
-        memory_event = self.log.log_event("coder", "memory_read", parents=[to_coder.id])
-        for key in ("style/preferences", "style/output"):
-            value = self.tools.memory_read(key)
-            if value is None:
-                continue
+        memory_keys = ("style/preferences", "style/output")
+        read_values = {
+            key: self.tools.memory_read(key)
+            for key in memory_keys
+            if self.tools.memory_read(key) is not None
+        }
+        memory_event = self.log.log_event(
+            "coder",
+            "memory_read",
+            parents=[to_coder.id],
+            exposures=self.context.get("coder", []),
+            inputs_ref=[
+                self.log.put_content(
+                    json.dumps({"keys": list(memory_keys)}, sort_keys=True),
+                    kind="tool_args",
+                    meta={"tool": "memory"},
+                )
+            ],
+            # The key/value pairs live with the event that read them, so
+            # verification can tell whether a live memory entry still points at
+            # something an invalidated event wrote.
+            output_ref=self.log.put_content(
+                json.dumps(read_values, sort_keys=True),
+                kind="memory",
+                meta={"tool": "memory", "keys": list(read_values)},
+            ),
+        )
+        record_structural(
+            self.log,
+            memory_event.id,
+            list(memory_event.exposures),
+            used=[],
+            why="memory keys are literals in the pipeline; the read consults no source",
+        )
+        for key, value in read_values.items():
             source = remember(
                 self.log.log_source(
                     "memory",
@@ -294,18 +553,20 @@ class GeminiPipeline:
 
         samples = self.tools.db_lookup("task/date_samples") or []
         coder_sources = self.context["coder"]
+        coder_block = self._source_block(coder_sources)
 
         decision_event, decision_response = self._call(
             "coder",
             "decision",
             prompt=(
                 f"Task:\n{self.task}\n\nDate samples: {json.dumps(samples)}\n\n"
-                f"Inputs:\n{self._source_block(coder_sources)}\n\n"
+                f"Inputs:\n{coder_block}\n\n"
                 "Decide the approach in at most three sentences. State which "
                 "library you will use and why."
             ),
             system=CODER_SYSTEM,
             parents=[memory_event.id],
+            source_block=coder_block,
         )
 
         code_event, code_response = self._call(
@@ -314,34 +575,91 @@ class GeminiPipeline:
             prompt=(
                 f"Task:\n{self.task}\n\nDate samples: {json.dumps(samples)}\n\n"
                 f"Approach you chose:\n{decision_response.text.strip()}\n\n"
-                f"Inputs:\n{self._source_block(coder_sources)}\n\n"
+                f"Inputs:\n{coder_block}\n\n"
                 "Reply with the complete Python script and nothing else. No "
                 "markdown fences, no commentary. The script must hardcode the "
                 "samples and print one ISO date per line."
             ),
             system=CODER_SYSTEM,
             parents=[decision_event.id],
+            source_block=coder_block,
         )
         code = _strip_fences(code_response.text)
 
-        write_event = self.log.log_event("coder", "memory_write", parents=[code_event.id])
-        self.tools.memory_write("last_run/approach", decision_response.text.strip())
+        approach = decision_response.text.strip()
+        write_event = self.log.log_event(
+            "coder",
+            "memory_write",
+            parents=[code_event.id],
+            exposures=self.context.get("coder", []),
+            output_ref=self.log.put_content(
+                json.dumps({"key": "last_run/approach", "value": approach}, sort_keys=True),
+                kind="memory",
+                meta={"tool": "memory", "key": "last_run/approach"},
+            ),
+        )
+        self.tools.memory_write("last_run/approach", approach)
+        # The written value is the decision event's output verbatim, so the
+        # write inherits that event's influence. This is the edge that makes
+        # rolling back a poisoned memory entry possible: without it, a memory
+        # write looks like an operation that consulted nothing.
+        record_carrier(
+            self.log,
+            write_event.id,
+            list(write_event.exposures),
+            self._influenced_by(decision_event.id),
+            decision_event.id,
+        )
         self._checkpoint(write_event.id, "coder")
 
         # --- executor ---------------------------------------------------------------
-        self.log.log_event(
-            "executor", "tool_call", parents=[code_event.id], tool_id="python"
+        exec_call = self.log.log_event(
+            "executor",
+            "tool_call",
+            parents=[code_event.id],
+            tool_id="python",
+            exposures=self.context.get("executor", []),
+            inputs_ref=[
+                self.log.put_content(code, kind="tool_args", meta={"tool": "python"})
+            ],
         )
         result = self.tools.run_python(code)
         exec_response = self.log.log_event(
-            "executor", "tool_response", tool_id="python"
+            "executor",
+            "tool_response",
+            tool_id="python",
+            exposures=self.context.get("executor", []),
+            output_ref=self.log.put_content(
+                json.dumps(result, sort_keys=True), kind="output", meta={"tool": "python"}
+            ),
         )
 
         # Checkable outcome: compare against known-correct values, no LLM judge.
         expected = [str(v) for v in (self.tools.db_lookup("task/expected_iso") or [])]
         produced = [ln.strip() for ln in result["stdout"].splitlines() if ln.strip()]
         success = bool(expected) and produced == expected
-        final = self.log.log_event("executor", "agent_output", parents=[exec_response.id])
+        final = self.log.log_event(
+            "executor",
+            "agent_output",
+            parents=[exec_response.id],
+            exposures=self.context.get("executor", []),
+            output_ref=self.log.put_content(
+                json.dumps(
+                    {"expected": expected, "produced": produced, "success": success},
+                    sort_keys=True,
+                ),
+                kind="output",
+                meta={"agent": "executor"},
+            ),
+        )
+        for event in (exec_call, exec_response, final):
+            record_structural(
+                self.log,
+                event.id,
+                list(event.exposures),
+                used=[],
+                why="executor runs the generated script; it consults no source directly",
+            )
         self._checkpoint(final.id, "executor")
 
         return PipelineResult(
@@ -378,6 +696,7 @@ def run_pipeline(
     cassette_mode: str = "replay",
     tools: Tools | None = None,
     client: Any = None,
+    attributor: Attributor | None = None,
 ) -> PipelineResult:
     """Run the pipeline and write a trace, its checkpoints, and its memory.
 
@@ -392,6 +711,13 @@ def run_pipeline(
 
     `client` overrides the LLM client entirely, for offline tests that drive
     the whole pipeline without an API key or a cassette.
+
+    `attributor` decides how influence edges get established during the run.
+    None means none are: the trace shows exposure only, and everything
+    downstream falls back to treating exposure as influence. That is the
+    default because attribution costs an extra call per event and a caller
+    should have to ask for it -- but a run without one cannot demonstrate the
+    exposure/influence gap, which is the paper's claim.
     """
     if cassette_path and cassette_mode == "replay":
         settings = _settings_or_offline(settings)
@@ -406,7 +732,15 @@ def run_pipeline(
         # so a poisoned run's memory writes do not leak into the next run.
         tools.memory_path = Path(path).with_suffix(".memory.json")
 
-    meta: dict[str, Any] = {"pipeline": "gemini", "task": task, **settings.fingerprint()}
+    meta: dict[str, Any] = {
+        "pipeline": "gemini",
+        "task": task,
+        # In the header so a trace can be read for what analysis it carries
+        # without scanning it for records. "none" is a meaningful value, not a
+        # missing one, and it is the value every trace written before now had.
+        "attributor": getattr(attributor, "name", "none"),
+        **settings.fingerprint(),
+    }
     if client is not None:
         # Marked in the header for the same reason a cassette is (D-019): a
         # run whose responses did not come from the model must never be
@@ -424,7 +758,12 @@ def run_pipeline(
     with TraceLogger(path, meta=meta) as log:
         with CheckpointStore(checkpoint_path_for(path)) as store:
             return GeminiPipeline(
-                log, client, tools, task=task, checkpoints=store
+                log,
+                client,
+                tools,
+                task=task,
+                checkpoints=store,
+                attributor=attributor,
             ).run()
 
 

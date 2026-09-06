@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from src.eval.attacks import Attack, build, label_malicious
-from src.eval.metrics import all_exposure_pairs, compare, table
+from src.eval.metrics import compare, table
 from src.tracing.logger import read_trace
 from src.tracing.pipeline import run_pipeline
 from src.tracing.tools import Tools
@@ -45,7 +45,7 @@ def run_attack(
     attack: Attack,
     path: str | Path,
     client: Any = None,
-    assume_all_checked: bool = False,
+    attributor: Any = None,
 ) -> AttackRun:
     """One poisoned run, labelled and scored.
 
@@ -54,20 +54,24 @@ def run_attack(
     counting it would put a scenario in the results table that never
     happened.
 
-    `assume_all_checked` defaults to **False** and you should think hard
-    before turning it on. It asserts that influence analysis examined every
-    exposure, so an exposure with no influence edge was tested and cleared.
-    On a trace where analysis has not run, every exposure has no edge, and
-    that assertion turns "nothing has been analysed" into "nothing was
-    influenced" -- 100% work preserved on a run that really was poisoned.
-    That is a perfect unsafe preservation, manufactured by an assumption
-    rather than by a mistaken measurement, and it is the exact error the
-    whole project exists to avoid. It is only true of the authored fixtures,
-    where the edges were written by hand alongside the trace.
+    `attributor` is what establishes influence during the run. With None, the
+    trace records exposure only and every method below collapses to the
+    conservative fallback -- which is a legitimate control condition (D-025)
+    but is not a measurement of the method.
+
+    The `assume_all_checked` flag that used to be here is gone. It asserted
+    that influence analysis had examined every exposure, and on a trace where
+    no analysis had run it turned "nothing was examined" into "nothing was
+    influenced": 100% work preserved on a genuinely poisoned run, a perfect
+    unsafe preservation invented out of an assumption (D-025 point 3). The
+    `check` record replaces it -- examination is now recorded rather than
+    assumed, so there is nothing left to assume.
     """
     path = Path(path)
     clean = Tools.from_fixtures(memory_path=path.with_suffix(".memory.json"))
-    result = run_pipeline(path, tools=attack.apply(clean), client=client)
+    result = run_pipeline(
+        path, tools=attack.apply(clean), client=client, attributor=attributor
+    )
 
     # The only honest check that the attack landed is the finished trace. A
     # pre-flight query is a guess -- the real one is built from the Planner's
@@ -82,18 +86,9 @@ def run_attack(
 
     trace = read_trace(path)
     trace.validate()
-    if not trace.influence and assume_all_checked:
-        raise RuntimeError(
-            f"{path} has no influence edges, so no analysis has run on it. "
-            "assume_all_checked would read that as 'every exposure was "
-            "tested and came back clean' and report the run as fully "
-            "preserved -- an unsafe preservation invented out of an "
-            "assumption. Run influence analysis first, or leave the flag off."
-        )
-    checked = all_exposure_pairs(trace) if assume_all_checked else None
     # The detector stand-in is handed exactly the planted ids -- the perfect
     # detector docs/01-scope.md assumes and does not build.
-    scores = compare(trace, malicious=planted, checked=checked)
+    scores = compare(trace, malicious=planted)
     return AttackRun(
         attack=attack,
         trace_path=path,

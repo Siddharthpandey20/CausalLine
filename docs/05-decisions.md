@@ -696,3 +696,167 @@ Caveat, stated because it limits the claim: 8 trials, not 20 -- the daily
 quota ran out. A 0% decision-level floor on 8 trials is still consistent with
 a true rate near 30%. The 100% text-level floor needs no such caveat; it is
 8 out of 8 and it is not going to improve with more samples.
+
+---
+
+## D-027  The `check` record lands, and `structural` joins the method vocabulary
+Date: 06-09-2026
+Decided by: proposed with the recovery work, needs group sign-off --
+this adds to the shared trace format (D-006, D-008)
+Choice: two additive schema changes, both of them what D-024 asked for.
+
+**1. `CheckRecord`, written for both outcomes.** The record D-024 specified,
+with three fields beyond its sketch: `verdict` (`clean` | `tainted`),
+`confidence`, and the two `signature_before` / `signature_after` strings plus
+the `comparator` that produced them. `unchecked` is deliberately *not* a
+storable verdict -- it is the absence of a record, and giving it a second
+spelling would create two ways to say the same thing. `Trace.checked(event,
+source)` is the lookup and returns all three values.
+
+`contaminate()` no longer infers the checked set from the influence edges.
+That inference was the defect: a check finding no influence recorded nothing,
+so a cleared pair and an unexamined pair were the same absence. A trace with
+no `check` records now clears nothing, which is the correct reading of
+"nothing was examined" -- and `metrics.all_exposure_pairs()` is deleted with
+it, along with the `--assume-all-checked` flag, because there is no longer
+anything to assume. That flag was the D-025 point 3 footgun; on a trace with
+no analysis it reported a poisoned run as 100% preserved.
+
+**2. `structural` is a fourth influence method**, and it is the strongest of
+the four. Roughly half the events in a run -- tool calls, tool responses,
+memory reads and writes -- are computed by our own code, so which inputs
+reached them is read off the code path rather than estimated. Two sub-cases,
+and getting the second wrong would have been unsafe:
+
+  * *computed from literals.* The database keys and memory keys are constants
+    in `pipeline.py`. Nothing in the agent's context reached them, so every
+    exposure on those events is genuinely `clean`, free, and certain.
+  * *carriers.* A hand-off message, or a tool call whose query was lifted out
+    of an earlier output, produces no new content: its text is a function of
+    one upstream event's output. The tempting reading is "it consulted no
+    source, so it is clean", and that is wrong in the dangerous direction --
+    it would mark a message that is a verbatim copy of contaminated output as
+    clean. A carrier inherits the influence set of the event it copies
+    (`record_carrier`). The copy relation is real influence; only the *reading
+    of fresh sources* is absent.
+
+Measured, on the stub-driven scenario A run: check coverage goes from 0 pairs
+to 29 of 64 with structural attribution alone, and work preserved under our
+method goes 44% -> 72%. The remaining 35 pairs are the model-written events,
+which is what Phase 2's estimator is for.
+Reason for doing it as records rather than as fields on `InfluenceEdge`: an
+edge is a positive claim and there is no edge to hang a negative on. D-024
+argued this; nothing found since disagrees.
+Consequence: `Trace.validate()` now rejects a `clean` check sitting beside an
+influence edge for the same pair, two verdicts on one pair, and a check
+naming a pair that was never an exposure. All three are ways for an analysis
+run against the wrong trace to produce confident-looking nonsense.
+
+---
+
+## D-028  The content store, and checkpoints that carry refs instead of text
+Date: 06-09-2026
+Decided by: proposed with the recovery work, needs group sign-off
+Choice: build the content store D-010 deferred. A run is now a directory of
+three files, not two (extending D-018):
+
+```
+data/runs/run1.jsonl              events, sources, influence, checks, usage
+data/runs/run1.checkpoints.jsonl  agent state and memory snapshots
+data/runs/run1.content.jsonl      prompts, source blocks, outputs, tool state
+```
+
+D-010 was right to wait and is now spent: it said no store until selective
+replay needed event content, and replay needs three things the trace did not
+keep -- the prompt that produced an event (to re-issue it with one source
+redacted), the output an event produced (to splice a preserved event back in
+without re-invoking the model), and tool/memory state (to detect a live object
+still pointing at something invalidated).
+
+**Refs are content-addressed**, `ref = "c" + sha256(text)[:16]`, and that is
+load-bearing rather than tidy. Two consequences we rely on:
+
+  * D-016 re-sends every source once per question, so identical text is stored
+    many times over. Content addressing makes that one record.
+  * "did this preserved event's output change" becomes a 16-character
+    comparison. Phase 5 asserts that every spliced event's output matches its
+    original log entry byte for byte, and with content addressing that
+    assertion is a ref equality rather than a string diff.
+
+**Checkpoints now store `{event_id -> content ref}`, not `{event_id -> text}`.**
+D-022 measured checkpoints at 56% of stored bytes and named the cause: a
+checkpoint carries every output produced so far, so under the v1 policy the
+*k*th checkpoint re-serialises all *k-1* previous outputs, and payloads grow
+with the square of run length while the trace grows linearly. Refs make each
+output appear once, in the content store, however many checkpoints name it.
+
+Measured twice, on two 18-event runs, because the ratio is made of output
+length and the two runs differ in exactly that:
+
+```
+                          stub run        cassette run (real model text)
+checkpoints with refs        2,814 B                  5,278 B
+checkpoints inline           5,072 B (1.8x)          15,520 B (2.9x)
+content store               16,825 B                 29,132 B
+checkpoint share                 8%                     10%   was 56% (D-022)
+```
+
+The stub figure is a floor and D-022 already said why: canned stub text is a
+fraction of the length of what the model actually writes. 2.9x is the number to
+quote, and it will grow further with run length, because the term being removed
+is quadratic in event count and linear in output size.
+
+On quoting a number from a cassette replay, since D-019 forbids exactly that:
+this one is admissible and it is worth being precise about why. D-019's rule
+protects against a number that describes *a request that never happened*.
+Nothing here describes a request. These are byte counts of files written now,
+holding text the model genuinely produced, and the arithmetic does not depend
+on when the request was made. The tokens and latency in that same trace are
+replayed values and remain unquotable. The distinction is per-number, not
+per-run.
+Consequence for open issue #8: the overhead split is three-way, and content is
+50% of stored bytes on the cassette run. That is the honest place for it -- it
+is real model output that replay genuinely needs, not tracing overhead we could
+drop. The thing we *can* claim to have dropped is the quadratic term.
+
+---
+
+## D-029  One prompt format, and surgery takes the block rather than the prompt
+Date: 06-09-2026
+Decided by: forced by a near-miss while building the counterfactual stage
+Choice: the rendered-source format moves out of `GeminiPipeline._source_block`
+into `src/common/prompts.py`, and the redact/replace functions take **both**
+the prompt and the rendered source block, never the prompt alone.
+
+Reason, and this one is worth reading before touching that module. Three
+things have to agree on the format: the pipeline renders sources into a
+prompt, a counterfactual re-issues that prompt with one source removed, and
+selective replay re-issues it with one source's content *replaced* by a
+recomputed value. While the pipeline owned the format privately this was fine,
+because nothing read a prompt back.
+
+The first version of the redactor took a prompt and found the source's span by
+scanning for the next header, treating the last source as running to the next
+blank line. That is wrong on two of our own prompts. The Coder's prompts put
+instructions *after* the source list ("Decide the approach in at most three
+sentences"), and a Researcher finding can contain a blank line -- so the last
+source either swallowed the trailing instruction or was truncated at its own
+paragraph break. A truncated redaction is the bad one: it removes part of a
+source, leaves the rest in the prompt, and reports that the source was
+removed. The counterfactual then runs, the answer comes back unchanged for the
+obvious reason, and the verdict is recorded as *evidence of non-influence*.
+That is an unsafe preservation manufactured by a parser, and it is
+indistinguishable in the trace from a real result.
+
+So no boundary is ever inferred. The pipeline stores the rendered block in the
+content store next to the prompt, surgery happens inside the block where
+boundaries are unambiguous, and the result is spliced back by exact substring
+replacement that refuses to proceed if the block does not appear in the prompt
+exactly once. `render_sources()` also parses its own output before returning
+it, so a source whose content contains something that looks like a block
+header fails while the prompt is being built rather than during a replay days
+later.
+Note: the format itself is byte-identical to what the pipeline emitted before,
+so `data/cassettes/run1.jsonl` still replays. That was checked, not assumed --
+a format change here would have silently invalidated the only real model
+output we have.

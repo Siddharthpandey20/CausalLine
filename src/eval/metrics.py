@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from typing import Iterable
 
 from src.eval.baselines import METHODS
+from src.provenance.checks import CheckLedger
 from src.provenance.contamination import contaminate
 from src.tracing.logger import Trace
 
@@ -37,19 +38,6 @@ from src.tracing.logger import Trace
 def malicious_sources(trace: Trace) -> set[str]:
     """Ground truth: the sources attack injection planted. Eval only."""
     return {s.id for s in trace.sources if s.malicious}
-
-
-def all_exposure_pairs(trace: Trace) -> set[tuple[str, str]]:
-    """Every (source, event) pair where the source was in context.
-
-    Stopgap for D-024, and only valid on a trace where influence analysis
-    examined every exposure -- which is true of the authored fixtures and of
-    nothing else. It says "absence of an influence edge means checked and
-    cleared", which is the assumption the trace cannot yet record for itself.
-
-    Delete this the day the `check` record lands.
-    """
-    return {(sid, e.id) for e in trace.events for sid in e.exposures}
 
 
 def ground_truth_events(
@@ -65,7 +53,10 @@ def ground_truth_events(
     influence, which inflates ground truth as well. Both sides inflate
     together, so the unsafe count still comes out right, but "truly hit N
     events" is then a number that is too big -- and that one goes in the
-    paper.
+    paper. Passing None now reads the trace's own `check` records, which is
+    what the record was added for; `all_exposure_pairs()` -- which asserted
+    that every exposure had been examined and could turn "no analysis ran"
+    into "nothing was influenced" (D-025 point 3) -- is gone with it.
     """
     seeds = malicious_sources(trace)
     if not seeds:
@@ -185,28 +176,26 @@ if __name__ == "__main__":
     from src.tracing.logger import read_trace
 
     args = sys.argv[1:]
-    # Stopgap until the D-024 `check` record exists. On the authored fixtures
-    # every exposure really was examined, so this is true there and nowhere
-    # else -- which is why it is a flag and not the default.
-    assume_checked = "--assume-all-checked" in args
     positional = [a for a in args if not a.startswith("--")]
     path = positional[0] if positional else "data/runs/fake.jsonl"
 
     trace = read_trace(path)
     trace.validate()
-    checked = all_exposure_pairs(trace) if assume_checked else None
 
     truth_seeds = malicious_sources(trace)
-    truth = ground_truth_events(trace, checked=checked)
+    truth = ground_truth_events(trace)
+    ledger = CheckLedger.from_trace(trace)
 
     print(f"trace          {path}  ({len(trace.events)} events)")
     print(f"planted        {sorted(truth_seeds)}")
     print(f"truly hit      {sorted(truth)}  ({len(truth)} events)")
-    if not assume_checked:
-        print("               (inflated by D-024 -- rerun with "
-              "--assume-all-checked)")
+    print(f"coverage       {ledger.coverage(trace).summary()}")
+    if not trace.checks:
+        print("               no `check` records: every exposure is unexamined,")
+        print("               so every method below is really the conservative")
+        print("               fallback wearing a different name")
     print()
-    scores = compare(trace, checked=checked)
+    scores = compare(trace)
     print(table(scores))
     print()
 
