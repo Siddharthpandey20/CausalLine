@@ -70,7 +70,11 @@ def run_attack(
     path = Path(path)
     clean = Tools.from_fixtures(memory_path=path.with_suffix(".memory.json"))
     result = run_pipeline(
-        path, tools=attack.apply(clean), client=client, attributor=attributor
+        path,
+        tools=attack.apply(clean),
+        client=client,
+        attributor=attributor,
+        handoff_hook=attack.handoff_hook,
     )
 
     # The only honest check that the attack landed is the finished trace. A
@@ -86,9 +90,11 @@ def run_attack(
 
     trace = read_trace(path)
     trace.validate()
-    # The detector stand-in is handed exactly the planted ids -- the perfect
-    # detector docs/01-scope.md assumes and does not build.
-    scores = compare(trace, malicious=planted)
+    # Oracle is the named perfect detector (D-034). compare() no longer
+    # accepts a bare source list -- that was the silent circular default.
+    from src.eval.detectors import Oracle
+
+    scores = compare(trace, verdict=Oracle().flag(trace))
     return AttackRun(
         attack=attack,
         trace_path=path,
@@ -159,7 +165,7 @@ if __name__ == "__main__":
 
     args = sys.argv[1:]
     live = "--live" in args
-    scenario = next((a for a in args if a in ("A", "B")), "A")
+    scenario = next((a for a in args if a in ("A", "B", "C")), "A")
     influencing = "--exposed-only" not in args
 
     attack = build(scenario, influencing)

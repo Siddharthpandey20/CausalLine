@@ -1004,3 +1004,203 @@ unresolvable.
 Now every model-written event's inputs are addressable the same way, and the
 Planner's pair resolves like any other. Cost: one more rendered block per run,
 and the prompt reads slightly more formally.
+
+---
+
+## D-034  Detection is a socket, and the perfect detector gets a name
+Date: 06-09-2026
+Decided by: `compare()` defaulting to the true labels
+Choice: `src/eval/detectors.py` defines a `Verdict` and a `Detector` protocol.
+`metrics.compare()` takes a verdict, defaulting to `Oracle`, and every `Score`
+records which detector produced it.
+
+Reason. The specification is explicit that we do not build a detector -- it is a
+"pluggable, replaceable black box" -- so the missing piece was never a detector,
+it was the socket. `compare(trace, malicious=planted)` passed the planted source
+ids straight through, which is the perfect-detector assumption docs/01-scope.md
+declares out of scope, present in every number the project had produced and
+named in none of them. It is now `Oracle`, it prints its own name under every
+table, and it carries the note "an upper bound, not a measurement".
+
+A verdict carries three things beyond the source list, because CausalLine's
+sensitivity to each is a separate question. **Confidence**, so `MaliciousSources`
+is a threshold rather than a set. **Misses**, because a missed source is the only
+detector failure that can cause an unsafe preservation -- and that failure must
+be reported as the detector's, not the method's, which is why `Score` carries
+`detector_missed` and the table prints it apart from the unsafe count.
+**Latency**, as the event at which the alarm fires, because a slow detector means
+more work exists downstream by the time recovery starts, and that is exactly the
+condition under which selective recovery should beat restarting. A method
+evaluated only at zero latency is evaluated where it has least to prove.
+
+`Blind` -- flags nothing -- is in the set for a reason that is not symmetry: it
+is the only condition that proves the scoring can report failure at all. Under
+it every method preserves everything and the truly contaminated events show up
+as unsafe preservations. A metric that never comes out badly is not measuring
+anything.
+Ground truth is readable in exactly two modules now: `metrics.py`, which scores
+after the fact, and this one, because a simulated detector is by definition a
+function of the truth and there is nothing else to simulate it from. The rule
+that keeps it honest is the boundary: a detector reads the label and emits a
+Verdict, and everything downstream reads the Verdict.
+
+---
+
+## D-035  Ground truth walks true influence, not the estimator's influence
+Date: 06-09-2026
+Decided by: noticing that `unsafe = 0` was still guaranteed
+Choice: `ground_truth_events()` takes `true_influence`, an explicit (source,
+event) relation, and `contaminate()` takes an `influence` override so the walk
+can be run over it. The circularity flag now asks whether that relation was
+supplied.
+
+Reason. metrics.py already warned that ground truth and our method walking the
+same influence edges makes them identical by construction. The fix looked like
+it was "make the edges estimates, so they can be wrong" -- and that is not
+enough. If ground truth reads the estimator's edges, it inherits the estimator's
+mistakes: a source the estimator wrongly called clean is absent from *both*
+walks, so the event it contaminated is missing from the answer key too, and the
+unsafe preservation is not counted because ground truth agreed with the error.
+The guarantee survives the introduction of estimation untouched.
+
+So ground truth now walks the influence relation computed by leave-one-out on the
+scripted agent (D-030), with every other exposure pair treated as known-clean,
+because with the truth in hand nothing is unexamined. The method still walks its
+own estimated edges. The two disagree exactly where the estimator was wrong,
+which is the only arrangement in which the number means anything.
+The old flag was `bool(trace.influence) and method == "ours"` -- true of every
+trace the project could produce, so it would have printed CIRCULAR over real
+results forever. It is now `method == "ours" and not independent_truth`.
+
+---
+
+## D-036  Every prompt ends with its source block, and the trace is checked for it
+Date: 06-09-2026
+Decided by: the scripted agent reading the Coder's trailing instructions as part
+of a memory source
+Choice: the source block goes last in every prompt the pipeline builds, and
+`src/eval/contract.py` fails a trace where parsing sources from the prompt
+disagrees with parsing them from the stored block.
+
+Reason. D-029 removed the boundary hazard from the *redaction* path by doing
+surgery inside the stored block. It did not remove it from every reader of a
+prompt, and there is now another reader: the scripted agent parses the prompt it
+is handed. Its view of the Coder's `style/output` memory ran "...print one result
+per line.\n\nDecide the approach in at most three sentences", because a source's
+content extends to the next header and the last source's extends to the end of
+whatever it was embedded in.
+
+With the current wording this was harmless, and that is the worst kind of
+harmless. The trailing instructions contain no library name, no format code and
+no directive, so nothing moved. An instruction mentioning ISO or `%Y` would have
+made the last source appear to supply it -- and the leave-one-out ground truth
+would have agreed, because it is computed by the same reader. Ground truth and
+estimate would have been wrong together, which is the one failure mode this
+evaluation is built to rule out.
+
+Putting the block last makes the boundary unambiguous by construction rather than
+by discipline, and the contract check makes it a property the trace is tested for
+instead of a convention someone has to remember.
+Cost, and it is a real one: `data/cassettes/run1.jsonl` no longer replays. It had
+already stopped replaying at D-033 and nobody noticed, which is its own small
+lesson -- the check that would have caught it is the one now added. The cassette
+is still readable as recorded model output; it needs re-recording against the
+current prompts, and that costs 6 requests. See open issue #11.
+
+---
+
+## D-037  What facet exclusion costs, measured
+Date: 06-09-2026
+Decided by: isolating it, after it produced the only unsafe preservation we have
+Choice: keep the pre-registered exclusion rule, and report this number beside
+every result that depends on it.
+
+Reason. D-026's exclusion rule drops any facet whose floor on unchanged re-sends
+is non-zero, and `Calibration`'s docstring states plainly that this is the unsafe
+direction: a removed source that would only have moved an excluded facet leaves
+the signature unchanged, and the check returns `clean`. That was an argument.
+It now has a measurement.
+
+Same runs, same estimator, only the calibration differing:
+
+    calibration                       unsafe preservations across A/B x infl/exp
+    excludes strategy, dependency                    1  (S11 -> e0013, A-exp)
+    excludes nothing                                 0
+
+One unsafe preservation, and it is entirely attributable to the exclusion: with
+`strategy` restored the pair is caught and nothing else in the matrix moves. The
+mechanism is exactly the predicted one -- removing the format-codes finding flips
+the Coder from "candidate format strings" to "infer the format", which is the
+`strategy` facet and nothing else.
+
+The rule stays, and the reason is not stubbornness. `strategy` has a measured
+0.75 floor on `gemini-3.6-flash`: it moves on three of four *unchanged*
+re-sends. Keeping it would make almost every counterfactual answer "influenced"
+whatever was removed, which does not buy safety -- it buys a check that has
+stopped being a check, and the method silently becomes the conservative fallback
+it is supposed to improve on. So the honest statement is that this facet is
+unusable on this model and one real influence hides behind it, not that
+exclusion is free.
+Note the asymmetry in where the numbers come from: the 0.75 floor is measured on
+the live model, the 1 unsafe preservation is measured on the scripted agent. They
+are not the same instrument and the comparison is indicative, not exact.
+
+---
+
+## D-038  CausalLine recovery: verified frontier, greedy cover, splice replay
+Date: 06-09-2026
+Decided by: proposed with the recovery work, needs group sign-off
+Choice: four things, all of them what the algorithm spec asked for and what
+the repository did not have.
+
+**1. Safe Frontier is causal, then made cross-agent consistent.**
+`safe_checkpoint_for()` picked the latest checkpoint before the earliest
+invalidated event by topological position. That ignores whether the
+checkpoint's own causal past is clean, and it ignores an event that sits on
+the clean side of agent B but was influenced by something on the tainted
+side of agent A -- an orphan. `safe_frontier()` in `src/recovery/planner.py`
+picks, per agent, the latest checkpoint whose influence-ancestors are
+disjoint from Taint, then pulls frontiers backward until no kept event is
+influenced by an event another agent is about to throw away. The pull is
+monotone and bounded by |V|; exceeding that bound is an assertion, not a
+comment. Chronological parents are deliberately excluded from CausalPast:
+including them would make every post-taint checkpoint look unsafe and
+collapse the step to B1.
+
+**2. Action selection is greedy set cover, not an exact cut.**
+Minimum-cost cut over a contamination DAG is NP-hard (weighted
+feedback-vertex / hitting-set). The planner enumerates replay, invalidate,
+restart(agent), isolate(agent), restart_all, and picks min cost / paths
+broken, capped at restart_all. Isolate is priced at 2× restart_all so the
+greedy will not disable an agent the task still needs. We do not claim
+optimality.
+
+**3. Replay splices logged bytes; it never asks the model to reproduce them.**
+D-026 measured a 100% text-level noise floor. `SplicingClient` returns the
+logged output for every event not in the invalidation set and refuses to
+call the inner client otherwise. Equality is a content-ref comparison
+(D-028). Replayed prompts have flagged sources redacted. The recovered run
+is a new file; the original is not overwritten.
+
+**4. Scenario C is a handoff hook, not a corpus edit.**
+A and B stay data. C appends a Researcher→Coder message after the real
+findings. The planted string is labelled after the run, by marker. Raising
+`NotImplementedError` is no longer acceptable: a third of the experiment
+matrix was a hole.
+
+Baselines B0/B1/B2 share the same replay engine and differ only in the
+invalidation set. That is the fair comparison: same splice/re-invoke
+machinery, different discard policy.
+
+**5. Tainted events are sinks when influence never reaches the Executor.**
+The Executor runs the Coder's script without that script being wrapped as
+a source in its context, so `MaliciousSource → FinalOutput` paths in
+E_influence stop at the Coder. When Taint is non-empty and no such path
+exists, the planner treats each tainted event as a sink that the greedy
+cover must hit. Exposed-only (Taint empty) still selects nothing.
+Verification re-runs Taint on a sealed post-recovery graph: spliced
+events keep their original edges, replayed events drop edges from
+flagged sources, and pipeline-computed handoffs are not allowed to
+re-import the old flagged edges. Live memory is stale only when its
+*value* still matches an invalidated write, not when the recovered
+event happens to reuse the same id.
