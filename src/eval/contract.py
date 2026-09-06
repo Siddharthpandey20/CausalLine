@@ -49,6 +49,46 @@ class Finding:
     fatal: bool = True
 
 
+def _check_block_boundary(trace: Trace, event_id: str, prompt: str) -> list[Finding]:
+    """Does reading the sources out of the prompt give the same answer as
+    reading them out of the stored block?
+
+    It should, and when it does not the difference is silent and dangerous. The
+    source block has no terminator, so a source's content runs to the next
+    header -- and for the *last* source, to the end of whatever it was embedded
+    in. Put instructions after the block and the last source absorbs them.
+
+    D-029 removed this hazard from the redaction path by doing surgery inside
+    the stored block. It did not remove it from every *reader* of a prompt, and
+    the scripted agent read prompts directly: its view of the Coder's
+    `style/output` memory ended with "...print one result per line.\\n\\nDecide the
+    approach in at most three sentences", so that source appeared to supply
+    whatever vocabulary the trailing instructions contained. Harmless with the
+    current wording and not harmless in general -- an instruction mentioning ISO
+    or a format code would have made the last source look like the thing that
+    supplied it, and the leave-one-out ground truth would have agreed.
+
+    Every prompt now ends with its source block, which makes the boundary
+    unambiguous. This check is here so that stops being a convention someone has
+    to remember and becomes a property the trace is tested for.
+    """
+    from src.common.prompts import parse_sources
+
+    block = trace.source_block_text(event_id)
+    if not block:
+        return []
+    if parse_sources(prompt) == parse_sources(block):
+        return []
+    return [
+        Finding(
+            "block-boundary",
+            f"{event_id}: parsing sources from the prompt disagrees with parsing "
+            "them from the stored block, so text outside the block is being read "
+            "as part of a source. Put the source block last in the prompt.",
+        )
+    ]
+
+
 @dataclass
 class ContractReport:
     trace_path: Path
@@ -139,8 +179,10 @@ def check_contract(trace: Trace, path: str | Path | None = None) -> ContractRepo
 
         if event.id in from_model:
             report.model_events += 1
-            if trace.prompt_text(event.id):
+            prompt = trace.prompt_text(event.id)
+            if prompt:
                 report.model_events_with_prompt += 1
+                report.findings.extend(_check_block_boundary(trace, event.id, prompt))
             else:
                 report.findings.append(
                     Finding(

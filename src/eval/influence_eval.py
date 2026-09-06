@@ -226,7 +226,13 @@ def run_condition(
             **kwargs,
         )
 
-    result = run_pipeline(target, client=client, tools=tools, attributor=attributor)
+    result = run_pipeline(
+        target,
+        client=client,
+        tools=tools,
+        attributor=attributor,
+        handoff_hook=getattr(attack, "handoff_hook", None) if attack else None,
+    )
     if attack:
         marked = label_malicious(target, attack.marker)
         if not marked:
@@ -236,6 +242,7 @@ def run_condition(
                 f"measures nothing"
             )
     trace = read_trace(target)
+    _TRUTH_CACHE[target] = ground_truth_influence(trace, client)
     return result, score_estimator(trace, client), attributor
 
 
@@ -283,7 +290,13 @@ def run_targeted(
                 k: v for k, v in CONDITIONS[inline].items() if k != "mode"
             },
         )
-    result = run_pipeline(target, client=client, tools=tools, attributor=attributor)
+    result = run_pipeline(
+        target,
+        client=client,
+        tools=tools,
+        attributor=attributor,
+        handoff_hook=attack.handoff_hook,
+    )
 
     flagged = label_malicious(target, attack.marker)
     if not flagged:
@@ -300,11 +313,62 @@ def run_targeted(
     return result, score_estimator(read_trace(target), client), refined
 
 
+def recovery_table(
+    condition: str = "hybrid",
+    scenario: str = "A",
+    influencing: bool = True,
+    detector: str = "oracle",
+    seed: int = 20260906,
+    **detector_kwargs: Any,
+) -> str:
+    """Score the baselines and CausalLine's contaminated set, non-circularly.
+
+    Two things arrive from outside the method here, and they arrive by different
+    doors on purpose:
+
+      * the **detector's verdict** is the method's input. It may be wrong, and
+        `src/eval/detectors.py` can make it wrong in controlled ways.
+      * **true influence** is the yardstick, computed by leave-one-out on the
+        scripted agent and never shown to anything upstream. Without it the walk
+        that produces ground truth reads the estimator's own edges, so the
+        estimator's mistakes are copied into the answer key and cannot be
+        counted against it.
+    """
+    from src.eval.detectors import build as build_detector
+    from src.eval.metrics import compare, table
+    from src.tracing.logger import read_trace
+
+    path = f"data/runs/rec-{condition}-{scenario}-{influencing}-{detector}.jsonl"
+    _outcome, _score, _attributor = run_condition(
+        condition, scenario, influencing, path=path, seed=seed
+    )
+    trace = read_trace(path)
+    client_truth = _TRUTH_CACHE[path]
+    verdict = build_detector(detector, **detector_kwargs).flag(trace)
+    scores = compare(trace, verdict=verdict, true_influence=client_truth)
+    return f"{verdict.describe()}\n\n" + table(scores)
+
+
+# run_condition needs to hand the true influence relation back without putting
+# it anywhere the method could reach. Keyed by trace path, populated on the way
+# out, read only by recovery_table.
+_TRUTH_CACHE: dict[str, set[tuple[str, str]]] = {}
+
+
 if __name__ == "__main__":
     import sys
 
     scenarios = [("A", True), ("A", False), ("B", True), ("B", False)]
     only = sys.argv[1] if len(sys.argv) > 1 else None
+
+    if only == "recovery":
+        for scenario, influencing in scenarios:
+            for detector in ("oracle", "pessimistic", "blind"):
+                print(f"=== {scenario}-{'infl' if influencing else 'exp'} "
+                      f"/ detector={detector} ===")
+                print(recovery_table("hybrid", scenario, influencing, detector))
+                print()
+        raise SystemExit(0)
 
     if only == "targeted":
         print("Targeted refinement: self-report inline, counterfactual only on")

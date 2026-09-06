@@ -27,7 +27,7 @@ accident. Do not remove it because it is inconvenient.
 """
 
 from dataclasses import dataclass, field
-from typing import Iterable
+from typing import Any, Iterable
 
 from src.eval.baselines import METHODS
 from src.provenance.checks import CheckLedger
@@ -41,26 +41,45 @@ def malicious_sources(trace: Trace) -> set[str]:
 
 
 def ground_truth_events(
-    trace: Trace, checked: set[tuple[str, str]] | None = None
+    trace: Trace,
+    checked: set[tuple[str, str]] | None = None,
+    true_influence: set[tuple[str, str]] | None = None,
 ) -> set[str]:
     """The events that truly became contaminated.
 
     Known by construction because we author the attacks (open issue #3). This
     is the yardstick every method is scored against.
 
-    `checked` matters here for the same reason it matters to the method
-    (D-024): without it the walk assumes every unexamined exposure is
-    influence, which inflates ground truth as well. Both sides inflate
-    together, so the unsafe count still comes out right, but "truly hit N
-    events" is then a number that is too big -- and that one goes in the
-    paper. Passing None now reads the trace's own `check` records, which is
-    what the record was added for; `all_exposure_pairs()` -- which asserted
-    that every exposure had been examined and could turn "no analysis ran"
-    into "nothing was influenced" (D-025 point 3) -- is gone with it.
+    `true_influence` is what makes the yardstick independent. Given the real
+    (source, event) influence relation -- which `src/eval/scripted.py` computes
+    exactly, by leave-one-out -- the walk uses those edges and treats every other
+    exposure pair as known-clean, because with the truth in hand there is nothing
+    unexamined. Ground truth then owes nothing to the estimator, and where the
+    estimator was wrong the two sets genuinely differ.
+
+    Without it, ground truth walks the same estimated edges the method walks.
+    Both sides then inflate and deflate together: a source the estimator wrongly
+    called clean is absent from both walks, so the event it contaminated is
+    missing from truth as well, and the unsafe preservation is not counted
+    because ground truth agreed with the mistake. `checked` has the same
+    property and is kept for the same reason -- it must be given to both sides or
+    to neither (D-024).
     """
     seeds = malicious_sources(trace)
     if not seeds:
         return set()
+    if true_influence is not None:
+        exposure_pairs = {
+            (sid, e.id) for e in trace.events for sid in e.exposures
+        }
+        return set(
+            contaminate(
+                trace,
+                seeds,
+                influence=true_influence,
+                checked=exposure_pairs - set(true_influence),
+            ).events
+        )
     return set(contaminate(trace, seeds, checked=checked).events)
 
 
@@ -73,6 +92,12 @@ class Score:
     discarded: frozenset[str]
     truly_contaminated: frozenset[str]
     ground_truth_is_circular: bool = False
+    # Which detector's verdict this method was given. A work-preserved figure
+    # means something different under each one, so a score that does not carry
+    # its detector cannot be read -- and pooling scores across detectors would
+    # average an upper bound together with a measurement.
+    detector: str = "unknown"
+    detector_missed: frozenset[str] = frozenset()
     notes: list[str] = field(default_factory=list)
 
     @property
@@ -109,45 +134,72 @@ def score(
     method: str,
     discarded: Iterable[str],
     truth: set[str] | None = None,
+    detector: str = "unknown",
+    missed: Iterable[str] = (),
+    independent_truth: bool = False,
 ) -> Score:
     truth = ground_truth_events(trace) if truth is None else truth
-    # If the method's edges and the truth's edges are the same records, the
-    # comparison is circular. Today they always are: nothing estimates edges
-    # yet, so both walks read trace.influence.
-    circular = bool(trace.influence) and method == "ours"
     return Score(
         method=method,
         total_events=len(trace.events),
         discarded=frozenset(discarded),
         truly_contaminated=frozenset(truth),
-        ground_truth_is_circular=circular,
+        # Circular exactly when ground truth was derived from the same influence
+        # edges the method walked. Only "ours" walks them; the baselines use
+        # parent/topology edges and are unaffected either way.
+        #
+        # The old test was `bool(trace.influence) and method == "ours"`, which
+        # asserted a permanent condition -- true of every trace the project could
+        # produce -- and would have gone on printing CIRCULAR over real results
+        # forever. Estimated edges are not sufficient to fix it either: if ground
+        # truth reads the estimator's edges then it inherits the estimator's
+        # mistakes and agrees with them. What breaks the circle is a separately
+        # known influence relation, so that is what the flag asks about.
+        ground_truth_is_circular=(method == "ours" and not independent_truth),
+        detector=detector,
+        detector_missed=frozenset(missed),
     )
 
 
 def compare(
     trace: Trace,
-    malicious: Iterable[str] | None = None,
+    verdict: Any = None,
     checked: set[tuple[str, str]] | None = None,
+    true_influence: set[tuple[str, str]] | None = None,
 ) -> list[Score]:
     """Run every method on one trace and score them against ground truth.
 
-    `malicious` is the detector's verdict. Defaults to the true labels, which
-    is the "perfect detector" assumption docs/01-scope.md declares out of
-    scope -- fine for now, but it is an assumption, not a measurement.
+    `verdict` is the detector's output (`src/eval/detectors.py`), and it is the
+    only channel by which anything about the attack reaches a method. It used to
+    be a bare list of source ids defaulting to the true labels, which made the
+    perfect-detector assumption docs/01-scope.md declares out of scope into the
+    silent default -- present in every number the project produced, named in
+    none of them. It now defaults to `Oracle`, which is the same behaviour
+    wearing its own name, and it is recorded on every Score.
 
     `checked` is passed to both the method and ground truth, so the two are
     always computed under the same assumption. Giving one and not the other
     would compare two different definitions of contaminated and call the
     difference a result.
     """
-    seeds = set(malicious) if malicious is not None else malicious_sources(trace)
-    truth = ground_truth_events(trace, checked=checked)
+    from src.eval.detectors import Oracle
+
+    verdict = verdict if verdict is not None else Oracle().flag(trace)
+    seeds = set(verdict.sources())
+    missed = malicious_sources(trace) - seeds
+    truth = ground_truth_events(trace, checked=checked, true_influence=true_influence)
     scores = []
     for name, fn in METHODS.items():
         discarded = (
             fn(trace, seeds, checked=checked) if name == "ours" else fn(trace, seeds)
         )
-        scores.append(score(trace, name, discarded, truth=truth))
+        scores.append(
+            score(
+                trace, name, discarded, truth=truth,
+                detector=verdict.detector, missed=missed,
+                independent_truth=true_influence is not None,
+            )
+        )
     return scores
 
 
@@ -167,7 +219,75 @@ def table(scores: list[Score]) -> str:
             f"{unsafe:>8}"
             f"  {note}"
         )
+    if scores:
+        first = scores[0]
+        rows.append("")
+        rows.append(f"detector: {first.detector}")
+        if first.detector_missed:
+            # Stated separately from the unsafe count because it is a different
+            # failure: recovery cannot act on an incident it was not told about,
+            # and reading these as a fault in the method would be wrong.
+            rows.append(
+                f"  MISSED {sorted(first.detector_missed)} -- everything these "
+                f"influenced is preserved, and unsafely"
+            )
     return "\n".join(rows)
+
+
+@dataclass
+class RecoveryScore:
+    """One method, on one recovered run. The Phase 7 table row."""
+
+    scenario: str
+    variant: str
+    method: str
+    detector: str
+    total_events: int
+    discarded: int
+    work_preserved: float
+    recovery_tokens: int
+    analysis_tokens: int
+    replay_tokens: int
+    pipeline_tokens: int
+    unsafe_preservations: int
+    unsafe_ids: tuple[str, ...] = ()
+    task_success: bool = False
+    wall_clock_s: float = 0.0
+    storage_bytes: int = 0
+    blast_radius_events: int = 0
+    blast_radius_agents: int = 0
+    escalations: int = 0
+    notes: str = ""
+
+    @property
+    def recovery_success(self) -> bool:
+        return self.task_success and self.unsafe_preservations == 0
+
+
+def recovery_table(rows: list[RecoveryScore]) -> str:
+    """The docs/04 main result table, filled from actual recovery runs."""
+    head = (
+        f"{'scenario':<10}{'variant':<14}{'method':<22}"
+        f"{'preserved':>10}{'rec.tok':>9}{'anal':>7}{'replay':>8}"
+        f"{'unsafe':>8}{'ok':>5}{'blast':>7}  notes"
+    )
+    lines = [head, "-" * len(head)]
+    for r in rows:
+        note = r.notes
+        if r.unsafe_ids:
+            note = (note + " " if note else "") + f"kept {list(r.unsafe_ids)}"
+        lines.append(
+            f"{r.scenario:<10}{r.variant:<14}{r.method:<22}"
+            f"{r.work_preserved:>9.0%}"
+            f"{r.recovery_tokens:>9}"
+            f"{r.analysis_tokens:>7}"
+            f"{r.replay_tokens:>8}"
+            f"{r.unsafe_preservations:>8}"
+            f"{'Y' if r.recovery_success else 'n':>5}"
+            f"{r.blast_radius_events:>7}"
+            f"  {note}"
+        )
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":

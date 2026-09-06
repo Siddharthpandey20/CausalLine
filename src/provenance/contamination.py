@@ -118,6 +118,7 @@ def contaminate(
     policy: Policy | None = None,
     checked: set[tuple[str, str]] | None = None,
     ledger: CheckLedger | None = None,
+    influence: set[tuple[str, str]] | None = None,
 ) -> ContaminatedRegion:
     """Propagate contamination from the sources the detector flagged.
 
@@ -142,6 +143,15 @@ def contaminate(
     is why it survived unnoticed -- it made the method look worse than it is.
     A trace with no `check` records now clears nothing, which is the correct
     reading of "nothing was examined".
+
+    `influence` replaces the trace's own edges with an explicit (source, event)
+    relation. It exists for one caller: `metrics.ground_truth_events()`, which
+    must walk **true** influence rather than estimated influence. Both walking
+    the same records is the circularity metrics.py warns about, and it is not
+    fixed by the edges merely being estimates -- if ground truth reads the
+    estimator's edges then ground truth inherits the estimator's mistakes, the
+    two sets agree wherever the estimator was wrong, and the unsafe-preservation
+    count comes out zero for that reason alone.
     """
     policy = policy or Policy()
 
@@ -154,9 +164,13 @@ def contaminate(
         raise ValueError(f"trace has no source(s) {sorted(unknown)}")
 
     influenced_events: dict[str, set[str]] = {}
-    for edge in trace.influence:
-        if edge.confident or policy.unconfident_edges_contaminate:
-            influenced_events.setdefault(edge.source_id, set()).add(edge.target_event)
+    if influence is not None:
+        for sid, eid in influence:
+            influenced_events.setdefault(sid, set()).add(eid)
+    else:
+        for edge in trace.influence:
+            if edge.confident or policy.unconfident_edges_contaminate:
+                influenced_events.setdefault(edge.source_id, set()).add(edge.target_event)
 
     if ledger is not None:
         checked = ledger.cleared_pairs()

@@ -201,3 +201,67 @@ So the floor is not one number, it is a property of the comparison, and the
 gap between the two ends is total. Temperature 0 does **not** give
 determinism on this hosted model, which is the assumption issue #2's
 "repeat 3 times" was resting on.
+
+---
+
+## 11. The cassette no longer replays, and nothing noticed for two phases
+
+`data/cassettes/run1.jsonl` is the only recorded real model output we have, and
+it replays by matching the exact prompt text. Two prompt changes have since
+invalidated it:
+
+- D-033 rendered the Planner's task as a labelled source, so the Planner's
+  prompt changed.
+- D-036 moved the source block to the end of every prompt, so the Coder's two
+  prompts changed.
+
+Both changes are right and neither should be reverted. The problem is that the
+first one broke replay silently at the end of Phase 1 and was found by accident
+in Phase 3, while running something else.
+
+**Consequence:** the free offline path is now `src/eval/scripted.py`, which is
+better for developing the estimator anyway -- it has ground truth and the
+cassette does not. What the cassette uniquely provided was *real model text*
+flowing through the pipeline, and that is currently unavailable.
+
+**Our answer:** re-record on the next day's quota. Cost is 6 requests (D-017),
+and it should be done in the same sitting as the outstanding noise-floor top-up
+(issue #2, 12 trials remaining) so the two share a quota window. Until then, no
+result may be described as involving real model output except the 8 noise trials
+already on disk.
+
+**Status:** OPEN. Detected 06-09-2026. The contract check added in D-036 would
+have caught the first break; there is still nothing that checks the cassette
+itself, and a one-line replay smoke test belongs in the same commit as the
+re-recording.
+
+---
+
+## 12. The prose comparator has no measured noise floor
+
+D-026 measured floors for the `decision` comparator's four facets, on eight live
+re-sends. Nothing has measured `prose`, `code`, `json_shape` or `tool_args`, and
+`prose` is the one that matters most: it is the comparator for every Researcher
+finding, which is three of the six model calls in a run, and D-031 has just
+changed it by adding a `formats` facet.
+
+`Calibration.is_calibrated("prose")` is therefore false, and the estimator
+records `uncalibrated:prose` on every run that uses it. The current behaviour on
+an uncalibrated comparator is to exclude nothing, which is the conservative
+setting -- every facet counts, so verdicts lean towards "influenced" and the
+method over-invalidates rather than under-invalidating. That is the right default
+and it is not a substitute for the measurement.
+
+**Why this cannot be answered from the data on disk:** a floor is measured by
+re-sending an *identical* request and counting how often the answer moves. The
+eight trials on disk are re-sends of the Coder's decision call, so they can only
+speak about decision facets. Prose needs its own re-sends of a Researcher call.
+
+**Our answer:** 8-10 re-sends of one Researcher `agent_output` call from a
+recorded run, scored per facet with `python -m src.provenance.noise --facets`.
+Cost is 8-10 requests. Until it is done, any prose-comparator verdict quoted in
+the paper must carry "floor unmeasured" beside it, and the honest reading of a
+`clean` verdict from that comparator is weaker than from the code comparator,
+which has an executable behavioural facet.
+
+**Status:** OPEN. Raised 06-09-2026 by D-031.
