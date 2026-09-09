@@ -174,13 +174,27 @@ Three things this does and does not mean:
 
 - **It is a fact about the ratio, not about the method.** A six-call pipeline
   analysed by nine analysis calls is the worst possible case for an approach
-  whose cost is per-event and whose saving is per-run. The saving scales with
-  workflow length; the testbed is 18 events.
-- **The flat token model exaggerates it.** `ScriptedClient` charges 100 tokens
-  per call regardless of prompt size. Real pipeline calls carry eight rendered
-  sources; real self-report calls carry a truncated output and a short
-  catalogue. The true `A/N` is lower than 1.5 and we have not measured how much
-  lower, because measuring it needs live runs we do not have quota for.
+  whose cost is per-event and whose saving is per-run.
+- ~~The saving scales with workflow length; the testbed is 18 events.~~
+  **CORRECTED 09-09-2026 (D-049). This was asserted and is now measured false.**
+  A `long` workflow (27 events, 22 sources, 6 agents) was built specifically to
+  test it. Under a proportional token cost model, `A/N` is **1.23 at 19 events
+  and 1.24 at 27** — flat across a 42% longer trace, not improving. The saving
+  does **not** scale with workflow length on anything measured so far. Whether
+  it would at a length far beyond 27 events is unknown and is not what this
+  sentence claimed.
+- **The flat token model exaggerates it, by about 22%.** `ScriptedClient`
+  charged 100 tokens per call regardless of prompt size, which prices a
+  restart's few large prompts and the analysis's many small counterfactual ones
+  identically. `cost_model="proportional"` (Phase 8.1) bills by rendered
+  length. Measured: `A/N` **1.50 → 1.23** at the short length. This no longer
+  needs live quota — it needed a cost model.
+
+  Note the interaction, because it is why this went unnoticed: under the flat
+  model `A/N` appears to *degrade* with length (1.50 → 1.78), which looks like
+  evidence against scaling but is an artefact of counting calls instead of
+  tokens. Both the optimistic claim above and that pessimistic reading were
+  wrong for the same reason.
 - **f is large because contamination genuinely spreads.** At the oracle
   detector's one flagged source, 6 of 18 events are contaminated. That is the
   honest answer for a four-agent chain where every agent reads the previous
