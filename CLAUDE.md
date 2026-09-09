@@ -31,6 +31,8 @@ affected part from the nearest trusted checkpoint.
 - `docs/05-decisions.md` — running log of decisions and their reasons
 - `docs/06-limitations.md` — what the system does not do, and what the
   measurements actually say; **read before quoting a number**
+- `docs/07-completion-report.md` — integration sprint results, and the
+  current claims-you-can-make / claims-you-cannot lists
 
 ## Repo layout
 
