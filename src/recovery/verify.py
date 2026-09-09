@@ -18,7 +18,7 @@ distributed rollback-recovery.
 """
 
 from dataclasses import dataclass, field
-from typing import Iterable, Literal
+from typing import Any, Iterable, Literal
 
 from src.provenance.contamination import contaminate
 from src.tracing.checkpoints import Checkpoint, memory_rollback_plan
@@ -106,12 +106,26 @@ def verify(
     invalidated: Iterable[str] = (),
     current_memory: dict[str, str] | None = None,
     original: Trace | None = None,
+    region: Any = None,
 ) -> VerifyResult:
     """Re-run Taint, check live references, check the task.
 
     `flagged` is the detector verdict, not ground truth. A missed source
     will leave taint the method was never told about; that is the
     detector's failure and is reported as leftover taint, not hidden.
+
+    `region` lets a caller supply the post-recovery contamination walk it has
+    already done. `recover()` does: a plain `contaminate()` over a recovered
+    trace re-taints every spliced event that merely saw the flagged source,
+    because the recovered run re-logs the exposure without re-attributing it --
+    the D-024 defect, reintroduced by recovery. `_post_recovery_region()` in
+    src/recovery/causalline.py does that walk properly and passes the result
+    here.
+
+    This parameter exists because `verify()` and `recover()` had grown two
+    copies of this logic and only one of them had the missing-flagged-source
+    warning below. Sharing the function keeps the warning on the live path;
+    sharing the *walk* would have silently downgraded it.
     """
     reasons: list[str] = []
     known = {s.id for s in recovered.sources}
@@ -123,7 +137,8 @@ def verify(
             "trace; they cannot seed a walk"
         )
 
-    region = contaminate(recovered, seeds) if seeds else None
+    if region is None:
+        region = contaminate(recovered, seeds) if seeds else None
     tainted = frozenset(region.events) if region else frozenset()
 
     refs: list[str] = []

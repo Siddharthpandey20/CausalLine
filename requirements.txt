@@ -1,0 +1,27 @@
+# Dependencies. Kept short on purpose (D-013: ask before adding one).
+#
+# The core of the project -- tracing, provenance, recovery, and the scripted
+# evaluation -- has NO third-party dependencies at all and runs on a bare
+# Python 3.11+. Everything below is needed only by a named piece of the
+# analysis, is imported lazily at its call site, and its absence breaks that
+# one command rather than the package.
+
+# Phase 11.3 fixed-budget attribution: the Lasso fit in
+# src/provenance/budget_attribution.py. Written out by coordinate descent
+# rather than pulling in scikit-learn for thirty lines of arithmetic.
+numpy>=1.26
+
+# Phase 9 economics: the attack-rate threshold plot and the contamination
+# sweep plot, which docs/04 lists as required figures.
+#   python -m src.eval.economics
+matplotlib>=3.8
+
+# --- optional -----------------------------------------------------------------
+#
+# Phase 13.3's TransformerInjectionDetector. NOT installed by default: it wants
+# a ~180M-parameter model download, and a research prototype that cannot run
+# its own test suite offline is worse than one with an optional component. The
+# always-available HeuristicInjectionDetector needs nothing.
+#
+#   transformers>=4.40
+#   torch>=2.2

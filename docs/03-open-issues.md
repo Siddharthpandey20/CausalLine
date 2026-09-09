@@ -99,7 +99,22 @@ avoiding recomputation, and report the ratio. Then be selective: only run
 counterfactual checks when the event is expensive to redo. The break-even
 point is itself an interesting result.
 
-**Status:** highest-risk issue after #1. Instrument token counts from day one.
+**Status: ANSWERED, and the answer is uncomfortable.** Phase 9 measured it
+(`python -m src.eval.economics`). On our own runs N=600 tokens, A=900 with
+inline attribution or 300 with the targeted pass, f=0.67 at the oracle
+detector. `A + f*N` exceeds `N` in both conditions, so on this testbed the
+check does cost more than the rerun and no attack rate makes the storage tax
+worth paying. The break-even frontier says what would have to change:
+`A/N <= 0.25` with `f <= 0.5` pays off above roughly one attacked run in six.
+See D-040 and docs/06-limitations.md 4 for why that is a fact about an 18-event
+pipeline rather than about the method, and for the flat-token caveat that makes
+the measured `A/N` an overestimate.
+
+Three mechanisms now attack the cost rather than only measuring it: sequential
+investigation that can abort early (D-041), group testing over candidates
+(D-042), and self-report calibration that removes candidates before the
+expensive stage runs at all (D-042). The measured saving from group testing is
++12% of counterfactual calls, or +38% with sibling inference.
 
 ---
 
@@ -112,7 +127,16 @@ everything, so we must say exactly what we drop.
 token-level detail. Report overhead as a percentage of total workflow
 tokens and bytes.
 
-**Status:** measure in week 4.
+**Status: MEASURED, and now bounded.** `overhead()` reports the three-way
+split (trace / checkpoints / content) and D-022 and D-028 measured it. Phase 12
+adds the lifecycle that keeps it from growing without end: garbage collection
+gated on `check` records keeps one checkpoint per agent, so the retained
+*count* is flat in trace length (asserted on runs up to 2000 events in
+`tests/test_checkpoint_lifecycle.py`), and a configurable recovery horizon
+downgrades old content to its hash with an explicit fallback to coarse
+recovery. The surviving checkpoint's own payload still grows with the prefix it
+snapshots; making it incremental is future work. See D-043 and
+docs/06-limitations.md 7.
 
 ---
 

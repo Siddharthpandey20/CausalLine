@@ -20,8 +20,14 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from src.eval.attacks import build, label_malicious
-from src.eval.baselines import b0_full_restart, b1_agent_taint, b2_topology_closure
+from src.eval.baselines import (
+    b0_full_restart,
+    b1_agent_taint,
+    b2_topology_closure,
+    discarded_events,
+)
 from src.eval.detectors import Oracle, build as build_detector
+from src.eval.influence_eval import score_estimator
 from src.eval.metrics import RecoveryScore, ground_truth_events, recovery_table
 from src.eval.scripted import ScriptedClient, ground_truth_influence
 from src.provenance.estimator import CheckBudget, HybridAttributor, refine_for_verdict
@@ -34,12 +40,23 @@ from src.tracing.pipeline import run_pipeline
 from src.tracing.tools import Tools
 
 SCENARIOS = ("A", "B", "C")
+# PHASE C: workflow length is a named configuration, not a constant. "short"
+# is the original 19-event pipeline every existing measurement used; "long"
+# adds two more research rounds and a Reviewer agent between Coder and
+# Executor. Both are kept so the scaling claim can be measured as a
+# comparison rather than asserted -- see docs/06 section 4.
+WORKFLOWS: dict[str, dict[str, Any]] = {
+    "short": {},
+    "long": {"research_rounds": 3, "reviewer": True},
+}
 VARIANTS = (("influencing", True), ("exposed_only", False))
 METHODS = ("B0 full restart", "B1 agent taint", "B2 topology closure", "CausalLine")
 
 
-def _fresh_tools(attack, path: Path) -> Tools:
-    clean = Tools.from_fixtures(memory_path=path.with_suffix(".memory.json"))
+def _fresh_tools(attack, path: Path, extended: bool = False) -> Tools:
+    clean = Tools.from_fixtures(
+        memory_path=path.with_suffix(".memory.json"), extended=extended
+    )
     return attack.apply(clean)
 
 
@@ -49,10 +66,12 @@ def _original_run(
     path: Path,
     seed: int,
     estimator_mode: str = "hybrid",
+    workflow: str = "short",
+    cost_model: str = "flat",
 ) -> tuple[Any, ScriptedClient, set[tuple[str, str]]]:
     attack = build(scenario, influencing)
-    tools = _fresh_tools(attack, path)
-    client = ScriptedClient(seed=seed)
+    tools = _fresh_tools(attack, path, extended=(workflow == "long"))
+    client = ScriptedClient(seed=seed, cost_model=cost_model)
     # D-032: self-report inline, counterfactual only on the detector's
     # region. The `hybrid` mode here means that targeted pass, not the
     # inline-everything ablation.
@@ -74,6 +93,7 @@ def _original_run(
         tools=tools,
         attributor=attributor,
         handoff_hook=attack.handoff_hook,
+        **WORKFLOWS[workflow],
     )
     marked = label_malicious(path, attack.marker)
     if not marked:
@@ -114,6 +134,9 @@ def _score_row(
     blast_agents: int,
     escalations: int = 0,
     notes: str = "",
+    pair_unsafe_rate: float = 0.0,
+    pair_false_negatives: int = 0,
+    pair_scored: int = 0,
 ) -> RecoveryScore:
     discarded_set = set(discarded)
     unsafe = sorted(truth_events - discarded_set)
@@ -139,6 +162,9 @@ def _score_row(
         blast_radius_agents=blast_agents,
         escalations=escalations,
         notes=notes,
+        pair_unsafe_rate=pair_unsafe_rate,
+        pair_false_negatives=pair_false_negatives,
+        pair_scored=pair_scored,
     )
 
 
@@ -173,6 +199,7 @@ def run_cell(
     estimator_mode: str = "hybrid",
     workdir: Path | None = None,
     seed: int = 20260906,
+    workflow: str = "short",
     **detector_kwargs: Any,
 ) -> list[RecoveryScore]:
     """One (scenario, variant) against every method."""
@@ -180,10 +207,12 @@ def run_cell(
     workdir = workdir or Path("data/runs")
     workdir.mkdir(parents=True, exist_ok=True)
     stem = f"exp-{scenario}-{variant}-{estimator_mode}-{detector_name}"
+    if workflow != "short":
+        stem = f"{stem}-{workflow}"
     orig_path = workdir / f"{stem}.jsonl"
 
     _outcome, client, true_inf = _original_run(
-        scenario, influencing, orig_path, seed, estimator_mode
+        scenario, influencing, orig_path, seed, estimator_mode, workflow=workflow
     )
     original = read_trace(orig_path)
     original.validate()
@@ -191,6 +220,14 @@ def run_cell(
     verdict = build_detector(detector_name, **detector_kwargs).flag(original)
     flagged = verdict.sources()
     truth_events = ground_truth_events(original, true_influence=true_inf)
+    # Pair-level estimator accuracy, scored against the scripted client's own
+    # leave-one-out record (which the estimator never sees). Computed once and
+    # attached to every row so the event-level and pair-level unsafe numbers
+    # are never reported apart -- see the note on RecoveryScore.
+    estimator_score = score_estimator(original, client)
+    pair_rate = estimator_score.unsafe_preservation_rate
+    pair_fn = estimator_score.false_negative
+    pair_n = estimator_score.true_positive + estimator_score.false_negative
     store = overhead(orig_path)
     analysis = original.analysis_tokens()
     checkpoints = CheckpointStore.load(checkpoint_path_for(orig_path))
@@ -210,6 +247,11 @@ def run_cell(
         result, report = _run_baseline_recovery(
             method, discard, original, replay_client, flagged, attack, out
         )
+        # Read off the replay report rather than from `discard` directly, so
+        # the baselines and CausalLine are scored through the same function on
+        # the same field. Identical here by construction -- which is the point:
+        # it stays identical when someone changes one of them.
+        redone = discarded_events(report, discard)
         rows.append(
             _score_row(
                 scenario=scenario,
@@ -217,7 +259,7 @@ def run_cell(
                 method=method,
                 detector=verdict.detector,
                 trace=original,
-                discarded=discard,
+                discarded=redone,
                 truth_events=truth_events,
                 # Baselines do not run the estimator. Charging them the
                 # original run's analysis tokens would hide the cost that
@@ -228,14 +270,17 @@ def run_cell(
                 task_success=result.task_success,
                 wall_clock_s=report.wall_clock_s,
                 storage_bytes=store["total_bytes"],
-                blast_events=len(discard),
-                blast_agents=len({original.event(e).agent_id for e in discard} - {"user"}),
+                blast_events=len(redone),
+                blast_agents=len({original.event(e).agent_id for e in redone} - {"user"}),
+                pair_unsafe_rate=pair_rate,
+                pair_false_negatives=pair_fn,
+                pair_scored=pair_n,
             )
         )
 
     out = workdir / f"{stem}-CausalLine.jsonl"
     replay_client = ScriptedClient(seed=seed + 1)
-    tools = _fresh_tools(attack, out)
+    tools = _fresh_tools(attack, out, extended=(workflow == "long"))
     recovered = recover(
         original,
         flagged,
@@ -245,9 +290,9 @@ def run_cell(
         checkpoints=checkpoints,
         handoff_hook=attack.handoff_hook,
     )
-    discarded = set(recovered.plan.invalidation_set)
-    if recovered.report is not None and recovered.escalations:
-        discarded = set(recovered.report.replayed)
+    # ONE definition of discarded, shared with the baselines above: the set
+    # handed to replay(). See `discarded_events()` in src/eval/baselines.py.
+    discarded = discarded_events(recovered.report, recovered.invalidated)
     rows.append(
         _score_row(
             scenario=scenario,
@@ -267,6 +312,9 @@ def run_cell(
             blast_agents=recovered.blast_radius_agents,
             escalations=recovered.escalations,
             notes=f"scope={recovered.scope}",
+            pair_unsafe_rate=pair_rate,
+            pair_false_negatives=pair_fn,
+            pair_scored=pair_n,
         )
     )
     return rows

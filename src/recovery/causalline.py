@@ -17,10 +17,16 @@ from src.recovery.verify import (
     Escalation,
     VerifyResult,
     invalidation_for_scope,
-    live_memory_points_at_invalidated,
     next_scope,
+    verify,
 )
-from src.tracing.checkpoints import Checkpoint, CheckpointStore, checkpoint_path_for
+from src.tracing.checkpoints import (
+    Checkpoint,
+    CheckpointStore,
+    checkpoint_path_for,
+    gc_checkpoints,
+    recovery_mode_for,
+)
 from src.tracing.graphs import CallGraph
 from src.tracing.logger import Trace, read_trace
 from src.tracing.tools import Tools
@@ -131,6 +137,10 @@ class RecoveryResult:
     scope: Escalation
     escalations: int
     recovered_path: Path | None
+    # Every event this recovery actually recomputed -- the set handed to the
+    # last replay attempt. THE field to score work preserved on, and the same
+    # definition the baselines are scored under. See ReplayReport.invalidation.
+    invalidated: frozenset[str]
     task_success: bool
     analysis_tokens: int
     replay_tokens: int
@@ -164,7 +174,39 @@ def recover(
         checkpoints = CheckpointStore.load(checkpoint_path_for(original.path))
     checkpoints = checkpoints or []
 
+    # --- Phase 3a: checkpoint lifecycle, on the path that actually runs ------
+    # `gc_checkpoints()` was built and tested (20 tests) and called by no
+    # experiment. Run it here, before planning, so the frontier is chosen over
+    # the checkpoints a real deployment would still be holding rather than over
+    # every checkpoint ever written.
+    #
+    # Dropping a checkpoint cannot make recovery less safe: GC only removes a
+    # checkpoint that a *later* confirmed-clean one dominates, and it never
+    # removes an agent's most recent one. If nothing has been examined, nothing
+    # is dropped -- which is what happens on a lightly-analysed trace, and is
+    # the conservative direction.
+    gc = gc_checkpoints(checkpoints, original)
+    checkpoints = gc.retained
+    notes: list[str] = []
+    if gc.deleted:
+        notes.append(
+            f"checkpoint GC dropped {len(gc.deleted)} of "
+            f"{len(gc.deleted) + len(gc.retained)} checkpoints "
+            f"({gc.bytes_freed}B freed, {gc.bytes_retained}B retained)"
+        )
+
     plan = plan_recovery(original, flagged_list, checkpoints, policy=policy)
+
+    # --- Phase 3a: the recovery horizon -------------------------------------
+    # An incident reaching back past the horizon cannot be replayed selectively
+    # -- the prompts behind it have been downgraded to their hashes -- so the
+    # scope widens to a coarse agent restart rather than a selective plan that
+    # would silently skip the events it cannot re-issue.
+    mode = recovery_mode_for(original, plan.invalidation_set)
+    horizon_scope: set[str] | None = None
+    if mode.mode == "coarse":
+        horizon_scope = set(mode.invalidation)
+        notes.append(f"recovery horizon: {mode.reason}")
     agent_scope = _compromised_and_downstream(original, flagged_list)
     all_events = {e.id for e in original.events}
 
@@ -176,12 +218,34 @@ def recover(
     last_report: ReplayReport | None = None
     recovered_path: Path | None = None
     task_success = False
-    notes: list[str] = []
 
-    while scope != "exhausted" and escalations <= max_escalations:
+    # `escalations` counts WIDENINGS ACTUALLY REPLAYED, and is bounded by
+    # max_escalations. The budget check is at the bottom of the loop, not in
+    # this guard, and that placement is the fix rather than an accident:
+    #
+    #   was:  while scope != "exhausted" and escalations <= max_escalations:
+    #             ... replay ...
+    #             scope = next_scope(scope); escalations += 1
+    #
+    # `next_scope("restart_all")` is `"exhausted"`, which is a terminal marker
+    # and not a scope anything is replayed at. The old loop incremented on that
+    # transition too, so a run that exhausted the ladder reported
+    # `escalations=3` against `max_escalations=2` -- three counted, two
+    # performed. Every blind-detector cell in the campaign printed 3.
+    #
+    # Moving the guard to `<` in the header, which is the obvious-looking fix,
+    # is worse: with max=2 it stops after agent_restart and `restart_all` --
+    # the strongest recovery the ladder has -- becomes unreachable. So the
+    # count is fixed where the count was wrong, and the ladder still reaches
+    # its top rung.
+    while scope != "exhausted":
         invalidation = invalidation_for_scope(
             scope, plan.invalidation_set, agent_scope, all_events
         )
+        if scope == "selective" and horizon_scope is not None:
+            # The selective plan is not replayable at this horizon; use the
+            # coarse fallback instead of a plan that cannot be carried out.
+            invalidation = frozenset(horizon_scope)
         target = Path(out_path)
         if escalations:
             target = target.with_name(f"{target.stem}-esc{escalations}{target.suffix}")
@@ -201,25 +265,21 @@ def recover(
         )
         recovered = read_trace(result.trace_path)
         region = _post_recovery_region(original, recovered, report, flagged_list)
-        refs = live_memory_points_at_invalidated(
+        # One implementation, shared. This block used to reimplement
+        # `verify()` inline and, in doing so, dropped its missing-flagged-source
+        # warning: a flagged source absent from the recovered trace cannot seed
+        # a walk, the walk comes back empty, and an empty walk is
+        # indistinguishable from a clean recovery. The region is computed here
+        # rather than inside verify() because the post-recovery walk needs the
+        # splice/replay bookkeeping -- see `_post_recovery_region`.
+        last_verify = verify(
             recovered,
-            invalidation,
-            dict(tools.memory) if tools is not None else {},
-            original=original,
-        )
-        reasons: list[str] = []
-        if region.events:
-            reasons.append("Taint(new_graph) is non-empty")
-        if refs:
-            reasons.append("referential inconsistency")
-        if not result.task_success:
-            reasons.append("task-level check failed")
-        last_verify = VerifyResult(
-            ok=not reasons,
-            tainted_events=frozenset(region.events),
-            referential_failures=refs,
+            flagged_list,
             task_success=result.task_success,
-            reasons=reasons,
+            invalidated=invalidation,
+            current_memory=dict(tools.memory) if tools is not None else None,
+            original=original,
+            region=region,
         )
 
         last_report = report
@@ -230,20 +290,30 @@ def recover(
             notes.append(f"succeeded at scope={scope}")
             break
         notes.append(f"verify failed at scope={scope}: {last_verify.reasons}")
+        if escalations >= max_escalations:
+            notes.append(
+                f"escalation budget spent ({escalations}/{max_escalations}); "
+                f"stopping at scope={scope}"
+            )
+            scope = "exhausted"
+            break
         scope = next_scope(scope)
         escalations += 1
 
     replay_tokens = last_report.replay_tokens if last_report else 0
-    invalidation_final = invalidation_for_scope(
-        "selective" if last_verify.ok and escalations == 0 else scope,
-        plan.invalidation_set,
-        agent_scope,
-        all_events,
-    )
-    if last_verify.ok and escalations == 0:
+    # What was actually recomputed: the set handed to the last replay attempt,
+    # which after an escalation is the widened scope rather than the original
+    # selective plan.
+    #
+    # This used to fall back to `last_report.replayed` on any escalation, which
+    # holds only the events that made a model call -- 6 of 19 here. A
+    # `restart_all` escalation redoes every event and was reported as having
+    # redone six, so the blast radius of the most expensive recovery available
+    # came out smaller than the blast radius of the cheapest.
+    if last_report is not None:
+        invalidation_final = set(last_report.invalidation)
+    else:
         invalidation_final = set(plan.invalidation_set)
-    elif last_report is not None:
-        invalidation_final = set(last_report.replayed)
     agents_hit = {original.event(eid).agent_id for eid in invalidation_final if original.has_event(eid)}
 
     return RecoveryResult(
@@ -253,6 +323,7 @@ def recover(
         scope=scope if last_verify.ok else (scope if scope == "exhausted" else scope),
         escalations=escalations if not last_verify.ok else max(0, escalations),
         recovered_path=recovered_path,
+        invalidated=frozenset(invalidation_final),
         task_success=task_success,
         analysis_tokens=analysis_tokens,
         replay_tokens=replay_tokens,

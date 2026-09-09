@@ -29,6 +29,12 @@ affected part from the nearest trusted checkpoint.
 - `docs/03-open-issues.md` — known weak points; **read before proposing designs**
 - `docs/04-experiments.md` — attack scenarios, baselines, metrics
 - `docs/05-decisions.md` — running log of decisions and their reasons
+- `docs/06-limitations.md` — what the system does not do, and what the
+  measurements actually say; **read before quoting a number**
+- `docs/07-completion-report.md` — integration sprint results
+- `docs/08-final-report.md` — Final Push (Phases A–D) results, and the
+  **current** claims-you-can-make / claims-you-cannot lists; supersedes `07`
+  where they disagree
 
 ## Repo layout
 
@@ -36,7 +42,8 @@ affected part from the nearest trusted checkpoint.
 src/tracing/      event logging, call graph, event graph, checkpoints
 src/provenance/   source IDs, influence edges, counterfactual checking
 src/recovery/     contaminated region, recovery planner, selective replay
-src/eval/         attack injection, baselines, metrics, run harness
+src/eval/         attack injection, baselines, metrics, economics, run harness
+src/risk/         attack-probability model (per-channel pa)
 data/             traces, results (gitignored except small samples)
 paper/            LaTeX / drafts
 docs/             everything above

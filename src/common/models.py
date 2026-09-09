@@ -516,6 +516,11 @@ class UsageRecord:
 # --- JSON convenience --------------------------------------------------------
 
 
+# DEAD CODE -- no caller, kept for reference.
+# The logger writes records with `json.dumps({"record": ..., **obj.to_dict()})`
+# because every line needs the record tag, so this never gets used. `from_json`
+# below is its pair and is equally unused; both are kept as the obvious API a
+# reader looks for next to `to_dict`/`from_dict`.
 def to_json(
     obj: Event | Source | InfluenceEdge | CheckRecord | UsageRecord, **kwargs: Any
 ) -> str:

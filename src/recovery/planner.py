@@ -39,6 +39,10 @@ from src.tracing.logger import Trace
 # --- event-to-event influence ----------------------------------------------
 
 
+# DEAD CODE -- no caller, kept for reference.
+# The inverse of `source_producer()` below, which is the direction every
+# caller actually needs. Kept because the pairing is what makes the D-012
+# event/source correspondence readable.
 def derived_source_of(trace: Trace, event_id: str) -> list[str]:
     """Sources that *are* this event's output (D-012)."""
     return [s.id for s in trace.sources if s.derived_from == event_id]
@@ -408,7 +412,41 @@ def candidate_actions(
     frontiers: dict[str, Checkpoint | None],
     order: list[str],
 ) -> list[Action]:
-    """The action vocabulary, instantiated for this incident."""
+    """The action vocabulary, instantiated for this incident.
+
+    WHY EVERY TAINTED EVENT IS OFFERED, INCLUDING THE ONES A REPLAY CANNOT
+    CHANGE
+    ----------------------------------------------------------------------
+    An action breaks a MaliciousSource -> FinalOutput path by recomputing a
+    node on it without the malicious source, which works because
+    `SplicingClient` redacts flagged sources from a prompt before re-issuing it
+    (`redact_flagged` in src/recovery/replay.py). That mechanism exists only
+    for events that made a model call: tool calls, tool responses, memory
+    operations and the Executor's comparison are recomputed by pipeline code as
+    a pure function of unchanged upstream, so re-running one reproduces it
+    exactly.
+
+    So the vocabulary contains actions that cannot really cut anything, and
+    once the Coder->Executor edge existed and real paths appeared, the greedy's
+    cheapest option on every influencing scenario became `invalidate(e0019)` --
+    the Executor's final comparison, cost 1 because it spends no tokens,
+    sitting at the end of every path. Verification rejects those plans and the
+    run escalates.
+
+    Filtering the vocabulary down to model-written events was tried and is NOT
+    what this does, because it made results worse rather than better: with the
+    cheap cut removed the greedy exceeds its `restart_all` cost cap on traces
+    where taint is wide, and falls back to a full restart. Two configurations
+    regressed to restart_all that had previously produced a selective plan.
+
+    The real disagreement is one level up and is recorded in
+    docs/06-limitations.md: Step 2 optimises "cut every source -> output path"
+    while Step 4 verifies "Taint(new_graph) is empty", and those are not the
+    same condition. A tainted event that sits on no source -> output path
+    satisfies the first and fails the second. Reconciling them is a design
+    decision about what Step 2 should optimise, not a filter, and it is not
+    made here.
+    """
     actions: list[Action] = []
     full = restart_all_cost(trace)
     actions.append(restart_all_action(trace))
@@ -533,25 +571,48 @@ def plan_recovery(
     actions = candidate_actions(trace, set(taint.events), frontiers, order)
     cap = restart_all_cost(trace)
 
-    if not paths and taint.events:
-        # The Executor runs the Coder's script without that script being
-        # wrapped as a source in its context (pipeline records the
-        # Executor as structurally clean). Influence therefore stops at
-        # the Coder, FinalOutput is never in Taint, and the path set is
-        # empty even when the task result is poisoned. Treating each
-        # tainted event as a sink that must be covered is the
-        # conservative reading of Step 2: we still cut the contaminated
-        # region, we just cannot see the last hop.
-        paths = [
-            InfluencePath(source_id="taint", events=(eid,), edges=())
-            for eid in sorted(taint.events)
-        ]
-    if not paths:
-        # Truly exposed-only: Taint is empty, or every path was cleared.
+    # STEP 2'S COVERING TARGET IS THE CONTAMINATION CLOSURE (D-047)
+    # ------------------------------------------------------------
+    # Step 2 used to minimise cost subject to "cut every MaliciousSource ->
+    # FinalOutput path", while Step 4 accepts a recovery only when
+    # `Taint(new_graph)` is empty. Those are different conditions: a tainted
+    # event lying on no source -> output path satisfies the first and fails
+    # the second, so Step 2 would leave it alone to save cost and Step 4 would
+    # correctly reject the plan. The run then escalated.
+    #
+    # This was invisible until the Coder->Executor bridge existed, because
+    # `malicious_to_output_paths()` returned nothing on every trace, a
+    # "treat each tainted event as a sink" fallback fired unconditionally, and
+    # the cover satisfied Step 4 by accident. With real paths the two came
+    # apart at once: A-influencing/oracle went from no escalation at 67.8%
+    # work preserved to agent_restart at 15.8%.
+    #
+    # The fix is to make Step 2 optimise what Step 4 checks. Step 4 does not
+    # move -- it is the safety floor. The alternative, narrowing Step 4 to
+    # Step 1's old target, would mean accepting that genuinely tainted state
+    # can survive a "successful" recovery whenever it does not happen to feed
+    # the current output. That is exactly the silent residual risk this
+    # project refuses everywhere else.
+    #
+    # Mechanically: one singleton path per tainted event. `breaks_path()` on a
+    # singleton is true iff the event is in the action's `invalidates`, so
+    # "cover every singleton" is literally "invalidation_set covers Taint",
+    # which is Step 4's condition. `greedy_cover` and its cost function are
+    # untouched -- only the thing being covered changed.
+    #
+    # `paths` is still computed and still reported on the plan: it is a real
+    # provenance result and the summary line quotes it. It is no longer what
+    # Step 2 optimises against.
+    cover_targets = [
+        InfluencePath(source_id="taint", events=(eid,), edges=())
+        for eid in sorted(taint.events)
+    ]
+    if not cover_targets:
+        # Truly exposed-only: Taint is empty. Nothing to cut, nothing to redo.
         selected: list[Action] = []
         invalidation: set[str] = set()
     else:
-        selected = greedy_cover(paths, actions, cap)
+        selected = greedy_cover(cover_targets, actions, cap)
         invalidation = set()
         for action in selected:
             invalidation |= action.invalidates

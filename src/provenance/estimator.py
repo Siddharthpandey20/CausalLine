@@ -51,7 +51,12 @@ from typing import Any, Callable, Iterable
 from src.common.models import InfluenceEdge
 from src.common.prompts import SourceNotInPrompt, redact_in_prompt
 from src.provenance import selfreport
-from src.provenance.attribution import AttributionRequest, Sink
+from src.provenance.attribution import (
+    AttributionRequest,
+    Sink,
+    derived_links_for,
+)
+from src.common.models import SOURCE_KINDS as _SOURCE_KINDS
 from src.provenance.signatures import (
     Calibration,
     Comparator,
@@ -61,6 +66,21 @@ from src.provenance.signatures import (
 )
 
 MODES = ("hybrid", "self_report", "counterfactual")
+
+# Below this many candidates, group testing costs MORE than removing them one
+# at a time, and that is arithmetic rather than tuning. Recursive halving pays
+# two calls per split (one per half) and only wins when a whole half comes back
+# clean; with two or three candidates there is no half big enough for that to
+# save anything. Dorfman's bound is O(k log(n/k)) for k << n, and n=2 is not
+# that regime.
+#
+# Measured, which is why the constant exists: with group testing applied
+# unconditionally the targeted refinement path went from 3 calls to 4 on
+# scenario A, and the economics report's analysis cost A rose from 300 to 400
+# tokens -- the wiring made the number it was supposed to improve worse. The
+# same wiring saves 15% on the inline counterfactual path, where events carry
+# eight to eleven candidates.
+MIN_GROUP_TEST_CANDIDATES = 4
 
 
 @dataclass
@@ -259,6 +279,20 @@ class HybridAttributor:
     # None disables it and the comparator falls back to its AST facets.
     run_code: Callable[[str], dict[str, Any]] | None = None
     seed: int = 20260906
+    # --- Phase 2 wiring ---------------------------------------------------
+    # Group-test the sources that need evidence instead of removing them one
+    # at a time (Dorfman; src/provenance/group_test.py), with the fixed-budget
+    # Lasso fallback (src/provenance/budget_attribution.py) behind it for when
+    # the sparsity assumption stops holding. Both were built and tested
+    # standalone and reached no experiment until now. On by default; the
+    # switch exists so the saving can be measured rather than asserted.
+    use_group_testing: bool = True
+    # Measured per-channel precision of positive self-reports
+    # (src/provenance/calibration.py). A channel that clears its threshold has
+    # its positives accepted without a verifying call. Never applied to a
+    # negative: accepting a positive costs replay tokens, accepting a negative
+    # costs safety.
+    self_report_calibration: Any = None
     # Filled in as it goes, for the cost table and the ablation report.
     stats: dict[str, int] = field(default_factory=dict)
 
@@ -312,6 +346,10 @@ class HybridAttributor:
             key=lambda sid: report.claim(sid).confidence if report else 0.0,
         )
 
+        # Sources that will need a counterfactual, collected before any is
+        # spent so they can be removed as a group rather than one at a time.
+        needs_evidence: list[str] = []
+
         for sid in order:
             claim = report.claim(sid) if report else None
             wants_evidence = claim is None or claim.needs_evidence
@@ -322,6 +360,17 @@ class HybridAttributor:
                 and self.audit_rate > 0
                 and self._rng.random() < self.audit_rate
             )
+
+            # --- 2c: a calibrated channel's positive needs no verification ---
+            if audited and self.self_report_calibration is not None:
+                from src.risk.attack_model import channel_for
+
+                kind = request.labels.get(sid, "").split(",")[0].strip()
+                if kind and self.self_report_calibration.accepts_positive(
+                    channel_for(kind) if kind in _SOURCE_KINDS else "unknown"
+                ):
+                    self._bump("calibration_skipped_audit")
+                    audited = False
 
             if claim is not None and claim.used and not audited:
                 self._record_self_report_positive(sink, request, sid, claim)
@@ -347,6 +396,17 @@ class HybridAttributor:
             if not self.budget.allows():
                 self.budget.deny()
                 self._bump("budget_denied")
+                continue
+
+            # Defer: batched below so a group removal can settle several at
+            # once. Ordering is preserved, so the least-confident negatives are
+            # still the ones a tight budget reaches first.
+            #
+            # The size test is applied to the whole deferred set after the loop,
+            # not here -- at this point we do not yet know how many will need
+            # evidence.
+            if self.use_group_testing:
+                needs_evidence.append(sid)
                 continue
 
             result = counterfactual(
@@ -392,6 +452,274 @@ class HybridAttributor:
                 notes=result.notes(),
             )
 
+        # ATOMIC UNITS BEFORE ANY REMOVAL TEST (D-051).
+        # A source and the sources it was recorded as derived from are
+        # individually unnecessary and jointly necessary, so testing them
+        # apart clears both. Merge them first; every test below -- single or
+        # recursive -- then operates on whole units and never splits one.
+        from src.provenance.group_test import merge_derived_units
+
+        units = merge_derived_units(needs_evidence, request.derived_links)
+        merged = [u for u in units if len(u) > 1]
+        if merged:
+            self._bump("derived_units_merged", len(merged))
+            self._bump(
+                "derived_sources_merged", sum(len(u) for u in merged)
+            )
+
+        # The threshold counts units, not sources: units are what halving
+        # actually splits, so three sources merged into one unit is one test,
+        # not three.
+        if len(units) >= MIN_GROUP_TEST_CANDIDATES:
+            self._group_investigate(
+                sink, request, units, comparator, context
+            )
+        else:
+            # Too few to halve profitably. One call each, which is what group
+            # testing would have cost more than.
+            self._bump("group_testing_skipped_small", len(units))
+            for unit in units:
+                if len(unit) == 1:
+                    self._single_investigate(
+                        sink, request, unit[0], comparator, context
+                    )
+                else:
+                    self._merged_investigate(
+                        sink, request, unit, comparator, context
+                    )
+
+    def _merged_investigate(
+        self,
+        sink: Sink,
+        request: AttributionRequest,
+        unit: tuple[str, ...],
+        comparator: Comparator,
+        context: dict[str, Any] | None,
+    ) -> None:
+        """One atomic unit, one counterfactual, removing every member together.
+
+        The small-candidate path still has to respect units, or the fix would
+        apply only above `MIN_GROUP_TEST_CANDIDATES` and the exact case it
+        exists for -- a summary beside its two inputs, three candidates -- would
+        slip through the cheap path untouched.
+
+        The verdict is recorded against **every** member. That is the honest
+        reading of the evidence: the removal shows the unit mattered, and which
+        member carried it is precisely what single-source testing cannot
+        determine here. Calling one member influenced and the others clean
+        would be inventing a distinction the measurement does not support, and
+        it would be the unsafe direction.
+        """
+        from src.provenance.group_test import CounterfactualDecision
+
+        decision = CounterfactualDecision(
+            client=self.client,
+            request=request,
+            comparator=comparator,
+            calibration=self.calibration,
+            context=context,
+        )
+        influenced = bool(decision(list(unit)))
+        self.budget.charge(decision.calls)
+        self._bump("counterfactual_calls", decision.calls)
+        self._bump("merged_unit_tests")
+        self._bump(f"counterfactual_{'tainted' if influenced else 'clean'}")
+        sink.log_usage(
+            "counterfactual",
+            model=self.model,
+            prompt_tokens=0,
+            output_tokens=0,
+            total_tokens=decision.tokens,
+            event_id_=request.event_id,
+            agent_id=request.agent_id,
+        )
+        error = decision.errors[0] if decision.errors else None
+        for sid in unit:
+            if influenced:
+                sink.log_influence(
+                    InfluenceEdge(
+                        sid, request.event_id, method="counterfactual",
+                        confident=error is None,
+                    )
+                )
+            sink.log_check(
+                sid, request.event_id,
+                "tainted" if influenced else "clean",
+                "counterfactual",
+                confidence=0.5 if error else 1.0,
+                signature_before=decision._before.value,
+                signature_after="",
+                comparator=comparator.name,
+                repeats=1,
+                notes=(
+                    f"removed as one atomic unit with {list(unit)} -- these "
+                    "carry a recorded derived_from link, so testing them "
+                    "separately clears both (D-051)"
+                ) + (f"; error: {error}" if error else ""),
+            )
+
+    def _single_investigate(
+        self,
+        sink: Sink,
+        request: AttributionRequest,
+        sid: str,
+        comparator: Comparator,
+        context: dict[str, Any] | None,
+    ) -> None:
+        """One source, one counterfactual. The path a candidate set too small
+        to halve profitably takes -- see MIN_GROUP_TEST_CANDIDATES."""
+        result = counterfactual(
+            self.client, request, sid,
+            comparator=comparator,
+            calibration=self.calibration,
+            repeats=self.repeats,
+            context=context,
+            control_run=self.control_run,
+        )
+        self.budget.charge(result.calls)
+        self._bump("counterfactual_calls", result.calls)
+        self._bump(f"counterfactual_{result.verdict}")
+        sink.log_usage(
+            "counterfactual",
+            model=self.model,
+            prompt_tokens=0,
+            output_tokens=0,
+            total_tokens=result.tokens,
+            event_id_=request.event_id,
+            agent_id=request.agent_id,
+        )
+        if result.influenced:
+            sink.log_influence(
+                InfluenceEdge(
+                    sid, request.event_id, method="counterfactual",
+                    confident=result.error is None,
+                )
+            )
+        sink.log_check(
+            sid, request.event_id, result.verdict, "counterfactual",
+            confidence=0.5 if result.error else 1.0,
+            signature_before=result.before.value,
+            signature_after=result.after.value,
+            comparator=comparator.name,
+            repeats=result.repeats,
+            notes=result.notes(),
+        )
+
+    def _group_investigate(
+        self,
+        sink: Sink,
+        request: AttributionRequest,
+        units: list[tuple[str, ...]],
+        comparator: Comparator,
+        context: dict[str, Any] | None,
+    ) -> None:
+        """Settle several sources with group removals instead of one call each.
+
+        This is where the cost actually is. A Researcher event in this pipeline
+        carries eight exposures and the Coder's decision event eleven, so
+        leave-one-out spends eight or eleven counterfactuals on one event --
+        while the replay those calls exist to avoid may cost one. That ratio is
+        docs/03 issue #7's collapse condition.
+
+        A group that changes nothing when removed contains nothing that
+        mattered, so a clean half of eight costs one call rather than eight.
+        The blind spot is interaction effects, which is documented on
+        `group_test()` and inherited from single-source leave-one-out rather
+        than introduced here (D-030, D-042).
+
+        Falls through to fixed-budget attribution when the group-test
+        diagnostics say sparsity is failing -- the Context-Cite-style fallback
+        the design specified and which nothing previously reached.
+        """
+        from src.provenance.budget_attribution import attribute as budget_attribute
+        from src.provenance.group_test import (
+            CounterfactualDecision,
+            GroupTestDiagnostics,
+            group_test,
+        )
+
+        decision = CounterfactualDecision(
+            client=self.client,
+            request=request,
+            comparator=comparator,
+            calibration=self.calibration,
+            context=context,
+        )
+        diagnostics = GroupTestDiagnostics()
+
+        # `group_test` halves a flat list, so it is handed one KEY per atomic
+        # unit and the decision function expands a key back to every source in
+        # that unit before removing it. The recursion therefore cannot split a
+        # unit: it never sees the members, only the key.
+        by_key = {unit[0]: unit for unit in units}
+        keys = [unit[0] for unit in units]
+
+        def unit_decision(group: list[str]) -> bool:
+            return decision([sid for key in group for sid in by_key[key]])
+
+        influential_keys = set(group_test(keys, unit_decision, diagnostics))
+        influential = {sid for key in influential_keys for sid in by_key[key]}
+        candidates = [sid for unit in units for sid in unit]
+
+        self._bump("group_tests", diagnostics.groups_tested)
+        self._bump("group_calls", decision.calls)
+        # What leave-one-out would have spent on the same candidates.
+        self._bump("group_calls_saved", len(candidates) - decision.calls)
+        if diagnostics.interaction_suspected:
+            self._bump("interaction_suspected", diagnostics.interaction_suspected)
+
+        if diagnostics.sparsity_failing():
+            self._bump("sparsity_failing")
+            fitted = budget_attribute(
+                keys, unit_decision, budget=max(16, len(keys) + 2)
+            )
+            self._bump("budget_fallback_calls", fitted.calls)
+            self._bump("budget_fallback_invocations")
+            if not fitted.degenerate:
+                # Fitted over unit keys, so expand before reporting -- the
+                # fallback must respect atomic units for the same reason the
+                # halving does.
+                influential = {
+                    sid for key in fitted.influential for sid in by_key[key]
+                }
+
+        self.budget.charge(decision.calls)
+        self._bump("counterfactual_calls", decision.calls)
+        sink.log_usage(
+            "counterfactual",
+            model=self.model,
+            prompt_tokens=0,
+            output_tokens=0,
+            total_tokens=decision.tokens,
+            event_id_=request.event_id,
+            agent_id=request.agent_id,
+        )
+
+        error = decision.errors[0] if decision.errors else None
+        for sid in candidates:
+            hit = sid in influential
+            self._bump(f"counterfactual_{'tainted' if hit else 'clean'}")
+            if hit:
+                sink.log_influence(
+                    InfluenceEdge(
+                        sid, request.event_id, method="counterfactual",
+                        confident=error is None,
+                    )
+                )
+            sink.log_check(
+                sid, request.event_id, "tainted" if hit else "clean",
+                "counterfactual",
+                confidence=0.5 if error else 1.0,
+                signature_before=decision._before.value,
+                signature_after=decision._before.value if not hit else "",
+                comparator=comparator.name,
+                repeats=1,
+                notes=(
+                    f"group-tested over {len(candidates)} candidates in "
+                    f"{decision.calls} calls ({diagnostics.line()})"
+                ) + (f"; error: {error}" if error else ""),
+            )
+
     def _record_self_report_positive(
         self, sink: Sink, request: AttributionRequest, sid: str, claim: Any
     ) -> None:
@@ -426,13 +754,48 @@ class RefineResult:
     tokens: int = 0
     denied: int = 0
     order: list[tuple[str, str]] = field(default_factory=list)
+    # --- Phase 2 instrumentation ------------------------------------------
+    # What the wired-in cost reductions actually did on this run. Reported
+    # rather than assumed: each of these was built and tested standalone, and
+    # a standalone measurement does not transfer until it is measured here.
+    groups_tested: int = 0
+    group_calls_saved: int = 0
+    sprt_decision: str = ""
+    sprt_checks: int = 0
+    sprt_log_lr: float = 0.0
+    sprt_trajectory: list[float] = field(default_factory=list)
+    aborted_early: bool = False
+    calibration_skips: int = 0
+    fallback_invocations: int = 0
+    # How often a summary and its own recorded inputs were removed together
+    # instead of separately (D-051), and how many sources that covered.
+    derived_units_merged: int = 0
+    derived_sources_merged: int = 0
 
     def summary(self) -> str:
-        return (
+        parts = [
             f"examined {self.examined} pairs ({self.cleared} cleared, "
             f"{self.tainted} influenced) in {self.calls} calls, "
             f"{self.tokens} tokens; {self.denied} denied by budget"
-        )
+        ]
+        if self.groups_tested:
+            parts.append(
+                f"group testing: {self.groups_tested} groups, "
+                f"{self.group_calls_saved} calls saved vs leave-one-out"
+            )
+        if self.sprt_decision:
+            parts.append(
+                f"SPRT: {self.sprt_decision} after {self.sprt_checks} "
+                f"observations (logLR={self.sprt_log_lr:+.2f})"
+                + (" -- ABORTED EARLY" if self.aborted_early else "")
+            )
+        if self.calibration_skips:
+            parts.append(f"calibration skipped {self.calibration_skips} checks")
+        if self.fallback_invocations:
+            parts.append(
+                f"budget-attribution fallback fired {self.fallback_invocations}x"
+            )
+        return "; ".join(parts)
 
 
 def refine_for_verdict(
@@ -445,6 +808,10 @@ def refine_for_verdict(
     run_code: Callable[[str], dict[str, Any]] | None = None,
     model: str = "unknown",
     control_run: bool = False,
+    use_group_testing: bool = True,
+    use_sprt: bool = True,
+    sprt_config: Any = None,
+    self_report_calibration: Any = None,
 ) -> RefineResult:
     """Examine only the pairs the detector's verdict makes relevant.
 
@@ -467,8 +834,45 @@ def refine_for_verdict(
 
     Appends `check` and `influence` records to the existing trace, which is what
     the append-only format is for (D-008). Nothing already written is rewritten.
+
+    THREE COST REDUCTIONS, WIRED IN HERE
+    ------------------------------------
+    Each was built and tested standalone and reached no experiment until now.
+    All three default on; the switches exist so the before/after can be
+    measured rather than asserted.
+
+    `use_group_testing`  Instead of one counterfactual per candidate source,
+        the unchecked sources on a single event are removed in groups and the
+        recursion descends only into halves that mattered (Dorfman;
+        src/provenance/group_test.py). When the group-test diagnostics say the
+        sparsity assumption is failing, this falls through to the fixed-budget
+        Lasso attribution (src/provenance/budget_attribution.py) rather than
+        continuing to halve blindly -- the fallback the design always specified
+        and which was previously unreachable.
+
+    `use_sprt`  Each candidate's verdict is a Bernoulli observation of the
+        contamination fraction. After every one, Wald's sequential test
+        (src/recovery/sprt_investigate.py) is updated; if the evidence says
+        contamination is spreading past the point where selective recovery pays
+        for itself, the investigation stops there instead of spending the rest
+        of its budget on a trace already trending towards "restart". The
+        trajectory is recorded either way, so "SPRT never fired" is a reported
+        measurement rather than silence.
+
+    `self_report_calibration`  A measured per-channel precision
+        (src/provenance/calibration.py). Channels whose positive self-reports
+        are precise enough are accepted without spending a counterfactual.
     """
+    from src.provenance.budget_attribution import attribute as budget_attribute
     from src.provenance.contamination import contaminate
+    from src.provenance.group_test import (
+        CounterfactualDecision,
+        GroupTestDiagnostics,
+        group_test,
+        merge_derived_units,
+    )
+    from src.recovery.sprt_investigate import SPRTConfig, SPRTState
+    from src.risk.attack_model import channel_for
     from src.tracing.logger import TraceLogger, read_trace
 
     calibration = calibration or Calibration()
@@ -476,72 +880,242 @@ def refine_for_verdict(
     result = RefineResult()
     flagged = set(malicious)
 
+    sprt = SPRTState(config=sprt_config or SPRTConfig()) if use_sprt else None
+
     trace = read_trace(trace_path)
     trace.validate()
+
+    def _record(log, sid, eid, request, influenced, error, before, after, repeats_done):
+        """One verdict written to the trace. Shared by both investigation
+        paths so a group-tested verdict and a single-source one are recorded
+        identically -- the trace must not be able to tell which found it."""
+        comparator = for_event(request.kind, request.output).name
+        if influenced:
+            result.tainted += 1
+            log.log_influence(
+                InfluenceEdge(sid, eid, method="counterfactual",
+                              confident=error is None)
+            )
+        else:
+            result.cleared += 1
+        log.log_check(
+            sid, eid, "tainted" if influenced else "clean", "counterfactual",
+            confidence=0.5 if error else 1.0,
+            signature_before=before,
+            signature_after=after,
+            comparator=comparator,
+            repeats=repeats_done,
+            notes=(
+                "group-tested counterfactual" if use_group_testing
+                else "single-source counterfactual"
+            ) + (f"; error: {error}" if error else ""),
+        )
+        result.examined += 1
+        result.order.append((sid, eid))
 
     with TraceLogger(trace_path, append=True, meta={"record_kind": "refinement"}) as log:
         while True:
             region = contaminate(trace, flagged)
-            candidates = [
-                (sid, eid)
-                for eid, sid in _unchecked_in_region(trace, region.sources)
-            ]
+            pending = _unchecked_in_region(trace, region.sources)
+            candidates = [(sid, eid) for eid, sid in pending]
             if not candidates:
                 break
             if not budget.allows():
                 result.denied += len(candidates)
                 break
 
-            sid, eid = candidates[0]
-            request = request_for(trace, eid, run_code=run_code)
+            # Work one event at a time. Group testing removes several of an
+            # event's sources in a single call, so the sources have to be
+            # batched by the event whose prompt they are being removed from.
+            target_event = candidates[0][1]
+            group = [sid for sid, eid in candidates if eid == target_event]
+
+            request = request_for(trace, target_event, run_code=run_code)
             if request is None:
                 # Nothing to re-issue. Left unchecked, so the walk keeps it
                 # contaminated; a placeholder `clean` here would be a fabricated
                 # clearance.
-                _mark_unexaminable(log, sid, eid)
+                for sid in group:
+                    _mark_unexaminable(log, sid, target_event)
                 trace = read_trace(trace_path)
                 continue
 
-            outcome = counterfactual(
-                client, request, sid,
-                calibration=calibration,
-                repeats=repeats,
-                context={"run": run_code} if run_code else None,
-                control_run=control_run,
-            )
-            budget.charge(outcome.calls)
-            result.examined += 1
-            result.calls += outcome.calls
-            result.tokens += outcome.tokens
-            result.order.append((sid, eid))
-            comparator = for_event(request.kind, request.output).name
+            # --- 2c: calibration can settle a positive without a call --------
+            if self_report_calibration is not None:
+                keep: list[str] = []
+                for sid in group:
+                    channel = channel_for(trace.source(sid).kind)
+                    record = trace.check_record(target_event, sid)
+                    positive = (
+                        record is not None
+                        and record.method == "self_report"
+                        and record.verdict == "tainted"
+                    )
+                    if positive and self_report_calibration.accepts_positive(channel):
+                        # Accepting a positive costs replay tokens and never
+                        # costs safety. A negative is never settled this way.
+                        result.calibration_skips += 1
+                        continue
+                    keep.append(sid)
+                group = keep
+                if not group:
+                    trace = read_trace(trace_path)
+                    continue
 
-            if outcome.influenced:
-                result.tainted += 1
-                log.log_influence(
-                    InfluenceEdge(sid, eid, method="counterfactual",
-                                  confident=outcome.error is None)
+            context = {"run": run_code} if run_code else None
+            decision = CounterfactualDecision(
+                client=client,
+                request=request,
+                calibration=calibration,
+                context=context,
+            )
+
+            # --- ATOMIC UNITS BEFORE ANY REMOVAL TEST (D-051) ---------------
+            # A source and the sources it was recorded as derived from are
+            # individually unnecessary and jointly necessary, so removing
+            # either alone clears both. Merge them into units removed whole and
+            # never split -- including inside the halving, which only ever sees
+            # unit keys.
+            units = merge_derived_units(group, request.derived_links)
+            merged_units = [u for u in units if len(u) > 1]
+            result.derived_units_merged += len(merged_units)
+            result.derived_sources_merged += sum(len(u) for u in merged_units)
+
+            by_key = {unit[0]: unit for unit in units}
+            unit_keys = [unit[0] for unit in units]
+
+            def unit_decision(keys, _d=decision, _m=by_key):
+                return _d([sid for key in keys for sid in _m[key]])
+
+            # The threshold counts units, not sources: units are what halving
+            # splits, so three sources in one unit are one test, not three.
+            batched = use_group_testing and len(units) >= MIN_GROUP_TEST_CANDIDATES
+            if batched:
+                diagnostics = GroupTestDiagnostics()
+                influential_keys = set(
+                    group_test(unit_keys, unit_decision, diagnostics)
+                )
+                result.groups_tested += diagnostics.groups_tested
+                # What leave-one-out would have spent on the same group.
+                result.group_calls_saved += len(group) - decision.calls
+
+                # --- 2b fallback: sparsity assumption failing ---------------
+                if diagnostics.sparsity_failing():
+                    fitted = budget_attribute(
+                        unit_keys, unit_decision, budget=max(16, len(unit_keys) + 2)
+                    )
+                    result.fallback_invocations += 1
+                    if not fitted.degenerate:
+                        influential_keys = set(fitted.influential)
+                influential = {
+                    sid for key in influential_keys for sid in by_key[key]
+                }
+
+                for sid in sorted(group):
+                    _record(
+                        log, sid, target_event, request,
+                        influenced=sid in influential,
+                        error=decision.errors[0] if decision.errors else None,
+                        before=decision._before.value,
+                        after=decision._before.value if sid not in influential else "",
+                        repeats_done=1,
+                    )
+                    if sprt is not None:
+                        sprt.observe(sid in influential)
+                        result.sprt_trajectory.append(round(sprt.log_lr, 3))
+                budget.charge(decision.calls)
+                result.calls += decision.calls
+                result.tokens += decision.tokens
+            elif len(by_key[unit_keys[0]]) > 1:
+                # Below the batching threshold, but the first unit is a merged
+                # one and still has to be removed whole -- otherwise the fix
+                # would apply only above MIN_GROUP_TEST_CANDIDATES and the
+                # exact case it exists for, a summary beside its inputs, would
+                # slip through the cheap path untouched.
+                unit = by_key[unit_keys[0]]
+                influenced = bool(unit_decision([unit_keys[0]]))
+                budget.charge(decision.calls)
+                result.calls += decision.calls
+                result.tokens += decision.tokens
+                error = decision.errors[0] if decision.errors else None
+                for sid in unit:
+                    # Recorded against every member. The removal shows the unit
+                    # mattered; which member carried it is exactly what
+                    # single-source testing cannot determine here, and
+                    # splitting the verdict would invent a distinction the
+                    # measurement does not support, in the unsafe direction.
+                    _record(
+                        log, sid, target_event, request,
+                        influenced=influenced,
+                        error=error,
+                        before=decision._before.value,
+                        after="" if influenced else decision._before.value,
+                        repeats_done=1,
+                    )
+                    if sprt is not None:
+                        sprt.observe(influenced)
+                        result.sprt_trajectory.append(round(sprt.log_lr, 3))
+                log.log_usage(
+                    "counterfactual", model=model, prompt_tokens=0,
+                    output_tokens=0, total_tokens=decision.tokens,
+                    event_id_=target_event, agent_id=request.agent_id,
                 )
             else:
-                result.cleared += 1
-            log.log_usage(
-                "counterfactual",
-                model=model,
-                prompt_tokens=0,
-                output_tokens=0,
-                total_tokens=outcome.tokens,
-                event_id_=eid,
-                agent_id=request.agent_id,
-            )
-            log.log_check(
-                sid, eid, outcome.verdict, "counterfactual",
-                confidence=0.5 if outcome.error else 1.0,
-                signature_before=outcome.before.value,
-                signature_after=outcome.after.value,
-                comparator=comparator,
-                repeats=outcome.repeats,
-                notes=outcome.notes(),
-            )
+                sid = group[0]
+                outcome = counterfactual(
+                    client, request, sid,
+                    calibration=calibration,
+                    repeats=repeats,
+                    context=context,
+                    control_run=control_run,
+                )
+                budget.charge(outcome.calls)
+                result.calls += outcome.calls
+                result.tokens += outcome.tokens
+                _record(
+                    log, sid, target_event, request,
+                    influenced=outcome.influenced,
+                    error=outcome.error,
+                    before=outcome.before.value,
+                    after=outcome.after.value,
+                    repeats_done=outcome.repeats,
+                )
+                log.log_usage(
+                    "counterfactual", model=model, prompt_tokens=0,
+                    output_tokens=0, total_tokens=outcome.tokens,
+                    event_id_=target_event, agent_id=request.agent_id,
+                )
+                if sprt is not None:
+                    sprt.observe(outcome.influenced)
+                    result.sprt_trajectory.append(round(sprt.log_lr, 3))
+
+            if batched:
+                log.log_usage(
+                    "counterfactual", model=model, prompt_tokens=0,
+                    output_tokens=0, total_tokens=decision.tokens,
+                    event_id_=target_event, agent_id=request.agent_id,
+                )
+
+            # --- 2a: stop as soon as the evidence is decisive ---------------
+            if sprt is not None:
+                result.sprt_checks = sprt.checks
+                result.sprt_log_lr = sprt.log_lr
+                verdict = sprt.decision()
+                if verdict == "abort_restart":
+                    # Contamination is spreading past the point where finishing
+                    # the investigation pays for itself. Everything still
+                    # unchecked stays unchecked, which the walk contaminates --
+                    # so stopping here costs preserved work, never safety.
+                    result.sprt_decision = "abort_restart"
+                    result.aborted_early = True
+                    trace = read_trace(trace_path)
+                    remaining = _unchecked_in_region(
+                        trace, contaminate(trace, flagged).sources
+                    )
+                    result.denied += len(remaining)
+                    break
+                result.sprt_decision = verdict
+
             trace = read_trace(trace_path)
 
     return result
@@ -600,6 +1174,17 @@ def request_for(
         source = trace.source(sid)
         where = source.metadata.get("url") or source.metadata.get("key") or source.kind
         labels[sid] = f"{source.kind}, {where}"
+    # Recorded derived_from links among the exposed sources, so the
+    # investigation loop can merge a summary with its own inputs into one
+    # atomic test unit (D-051). Computed from the finished trace here; the
+    # pipeline computes the same thing mid-run off its partial log.
+    def _producer(sid: str) -> str | None:
+        source = trace.source(sid)
+        return source.derived_from or source.origin_event
+
+    def _influencers(event: str) -> list[str]:
+        return [e.source_id for e in trace.influence if e.target_event == event]
+
     return AttributionRequest(
         event_id=event_id,
         agent_id=event.agent_id,
@@ -610,4 +1195,7 @@ def request_for(
         prompt=prompt,
         source_block=trace.source_block_text(event_id),
         system=trace.system_text(event_id),
+        derived_links=derived_links_for(
+            list(event.exposures), _producer, _influencers
+        ),
     )

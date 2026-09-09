@@ -61,9 +61,24 @@ from src.provenance.attribution import (
     AttributionRequest,
     Attributor,
     NullAttributor,
+    derived_links_for,
     record_carrier,
     record_structural,
 )
+
+
+def source_producer_of(source: Any) -> str | None:
+    """The event a source is the output of, if any.
+
+    Mirrors `planner.source_producer()` but takes the Source object, because
+    the pipeline holds sources in a dict and has no Trace to look them up in
+    while the run is still going.
+    """
+    if source is None:
+        return None
+    return getattr(source, "derived_from", None) or getattr(
+        source, "origin_event", None
+    )
 from src.tracing.checkpoints import CheckpointStore, checkpoint_path_for, overhead
 from src.tracing.logger import TraceLogger, read_trace
 from src.tracing.tools import Tools
@@ -89,6 +104,12 @@ CODER_SYSTEM = (
     "You are the Coder. You receive the Researcher's findings and must produce "
     "working Python. The execution environment has the standard library only "
     "and no network access."
+)
+REVIEWER_SYSTEM = (
+    "You are the Reviewer. You receive a Python script and the Researcher's "
+    "findings. Return the script you would run, corrected if it is wrong and "
+    "unchanged if it is right. Reply with the script and nothing else: no "
+    "markdown fences, no commentary."
 )
 
 
@@ -117,12 +138,53 @@ class GeminiPipeline:
         checkpoints: CheckpointStore | None = None,
         attributor: Attributor | None = None,
         handoff_hook: Any = None,
+        research_rounds: int = 1,
+        reviewer: bool = False,
+        checkpoint_interval: float | None = None,
     ) -> None:
         self.log = log
         self.client = client
         self.tools = tools
         self.task = task
         self.checkpoints = checkpoints
+        # PHASE C: the workflow's length is a parameter, not a constant.
+        #
+        # `research_rounds > 1` makes the Researcher search again with a query
+        # built from what it just found, so round 2's sources are causally
+        # downstream of round 1's. `reviewer=True` inserts a Reviewer agent
+        # between the Coder and the Executor which may revise the script, so
+        # the chain to the final output is researcher -> coder -> reviewer ->
+        # executor rather than researcher -> coder -> executor.
+        #
+        # Both default to the original shape. That is deliberate: the scaling
+        # claim in docs/06 needs the short and long workflows to *both* exist
+        # so A/N can be compared across lengths. Replacing the short one would
+        # move the measurement rather than extend it, and would silently
+        # invalidate every number already in the repository.
+        self.research_rounds = max(1, int(research_rounds))
+        self.reviewer = bool(reviewer)
+        # PHASE D: the Young/Daly interval, wired to the run that produces it.
+        #
+        # `checkpoint_interval()` and `measured_interval()` have existed since
+        # Phase 3a and computed a number nothing consumed: the pipeline still
+        # checkpointed once per agent boundary, whatever the formula said. This
+        # is the half docs/07 recorded as deferred, and it is the half that
+        # makes GC mean anything -- GC bounds a dense checkpoint stream, and a
+        # policy of one-per-agent never produces one.
+        #
+        # None keeps the original boundary-only policy, so every existing
+        # measurement stands. A float is a spacing in events: a checkpoint is
+        # taken whenever that many events have been logged since the last one,
+        # in addition to the agent-boundary checkpoints recovery's safe
+        # frontier depends on. Additive rather than replacing, because dropping
+        # a boundary checkpoint would remove a rewind point Step 1 relies on
+        # and would confound this measurement with a recovery regression.
+        self.checkpoint_interval = (
+            float(checkpoint_interval) if checkpoint_interval else None
+        )
+        self._events_since_checkpoint = 0
+        if self.checkpoint_interval and self.checkpoints is not None:
+            self._install_interval_checkpointing()
         # Optional injection point for scenario C: a compromised inter-agent
         # message. Called with (from_agent, to_agent, texts) and returns extra
         # message strings to append. None means no injection.
@@ -239,14 +301,48 @@ class GeminiPipeline:
                 prompt=prompt,
                 source_block=source_block,
                 system=system,
+                # Recorded derived_from links among what this agent can see,
+                # so the estimator can merge a summary with its own inputs
+                # into one atomic test unit (D-051). Read off the partial log
+                # mid-run; `request_for()` computes the same thing from a
+                # finished trace, through the same helper.
+                derived_links=derived_links_for(
+                    list(event.exposures),
+                    lambda sid: source_producer_of(self._sources.get(sid)),
+                    self._influenced_by,
+                ),
             ),
             self.log,
         )
         return event, response
 
+    def _install_interval_checkpointing(self) -> None:
+        """Count logged events and checkpoint every `checkpoint_interval`.
+
+        Wrapping the logger is the least invasive hook available: every event
+        in this pipeline goes through `log_event`, so counting there cannot
+        miss one, whereas threading a call through each of the ~20 log sites
+        would silently skip whichever site a later edit forgot.
+        """
+        inner = self.log.log_event
+
+        def counted(*args: Any, **kwargs: Any):
+            event = inner(*args, **kwargs)
+            self._events_since_checkpoint += 1
+            if (
+                self.checkpoint_interval
+                and self._events_since_checkpoint >= self.checkpoint_interval
+            ):
+                self._checkpoint(event.id, event.agent_id)
+            return event
+
+        self.log.log_event = counted  # type: ignore[method-assign]
+
     def _checkpoint(self, event_id: str, agent_id: str) -> None:
         """Checkpoint after an agent boundary (docs/02-architecture.md, v1
-        policy). Cost is measured rather than assumed: see overhead()."""
+        policy), and on the Young/Daly interval when one is configured. Cost is
+        measured rather than assumed: see overhead()."""
+        self._events_since_checkpoint = 0
         if self.checkpoints is None:
             return
         self.checkpoints.take(
@@ -480,6 +576,106 @@ class GeminiPipeline:
             )
             findings.append((event, response.text.strip()))
 
+        # --- researcher: further rounds (Phase C) -------------------------
+        # Each extra round searches again with a query built from what the
+        # previous round found, so the new sources are causally downstream of
+        # the old ones rather than a second independent batch. That is the
+        # property the scaling measurement needs: a longer trace whose later
+        # events have genuinely larger candidate sets, because every earlier
+        # round's sources are still in context.
+        #
+        # The follow-up query is derived from finding text, so the tool_call
+        # carries the findings' influence -- a structural "keys are literals"
+        # record would be false here, which is exactly the distinction D-012
+        # exists to keep.
+        seen_urls = {
+            self._sources[sid].metadata.get("url")
+            for sid in self.context.get("researcher", [])
+            if getattr(self._sources.get(sid), "metadata", None)
+        }
+        for extra_round in range(2, self.research_rounds + 1):
+            prior = " ".join(text for _, text in findings)
+            followup_query = " ".join(sorted({
+                word.strip(".,()[]:;").lower()
+                for word in prior.split()
+                if len(word.strip(".,()[]:;")) > 4
+            }))[:400] or web_query
+            followup_call = self.log.log_event(
+                "researcher",
+                "tool_call",
+                parents=[findings[-1][0].id],
+                tool_id="web",
+                exposures=self.context.get("researcher", []),
+                inputs_ref=[
+                    self.log.put_content(
+                        json.dumps(
+                            {"tool": "web", "query": followup_query,
+                             "round": extra_round},
+                            sort_keys=True,
+                        ),
+                        kind="tool_args",
+                        meta={"tool": "web", "round": extra_round},
+                    )
+                ],
+            )
+            record_carrier(
+                self.log,
+                followup_call.id,
+                list(followup_call.exposures),
+                self._influenced_by(findings[-1][0].id),
+                findings[-1][0].id,
+            )
+            fresh = [
+                page
+                for page in self.tools.web_search(followup_query, limit=8)
+                if page.url not in seen_urls
+            ]
+            followup_response = self.log.log_event(
+                "researcher",
+                "tool_response",
+                tool_id="web",
+                exposures=self.context.get("researcher", []),
+                output_ref=self.log.put_content(
+                    json.dumps([pg.to_dict() for pg in fresh], sort_keys=True),
+                    kind="output",
+                    meta={"tool": "web", "round": extra_round},
+                ),
+            )
+            record_carrier(
+                self.log,
+                followup_response.id,
+                list(followup_response.exposures),
+                self._influenced_by(followup_call.id),
+                followup_call.id,
+            )
+            for page in fresh:
+                seen_urls.add(page.url)
+                source = remember(
+                    self.log.log_source(
+                        "web",
+                        page.content,
+                        origin_event=followup_response.id,
+                        metadata={"url": page.url, "title": page.title},
+                    )
+                )
+                self.expose("researcher", source.id)
+
+            block = self._source_block(self.context["researcher"])
+            question = (
+                "Given what you have found so far, what remains unresolved "
+                "about parsing these date strings correctly?"
+            )
+            event, response = self._call(
+                "researcher",
+                "agent_output",
+                prompt=f"Question: {question}\n\nSources:\n{block}",
+                system=RESEARCHER_SYSTEM,
+                parents=[followup_response.id],
+                source_block=block,
+            )
+            findings.append((event, response.text.strip()))
+            self._checkpoint(event.id, "researcher")
+
         extra_messages: list[str] = []
         if self.handoff_hook is not None:
             extra_messages = list(
@@ -620,6 +816,89 @@ class GeminiPipeline:
         )
         code = _strip_fences(code_response.text)
 
+        # --- reviewer (Phase C) --------------------------------------------
+        # A fifth agent between the Coder and the Executor. It matters for the
+        # measurement in a way a fourth Researcher round does not: it puts a
+        # model-written event *on the path to the final output*, so the
+        # contamination chain becomes researcher -> coder -> reviewer ->
+        # executor and every recovery decision has one more hop to reason
+        # about. It also gives the Coder a second checkpoint, which is the
+        # condition GC needs before it can free anything -- GC never drops an
+        # agent's most recent checkpoint, so an agent with exactly one is
+        # untouchable by construction.
+        review_event = None
+        if self.reviewer:
+            to_reviewer = self.log.log_event(
+                "coder",
+                "message",
+                parents=[code_event.id],
+                exposures=self.context.get("coder", []),
+                output_ref=self.log.put_content(
+                    code, kind="output", meta={"agent": "coder", "to": "reviewer"}
+                ),
+            )
+            record_carrier(
+                self.log,
+                to_reviewer.id,
+                list(to_reviewer.exposures),
+                self._influenced_by(code_event.id),
+                code_event.id,
+            )
+            draft_source = remember(
+                self.log.log_source(
+                    "agent_message",
+                    code,
+                    origin_event=to_reviewer.id,
+                    derived_from=code_event.id,
+                )
+            )
+            self.expose("reviewer", draft_source.id)
+            # THE REVIEWER REVIEWS THE ARTEFACT, NOT THE RESEARCH.
+            # It gets the draft script and the environment facts, and not the
+            # web pages and findings that produced the draft.
+            #
+            # That is a measured decision, not a modelling preference. The
+            # first version exposed the Coder's whole context as well, which
+            # reads as the more generous choice. It zeroed the Reviewer out
+            # completely: the draft script and the sources behind it carry the
+            # same fact -- which library to use -- so leave-one-out found
+            # neither individually necessary, `e0022` came out with no
+            # influence edges at all, contamination stopped at the Reviewer,
+            # and every recovery escalated to restart_all at 0% preserved.
+            #
+            # This is the redundancy blind spot `_answer_task` documents,
+            # reached structurally rather than by coincidence: put a summary
+            # and its own inputs in one context and single-source
+            # counterfactuals report nothing. Worth stating in the paper --
+            # it is a real limit of counterfactual influence, and a pipeline
+            # can walk into it by being generous with context.
+            for sid in self.context.get("coder", []):
+                if getattr(self._sources.get(sid), "kind", None) in (
+                    "database",
+                    "memory",
+                ):
+                    self.expose("reviewer", sid)
+            self._checkpoint(to_reviewer.id, "coder")
+
+            reviewer_block = self._source_block(self.context["reviewer"])
+            review_event, review_response = self._call(
+                "reviewer",
+                "agent_output",
+                prompt=(
+                    f"Task:\n{self.task}\n\n"
+                    "Review the script below. Return the script you would run.\n\n"
+                    f"Script:\n{code}\n\n"
+                    f"Inputs:\n{reviewer_block}"
+                ),
+                system=REVIEWER_SYSTEM,
+                parents=[to_reviewer.id],
+                source_block=reviewer_block,
+            )
+            reviewed = _strip_fences(review_response.text)
+            if reviewed.strip():
+                code = reviewed
+            self._checkpoint(review_event.id, "reviewer")
+
         approach = decision_response.text.strip()
         write_event = self.log.log_event(
             "coder",
@@ -645,6 +924,69 @@ class GeminiPipeline:
             decision_event.id,
         )
         self._checkpoint(write_event.id, "coder")
+
+        # --- coder -> executor hand-off ----------------------------------------------
+        # The same agent-boundary bridge every other hand-off in this pipeline
+        # already has: a carrier message event, the producing event's output
+        # wrapped as a source with `derived_from`, then exposure to the
+        # receiving agent. Planner->Researcher does it (`handoff` +
+        # `brief_source`); Researcher->Coder does it (`to_coder` + one source
+        # per finding). This boundary was the only one that did not, and the
+        # omission was not cosmetic.
+        #
+        # WHAT IT COST TO BE MISSING
+        # --------------------------
+        # With nothing in the Executor's context, the Executor had zero
+        # exposure edges and zero influence edges. Contamination stopped dead
+        # at the Coder, `FinalOutput` was never in Taint, and
+        # `malicious_to_output_paths()` returned an empty list on every trace
+        # under every detector -- measured at 0 paths in 18 of 18
+        # configurations. The planner's "treat each tainted event as a sink"
+        # fallback then fired every time, collapsing Step 2 -- safe frontier,
+        # domino pass, greedy cover over five action kinds -- into the single
+        # rule "invalidate everything tainted". Fourteen of fourteen scored
+        # configurations came out with `invalidation_set == taint.events`.
+        #
+        # The contamination walk was never wrong: it already crosses agent
+        # boundaries on `derived_from` (src/provenance/contamination.py). The
+        # edge simply did not exist.
+        # Whoever wrote the script the Executor is about to run is the event
+        # this hand-off derives from. With a Reviewer in the pipeline that is
+        # the review, not the Coder's draft: `code` holds the reviewed text by
+        # this point, and attributing it to the Coder would both lie about
+        # provenance and leave the draft and the final script claiming the same
+        # producer -- which `Trace.validate()` rejects, correctly, as one event
+        # wrapped by two sources.
+        producer = review_event if review_event is not None else code_event
+        producing_agent = "reviewer" if review_event is not None else "coder"
+        to_executor = self.log.log_event(
+            producing_agent,
+            "message",
+            parents=[producer.id],
+            exposures=self.context.get(producing_agent, []),
+            output_ref=self.log.put_content(
+                code, kind="output", meta={"agent": producing_agent}
+            ),
+        )
+        # A carrier: its text is the producing event's output verbatim, so it
+        # inherits that event's influence set rather than being attributed on
+        # its own.
+        record_carrier(
+            self.log,
+            to_executor.id,
+            list(to_executor.exposures),
+            self._influenced_by(producer.id),
+            producer.id,
+        )
+        code_source = remember(
+            self.log.log_source(
+                "agent_message",
+                code,
+                origin_event=to_executor.id,
+                derived_from=producer.id,
+            )
+        )
+        self.expose("executor", code_source.id)
 
         # --- executor ---------------------------------------------------------------
         exec_call = self.log.log_event(
@@ -686,13 +1028,28 @@ class GeminiPipeline:
                 meta={"agent": "executor"},
             ),
         )
-        for event in (exec_call, exec_response, final):
+        # All three Executor events are functions of one thing: the script.
+        # `used=[]` was correct while nothing was in the Executor's context and
+        # is wrong now that the script is -- it would write a `clean`
+        # *structural* verdict for the very source the Executor executes, and a
+        # structural clean is the one the clearance policy trusts most
+        # (src/provenance/checks.py). That would be a false clearance of the
+        # strongest available kind.
+        #
+        # Structural rather than estimated because it is read off the code
+        # path: `run_python(code)` receives the script literally, the response
+        # is that call's return value, and the comparison reads its stdout.
+        for event, why in (
+            (exec_call, "the tool call's argument is this script, verbatim"),
+            (exec_response, "the response is the output of running this script"),
+            (final, "the comparison reads the stdout this script produced"),
+        ):
             record_structural(
                 self.log,
                 event.id,
                 list(event.exposures),
-                used=[],
-                why="executor runs the generated script; it consults no source directly",
+                used=[code_source.id],
+                why=why,
             )
         self._checkpoint(final.id, "executor")
 
@@ -732,6 +1089,9 @@ def run_pipeline(
     client: Any = None,
     attributor: Attributor | None = None,
     handoff_hook: Any = None,
+    research_rounds: int = 1,
+    reviewer: bool = False,
+    checkpoint_interval: float | None = None,
 ) -> PipelineResult:
     """Run the pipeline and write a trace, its checkpoints, and its memory.
 
@@ -774,6 +1134,17 @@ def run_pipeline(
         # without scanning it for records. "none" is a meaningful value, not a
         # missing one, and it is the value every trace written before now had.
         "attributor": getattr(attributor, "name", "none"),
+        # THE TRACE RECORDS ITS OWN SHAPE (Phase C).
+        # `replay()` re-runs the pipeline and splices stored outputs by event
+        # id, so it must rebuild a run of the *same* shape. Left to a caller to
+        # remember, that desyncs silently and the failure is baffling: replay a
+        # 27-event trace into a 19-event rerun and the ids still line up far
+        # enough that the Executor ends up running a Researcher's prose as
+        # Python. Recording it here means replay reads it off the trace and no
+        # caller can forget.
+        "research_rounds": research_rounds,
+        "reviewer": reviewer,
+        "checkpoint_interval": checkpoint_interval,
         **settings.fingerprint(),
     }
     if client is not None:
@@ -800,6 +1171,9 @@ def run_pipeline(
                 checkpoints=store,
                 attributor=attributor,
                 handoff_hook=handoff_hook,
+                research_rounds=research_rounds,
+                reviewer=reviewer,
+                checkpoint_interval=checkpoint_interval,
             ).run()
 
 

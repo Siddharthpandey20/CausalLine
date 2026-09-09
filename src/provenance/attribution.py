@@ -48,7 +48,7 @@ prediction the "self-report only" ablation is there to confirm.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, Sequence, runtime_checkable
 
 from src.common.models import InfluenceEdge
 from src.provenance import selfreport
@@ -79,6 +79,20 @@ class AttributionRequest:
     prompt: str | None = None
     source_block: str | None = None
     system: str | None = None
+    # RECORDED redundancy, for atomic-unit grouping (D-051).
+    #
+    # source id -> the other exposed sources it was derived from. Populated
+    # only from links the trace actually recorded: `Source.derived_from` names
+    # the event that produced this source, and the sources with an influence
+    # edge into that event are the inputs it was built from. A summary and its
+    # own inputs sitting in one context are individually unnecessary -- either
+    # alone still carries the fact -- so single-source removal clears both and
+    # the contamination chain silently breaks.
+    #
+    # Empty means "no recorded link", which is the honest default: coincidental
+    # redundancy between unrelated sources is NOT represented here and is not
+    # handled. See docs/06 section 2.2.
+    derived_links: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     def catalogue(self) -> list[tuple[str, str]]:
         return [(sid, self.labels.get(sid, "source")) for sid in self.exposures]
@@ -133,6 +147,11 @@ class NullAttributor:
         return None
 
 
+# DEAD CODE -- no caller, kept for reference.
+# The conservative fallback written down as an attributor. Never selected: the
+# fallback is what happens when nothing is recorded, so running this produces
+# the same verdicts at the cost of one record per exposure. Kept as the named
+# control condition the module docstring describes.
 class AssumeInfluenced:
     """Every exposure is an influence, recorded as `assumed`.
 
@@ -162,6 +181,12 @@ class AssumeInfluenced:
 # --- self-report -------------------------------------------------------------
 
 
+# DEAD CODE -- no caller, kept for reference.
+# A second, independent implementation of the self-report path. The one that
+# actually runs is `HybridAttributor` in src/provenance/estimator.py with
+# `mode="self_report"`, which shares `selfreport.ask()` with this class but
+# adds the counterfactual escalation and the budget. Two implementations of
+# one policy is a drift hazard; this is the one nothing calls.
 @dataclass
 class SelfReportAttributor:
     """One structured self-report call per event.
@@ -312,3 +337,78 @@ def record_structural(
                 confidence=1.0,
                 notes=why or "operation computed by code; this source was not read",
             )
+
+
+def derived_links_for(
+    exposures: Sequence[str],
+    producer_of: Callable[[str], str | None],
+    influencers_of: Callable[[str], Sequence[str]],
+    link_shared_ancestors: bool = True,
+) -> dict[str, tuple[str, ...]]:
+    """Which exposed sources are redundant with which, by recorded provenance.
+
+    Deliberately expressed over two callables rather than over a `Trace`, so
+    the same rule serves both callers: the pipeline establishes links mid-run
+    off its own partial log, and `request_for()` establishes them afterwards
+    off a finished trace. One rule, two call sites, no chance of them drifting.
+
+    TWO SHAPES OF RECORDED REDUNDANCY, BOTH REAL
+    --------------------------------------------
+    **Direct** -- a summary sitting beside its own inputs:
+
+        A links to B  <=>  A.derived_from names an event E
+                           AND B has an influence edge into E
+                           AND both are exposed here
+
+    **Shared ancestor** -- two summaries of the same upstream source, where
+    that source is *not* itself in this context:
+
+        A links to B  <=>  the events that produced A and B were influenced
+                           by at least one source in common
+
+    The second shape is the one that costs points, and it took a measurement
+    to see. At the Coder in the long workflow the context holds five Researcher
+    findings and no web pages: S14, S16, S17 and S18 were each produced by an
+    event that S4 -- the poisoned page -- influenced, but S4 is nowhere in the
+    Coder's context, so no direct link exists between any pair of them. Each
+    finding is individually unnecessary because the other four still carry the
+    poisoned fact. Leave-one-out clears all five, the script is attributed to
+    the memory source alone, contamination never reaches the Executor, and
+    A-influencing/oracle recovers 11.1% against B1's 14.8%.
+
+    Both shapes use only links the trace recorded. Neither covers two unrelated
+    sources that happen to state the same fact -- see docs/06 section 2.2.
+
+    `link_shared_ancestors=False` restricts this to the direct shape, which is
+    what the sibling case has to be measured against.
+    """
+    exposed = set(exposures)
+    links: dict[str, set[str]] = {sid: set() for sid in exposures}
+    ancestors: dict[str, set[str]] = {}
+
+    for sid in exposures:
+        producer = producer_of(sid)
+        if not producer:
+            ancestors[sid] = set()
+            continue
+        upstream = set(influencers_of(producer))
+        ancestors[sid] = upstream
+        # Direct: an input of mine is sitting right here beside me.
+        for other in upstream:
+            if other in exposed and other != sid:
+                links[sid].add(other)
+                links[other].add(sid)
+
+    if link_shared_ancestors:
+        ordered = list(exposures)
+        for i, a in enumerate(ordered):
+            for b in ordered[i + 1:]:
+                # An ancestor that is itself exposed is already handled above
+                # as a direct link; sharing it does not make a and b redundant
+                # with each other in the way this is about.
+                shared = (ancestors[a] & ancestors[b]) - exposed
+                if shared:
+                    links[a].add(b)
+                    links[b].add(a)
+
+    return {sid: tuple(sorted(peers)) for sid, peers in links.items() if peers}

@@ -583,7 +583,16 @@ def read_trace(path: str | Path, content: bool = True) -> Trace:
     for line_no, record in enumerate(_read_records(Path(path)), start=1):
         kind = record.get("record")
         if kind == "meta":
-            meta = {k: v for k, v in record.items() if k != "record"}
+            # MERGE, do not replace. A trace can carry more than one meta
+            # record: `refine_for_verdict()` reopens the log with
+            # `append=True, meta={"record_kind": "refinement"}`, which writes a
+            # second one. Replacing here dropped the entire original header --
+            # model, task, attributor, settings fingerprint -- for every trace
+            # that went through refinement, which is the whole hybrid campaign
+            # path. It surfaced as `score_run()` labelling a live
+            # gemini-3.6-flash result "unknown", and again when replay could
+            # not read the workflow shape it needed off the header.
+            meta.update({k: v for k, v in record.items() if k != "record"})
         elif kind == "event":
             events.append(Event.from_dict(record))
         elif kind == "source":

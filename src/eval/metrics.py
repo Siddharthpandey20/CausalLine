@@ -251,6 +251,27 @@ class RecoveryScore:
     pipeline_tokens: int
     unsafe_preservations: int
     unsafe_ids: tuple[str, ...] = ()
+    # PAIR-LEVEL unsafe preservation: of the (source, event) influences that
+    # really existed, the fraction the estimator called clean
+    # (src/eval/influence_eval.py). Reported ALONGSIDE the event-level count
+    # above, never instead of it, because they answer different questions and
+    # routinely disagree:
+    #
+    #   event-level  did recovery keep an event that was truly contaminated?
+    #                This is what a deployment experiences, and it is 0 across
+    #                the campaign.
+    #   pair-level   did the estimator clear a (source, event) pair that was
+    #                really an influence? This runs 0.14-0.60 depending on
+    #                ablation.
+    #
+    # A pair-level false clean does not have to become an event-level unsafe
+    # preservation -- the event is often contaminated by another route -- so
+    # quoting only the event-level 0% overstates how well the estimator works.
+    # Quoting only the pair-level rate overstates the risk a deployment runs.
+    # Both, always.
+    pair_unsafe_rate: float = 0.0
+    pair_false_negatives: int = 0
+    pair_scored: int = 0
     task_success: bool = False
     wall_clock_s: float = 0.0
     storage_bytes: int = 0
@@ -269,7 +290,7 @@ def recovery_table(rows: list[RecoveryScore]) -> str:
     head = (
         f"{'scenario':<10}{'variant':<14}{'method':<22}"
         f"{'preserved':>10}{'rec.tok':>9}{'anal':>7}{'replay':>8}"
-        f"{'unsafe':>8}{'ok':>5}{'blast':>7}  notes"
+        f"{'unsafe':>8}{'pairUNSF':>9}{'ok':>5}{'blast':>7}  notes"
     )
     lines = [head, "-" * len(head)]
     for r in rows:
@@ -283,11 +304,146 @@ def recovery_table(rows: list[RecoveryScore]) -> str:
             f"{r.analysis_tokens:>7}"
             f"{r.replay_tokens:>8}"
             f"{r.unsafe_preservations:>8}"
+            f"{r.pair_unsafe_rate:>8.0%} "
             f"{'Y' if r.recovery_success else 'n':>5}"
             f"{r.blast_radius_events:>7}"
             f"  {note}"
         )
     return "\n".join(lines)
+
+
+# --- the complete cost of one recovery (Phase 9) ------------------------------
+#
+# docs/04 asks for recovery cost "split into analysis cost + replay cost", and
+# that is what `RecoveryScore` above already carries. It is not the whole cost,
+# and the two missing terms are missing in opposite directions:
+#
+#   storage       CausalLine's standing tax. It is paid on every run, attacked
+#                 or not, and leaving it out is how a method that only ever
+#                 costs tokens during an incident looks free. Open issue #8.
+#   residual risk what we are still exposed to after choosing to preserve work
+#                 rather than recompute it. Leaving it out makes "preserve
+#                 everything" look optimal, since preserving is what costs
+#                 nothing in tokens.
+#
+# `lost_legitimate_work` is the third: clean events a method discarded anyway.
+# Priced in the same units as replay, because that is what re-doing them costs.
+
+
+@dataclass(frozen=True)
+class CostWeights:
+    """Exchange rates between the four things a recovery spends.
+
+    Not measured -- there is no principled conversion from a byte to a token,
+    and pretending otherwise would put a fabricated constant at the centre of
+    every comparison. They are *reporting* parameters: a result is quoted at a
+    stated weight, and `src/eval/economics.py` sweeps them rather than picking
+    one. The defaults below are the neutral choice (storage free, risk unpriced)
+    so that `total_cost()` with default weights is exactly the token cost
+    docs/04 already defines, and any difference from that number is visibly
+    something a caller asked for.
+    """
+
+    # Tokens per stored byte. 0.0 means "report storage separately, do not fold
+    # it into the token total".
+    storage_weight: float = 0.0
+    # Tokens per unit of residual risk (lambda). The price of being wrong,
+    # expressed in the currency of being slow.
+    risk_lambda: float = 0.0
+
+
+@dataclass
+class TotalCost:
+    """One recovery, fully priced. Terms kept separate so the total can be
+    re-weighted without re-running anything."""
+
+    analysis_tokens: int = 0
+    replay_tokens: int = 0
+    storage_bytes: int = 0
+    lost_legitimate_work: int = 0
+    residual_risk: float = 0.0
+    weights: CostWeights = field(default_factory=CostWeights)
+
+    @property
+    def storage_cost(self) -> float:
+        return self.storage_bytes * self.weights.storage_weight
+
+    @property
+    def risk_cost(self) -> float:
+        return self.weights.risk_lambda * self.residual_risk
+
+    @property
+    def token_cost(self) -> int:
+        return self.analysis_tokens + self.replay_tokens + self.lost_legitimate_work
+
+    @property
+    def total(self) -> float:
+        return self.token_cost + self.storage_cost + self.risk_cost
+
+    def line(self) -> str:
+        return (
+            f"analysis={self.analysis_tokens} replay={self.replay_tokens} "
+            f"lost_work={self.lost_legitimate_work} "
+            f"storage={self.storage_bytes}B(->{self.storage_cost:.1f}) "
+            f"risk={self.residual_risk:.3f}(->{self.risk_cost:.1f}) "
+            f"TOTAL={self.total:.1f}"
+        )
+
+
+def total_cost(
+    analysis_tokens: int,
+    replay_tokens: int,
+    storage_bytes: int = 0,
+    lost_legitimate_work: int = 0,
+    residual_risk: float = 0.0,
+    weights: CostWeights | None = None,
+) -> TotalCost:
+    """The cost formula Phase 9 completes:
+
+        total = analysis + replay
+              + storage_bytes * storage_weight
+              + lost_legitimate_work
+              + lambda * residual_risk
+
+    Every term is reported as well as summed. A single number here would hide
+    which of them moved, and the storage and risk terms are precisely the ones
+    whose weight is a choice rather than a measurement.
+    """
+    return TotalCost(
+        analysis_tokens=analysis_tokens,
+        replay_tokens=replay_tokens,
+        storage_bytes=storage_bytes,
+        lost_legitimate_work=lost_legitimate_work,
+        residual_risk=residual_risk,
+        weights=weights or CostWeights(),
+    )
+
+
+# DEAD CODE -- no caller, kept for reference.
+# Convenience wrapper over `total_cost()` for a scored row. The economics
+# report builds its Deployment objects directly from traces instead, so this
+# has never been on a path that runs.
+def cost_of(
+    row: RecoveryScore,
+    residual_risk: float = 0.0,
+    lost_legitimate_work: int | None = None,
+    weights: CostWeights | None = None,
+) -> TotalCost:
+    """`total_cost` for a scored recovery row.
+
+    `lost_legitimate_work` defaults to 0 rather than being inferred from the
+    row: a RecoveryScore knows how many events were discarded but not how many
+    of those were clean, and guessing would make the term a function of the
+    method's own claim instead of ground truth.
+    """
+    return total_cost(
+        analysis_tokens=row.analysis_tokens,
+        replay_tokens=row.replay_tokens,
+        storage_bytes=row.storage_bytes,
+        lost_legitimate_work=lost_legitimate_work or 0,
+        residual_risk=residual_risk,
+        weights=weights,
+    )
 
 
 if __name__ == "__main__":
