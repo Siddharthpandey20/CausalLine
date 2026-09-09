@@ -1588,6 +1588,39 @@ escalations across the matrix fell 22 -> 16; A/N improved 1.67 -> 1.50 (inline
 A 1000 -> 900), because escalation was the cost driver. Event-level unsafe
 preservations remain 0 everywhere.
 
+**The 30-repetition campaign** (96 cells, 3600 pipeline runs, 1228s,
+`data/results/campaign.json`). CausalLine vs B1, mean +/- 95% CI, before
+figures from docs/07 section 3.1:
+
+| detector | scenario | before | after | B1 | gain |
+|---|---|---|---|---|---|
+| oracle | A influencing | 15.8% +/- 0.0% | **44.2% +/- 4.4%** | 21.1% | **+23.2** |
+| oracle | A exposed-only | 93.7% +/- 8.0% | **96.0% +/- 4.8%** | 21.1% | +74.9 |
+| oracle | B influencing | 57.9% +/- 0.0% | **65.1% +/- 1.0%** | 57.9% | **+7.2** |
+| oracle | B exposed-only | 94.0% +/- 4.8% | **95.6% +/- 3.1%** | 57.9% | +37.7 |
+| oracle | C influencing | 15.8% +/- 0.0% | **66.5% +/- 1.1%** | 52.6% | **+13.9** |
+| oracle | C exposed-only | 93.0% +/- 8.0% | **93.7% +/- 6.3%** | 52.6% | +41.1 |
+
+**CausalLine now beats B1 on all six oracle cells**, influencing included. It
+previously lost on A by 5.3 and on C by 36.8 and tied on B. The heuristic
+detector's A and C cells move the same way (44.2% and 66.5% against B1's 21.1%
+and 52.6%).
+
+Event-level unsafe preservation is **0% for CausalLine in all 24 cells**. The
+eight cells recording one are all B1 or B2, under `blind` or under the
+heuristic detector that misses scenario B -- unchanged, and still the metric
+behaving correctly rather than the method.
+
+The deterministic single-seed matrix above gives A-influencing/oracle as 52.6%
+where the 30-repetition mean is 44.2% +/- 4.4%. Both are right: the seed moves
+which self-report claims are wrong, and the campaign mean is the number to
+quote.
+
+Three cells still sit at 0% and none is a regression from this change:
+`blind`-influencing (no verdict, so verification fails and the ladder climbs --
+the control working), `heuristic` B-influencing (that detector misses B), and
+`pessimistic` A and C (already 0% before, see below).
+
 **The predicted pessimistic regression did not happen.** The brief expected
 that covering a large false-positive closure might exceed the restart cap and
 fall back to `restart_all`, costing pessimistic cells their work-preserved
