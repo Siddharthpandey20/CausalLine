@@ -412,7 +412,41 @@ def candidate_actions(
     frontiers: dict[str, Checkpoint | None],
     order: list[str],
 ) -> list[Action]:
-    """The action vocabulary, instantiated for this incident."""
+    """The action vocabulary, instantiated for this incident.
+
+    WHY EVERY TAINTED EVENT IS OFFERED, INCLUDING THE ONES A REPLAY CANNOT
+    CHANGE
+    ----------------------------------------------------------------------
+    An action breaks a MaliciousSource -> FinalOutput path by recomputing a
+    node on it without the malicious source, which works because
+    `SplicingClient` redacts flagged sources from a prompt before re-issuing it
+    (`redact_flagged` in src/recovery/replay.py). That mechanism exists only
+    for events that made a model call: tool calls, tool responses, memory
+    operations and the Executor's comparison are recomputed by pipeline code as
+    a pure function of unchanged upstream, so re-running one reproduces it
+    exactly.
+
+    So the vocabulary contains actions that cannot really cut anything, and
+    once the Coder->Executor edge existed and real paths appeared, the greedy's
+    cheapest option on every influencing scenario became `invalidate(e0019)` --
+    the Executor's final comparison, cost 1 because it spends no tokens,
+    sitting at the end of every path. Verification rejects those plans and the
+    run escalates.
+
+    Filtering the vocabulary down to model-written events was tried and is NOT
+    what this does, because it made results worse rather than better: with the
+    cheap cut removed the greedy exceeds its `restart_all` cost cap on traces
+    where taint is wide, and falls back to a full restart. Two configurations
+    regressed to restart_all that had previously produced a selective plan.
+
+    The real disagreement is one level up and is recorded in
+    docs/06-limitations.md: Step 2 optimises "cut every source -> output path"
+    while Step 4 verifies "Taint(new_graph) is empty", and those are not the
+    same condition. A tainted event that sits on no source -> output path
+    satisfies the first and fails the second. Reconciling them is a design
+    decision about what Step 2 should optimise, not a filter, and it is not
+    made here.
+    """
     actions: list[Action] = []
     full = restart_all_cost(trace)
     actions.append(restart_all_action(trace))
@@ -538,14 +572,27 @@ def plan_recovery(
     cap = restart_all_cost(trace)
 
     if not paths and taint.events:
-        # The Executor runs the Coder's script without that script being
-        # wrapped as a source in its context (pipeline records the
-        # Executor as structurally clean). Influence therefore stops at
-        # the Coder, FinalOutput is never in Taint, and the path set is
-        # empty even when the task result is poisoned. Treating each
-        # tainted event as a sink that must be covered is the
-        # conservative reading of Step 2: we still cut the contaminated
-        # region, we just cannot see the last hop.
+        # NOTE (integration sprint): this fallback is load-bearing in a way it
+        # was not designed to be. Step 4 accepts a recovery only when
+        # `Taint(new_graph)` is empty; Step 2 optimises "cut every
+        # MaliciousSource -> FinalOutput path". Those are different conditions,
+        # and a tainted event lying on no source -> output path satisfies the
+        # second and fails the first.
+        #
+        # While `malicious_to_output_paths()` returned nothing on every trace
+        # -- which it did until the Coder->Executor edge was added -- this
+        # branch fired unconditionally, every tainted event became a sink, and
+        # the cover satisfied Step 4 by accident. With real paths available the
+        # two objectives come apart and the selective plan systematically fails
+        # verification. Measured: A-influencing/oracle went from no escalation
+        # at 67.8% work preserved to agent_restart at 15.8%.
+        #
+        # Making the sinks unconditional (paths + taint, rather than taint only
+        # when there are no paths) was measured too: oracle recovers to 52.6%
+        # with no escalation, pessimistic regresses from 68.4% to 0%. Neither
+        # arrangement dominates, so the objective mismatch is recorded in
+        # docs/06-limitations.md as a design decision for the group rather than
+        # settled here.
         paths = [
             InfluencePath(source_id="taint", events=(eid,), edges=())
             for eid in sorted(taint.events)

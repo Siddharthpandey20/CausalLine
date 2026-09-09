@@ -94,8 +94,32 @@ def pipeline_model_events(trace: Trace) -> list[str]:
 
 @dataclass
 class ReplayReport:
-    """What the splicing client did. The Phase 5 assertions live here."""
+    """What the splicing client did. The Phase 5 assertions live here.
 
+    THE ONE DEFINITION OF "DISCARDED"
+    ---------------------------------
+    `invalidation` is the set handed to `replay()`, and it is the **only**
+    field a metric may use to answer "how much work did this method throw
+    away". Every method -- B0, B1, B2 and CausalLine -- reaches the replay
+    engine through the same call with the same argument, so scoring on this
+    field is the one place all four are measured the same way.
+
+    `replayed` is NOT that number. It lists the events that reached the inner
+    client, which is only the events that made a *model call* -- 6 of 19 in
+    this pipeline. Tool calls, tool responses, memory operations and the
+    Executor's comparison are recomputed by pipeline code and never pass
+    through `SplicingClient.generate()`, so they are absent from it however
+    thoroughly they were redone.
+
+    Scoring CausalLine on `replayed` while scoring the baselines on their full
+    discard sets is not a rounding difference: it made an escalated
+    `restart_all` -- which redoes every event, exactly as B0 does -- score
+    66.7% work preserved against B0's 0%. Two definitions of one word, printed
+    in adjacent columns.
+    """
+
+    # The set handed to replay(). Score on this.
+    invalidation: frozenset[str] = frozenset()
     spliced: list[str] = field(default_factory=list)
     replayed: list[str] = field(default_factory=list)
     replay_tokens: int = 0
@@ -249,6 +273,9 @@ def replay(
         attributor=attributor,
         handoff_hook=handoff_hook,
     )
+    # Recorded at the one point every method passes through, so no caller has
+    # to reconstruct "what was discarded" from something narrower.
+    wrapper.report.invalidation = frozenset(invalidation_set)
     wrapper.report.recovered_path = result.trace_path
     wrapper.report.task_success = result.task_success
     wrapper.report.stdout = result.stdout

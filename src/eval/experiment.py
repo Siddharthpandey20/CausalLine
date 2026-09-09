@@ -20,7 +20,12 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from src.eval.attacks import build, label_malicious
-from src.eval.baselines import b0_full_restart, b1_agent_taint, b2_topology_closure
+from src.eval.baselines import (
+    b0_full_restart,
+    b1_agent_taint,
+    b2_topology_closure,
+    discarded_events,
+)
 from src.eval.detectors import Oracle, build as build_detector
 from src.eval.metrics import RecoveryScore, ground_truth_events, recovery_table
 from src.eval.scripted import ScriptedClient, ground_truth_influence
@@ -210,6 +215,11 @@ def run_cell(
         result, report = _run_baseline_recovery(
             method, discard, original, replay_client, flagged, attack, out
         )
+        # Read off the replay report rather than from `discard` directly, so
+        # the baselines and CausalLine are scored through the same function on
+        # the same field. Identical here by construction -- which is the point:
+        # it stays identical when someone changes one of them.
+        redone = discarded_events(report, discard)
         rows.append(
             _score_row(
                 scenario=scenario,
@@ -217,7 +227,7 @@ def run_cell(
                 method=method,
                 detector=verdict.detector,
                 trace=original,
-                discarded=discard,
+                discarded=redone,
                 truth_events=truth_events,
                 # Baselines do not run the estimator. Charging them the
                 # original run's analysis tokens would hide the cost that
@@ -228,8 +238,8 @@ def run_cell(
                 task_success=result.task_success,
                 wall_clock_s=report.wall_clock_s,
                 storage_bytes=store["total_bytes"],
-                blast_events=len(discard),
-                blast_agents=len({original.event(e).agent_id for e in discard} - {"user"}),
+                blast_events=len(redone),
+                blast_agents=len({original.event(e).agent_id for e in redone} - {"user"}),
             )
         )
 
@@ -245,9 +255,9 @@ def run_cell(
         checkpoints=checkpoints,
         handoff_hook=attack.handoff_hook,
     )
-    discarded = set(recovered.plan.invalidation_set)
-    if recovered.report is not None and recovered.escalations:
-        discarded = set(recovered.report.replayed)
+    # ONE definition of discarded, shared with the baselines above: the set
+    # handed to replay(). See `discarded_events()` in src/eval/baselines.py.
+    discarded = discarded_events(recovered.report, recovered.invalidated)
     rows.append(
         _score_row(
             scenario=scenario,

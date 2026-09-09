@@ -23,7 +23,7 @@ right to call it rigged. B2 keeps no cutoff, which is what makes it the
 strict upper bound rather than a second version of B1.
 """
 
-from typing import Iterable
+from typing import Any, Iterable
 
 from src.provenance.contamination import Policy, contaminate
 from src.tracing.graphs import CallGraph
@@ -120,3 +120,37 @@ METHODS = {
     "B2 topology closure": b2_topology_closure,
     "ours": ours,
 }
+
+
+# --- the one definition of "discarded" -----------------------------------------
+
+
+def discarded_events(report: Any, fallback: Iterable[str] = ()) -> set[str]:
+    """Which events a recovery actually recomputed. Every method calls this.
+
+    THE BUG THIS EXISTS TO PREVENT
+    ------------------------------
+    "Work preserved" is the headline metric and it is
+    `1 - |discarded| / |events|`. That is comparable across methods only if
+    `discarded` means the same thing for all of them, and it did not:
+
+        baselines    the full event-id set the method chose (b0/b1/b2 above)
+        CausalLine   `ReplayReport.replayed`, whenever an escalation happened
+
+    `replayed` counts only events that reached the model, excluding tool calls,
+    tool responses, memory operations and the Executor's comparison -- 13 of
+    the 19 events in a run. So a CausalLine run that escalated to `restart_all`
+    and redid *every* event scored 66.7% work preserved while B0, doing exactly
+    the same thing, scored 0%.
+
+    Both paths reach `replay()` with an `invalidation` argument, and that
+    argument is what got recomputed. So that is what this returns.
+
+    `fallback` covers a plan that was never replayed at all -- there is no
+    report to read, and the invalidation set that would have been used is the
+    honest answer.
+    """
+    invalidation = getattr(report, "invalidation", None)
+    if invalidation:
+        return set(invalidation)
+    return set(fallback)

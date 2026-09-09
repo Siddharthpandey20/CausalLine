@@ -646,6 +646,60 @@ class GeminiPipeline:
         )
         self._checkpoint(write_event.id, "coder")
 
+        # --- coder -> executor hand-off ----------------------------------------------
+        # The same agent-boundary bridge every other hand-off in this pipeline
+        # already has: a carrier message event, the producing event's output
+        # wrapped as a source with `derived_from`, then exposure to the
+        # receiving agent. Planner->Researcher does it (`handoff` +
+        # `brief_source`); Researcher->Coder does it (`to_coder` + one source
+        # per finding). This boundary was the only one that did not, and the
+        # omission was not cosmetic.
+        #
+        # WHAT IT COST TO BE MISSING
+        # --------------------------
+        # With nothing in the Executor's context, the Executor had zero
+        # exposure edges and zero influence edges. Contamination stopped dead
+        # at the Coder, `FinalOutput` was never in Taint, and
+        # `malicious_to_output_paths()` returned an empty list on every trace
+        # under every detector -- measured at 0 paths in 18 of 18
+        # configurations. The planner's "treat each tainted event as a sink"
+        # fallback then fired every time, collapsing Step 2 -- safe frontier,
+        # domino pass, greedy cover over five action kinds -- into the single
+        # rule "invalidate everything tainted". Fourteen of fourteen scored
+        # configurations came out with `invalidation_set == taint.events`.
+        #
+        # The contamination walk was never wrong: it already crosses agent
+        # boundaries on `derived_from` (src/provenance/contamination.py). The
+        # edge simply did not exist.
+        to_executor = self.log.log_event(
+            "coder",
+            "message",
+            parents=[code_event.id],
+            exposures=self.context.get("coder", []),
+            output_ref=self.log.put_content(
+                code, kind="output", meta={"agent": "coder"}
+            ),
+        )
+        # A carrier: its text is the code event's output verbatim, so it
+        # inherits that event's influence set rather than being attributed on
+        # its own.
+        record_carrier(
+            self.log,
+            to_executor.id,
+            list(to_executor.exposures),
+            self._influenced_by(code_event.id),
+            code_event.id,
+        )
+        code_source = remember(
+            self.log.log_source(
+                "agent_message",
+                code,
+                origin_event=to_executor.id,
+                derived_from=code_event.id,
+            )
+        )
+        self.expose("executor", code_source.id)
+
         # --- executor ---------------------------------------------------------------
         exec_call = self.log.log_event(
             "executor",
@@ -686,13 +740,28 @@ class GeminiPipeline:
                 meta={"agent": "executor"},
             ),
         )
-        for event in (exec_call, exec_response, final):
+        # All three Executor events are functions of one thing: the script.
+        # `used=[]` was correct while nothing was in the Executor's context and
+        # is wrong now that the script is -- it would write a `clean`
+        # *structural* verdict for the very source the Executor executes, and a
+        # structural clean is the one the clearance policy trusts most
+        # (src/provenance/checks.py). That would be a false clearance of the
+        # strongest available kind.
+        #
+        # Structural rather than estimated because it is read off the code
+        # path: `run_python(code)` receives the script literally, the response
+        # is that call's return value, and the comparison reads its stdout.
+        for event, why in (
+            (exec_call, "the tool call's argument is this script, verbatim"),
+            (exec_response, "the response is the output of running this script"),
+            (final, "the comparison reads the stdout this script produced"),
+        ):
             record_structural(
                 self.log,
                 event.id,
                 list(event.exposures),
-                used=[],
-                why="executor runs the generated script; it consults no source directly",
+                used=[code_source.id],
+                why=why,
             )
         self._checkpoint(final.id, "executor")
 

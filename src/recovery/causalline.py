@@ -131,6 +131,10 @@ class RecoveryResult:
     scope: Escalation
     escalations: int
     recovered_path: Path | None
+    # Every event this recovery actually recomputed -- the set handed to the
+    # last replay attempt. THE field to score work preserved on, and the same
+    # definition the baselines are scored under. See ReplayReport.invalidation.
+    invalidated: frozenset[str]
     task_success: bool
     analysis_tokens: int
     replay_tokens: int
@@ -260,16 +264,19 @@ def recover(
         escalations += 1
 
     replay_tokens = last_report.replay_tokens if last_report else 0
-    invalidation_final = invalidation_for_scope(
-        "selective" if last_verify.ok and escalations == 0 else scope,
-        plan.invalidation_set,
-        agent_scope,
-        all_events,
-    )
-    if last_verify.ok and escalations == 0:
+    # What was actually recomputed: the set handed to the last replay attempt,
+    # which after an escalation is the widened scope rather than the original
+    # selective plan.
+    #
+    # This used to fall back to `last_report.replayed` on any escalation, which
+    # holds only the events that made a model call -- 6 of 19 here. A
+    # `restart_all` escalation redoes every event and was reported as having
+    # redone six, so the blast radius of the most expensive recovery available
+    # came out smaller than the blast radius of the cheapest.
+    if last_report is not None:
+        invalidation_final = set(last_report.invalidation)
+    else:
         invalidation_final = set(plan.invalidation_set)
-    elif last_report is not None:
-        invalidation_final = set(last_report.replayed)
     agents_hit = {original.event(eid).agent_id for eid in invalidation_final if original.has_event(eid)}
 
     return RecoveryResult(
@@ -279,6 +286,7 @@ def recover(
         scope=scope if last_verify.ok else (scope if scope == "exhausted" else scope),
         escalations=escalations if not last_verify.ok else max(0, escalations),
         recovered_path=recovered_path,
+        invalidated=frozenset(invalidation_final),
         task_success=task_success,
         analysis_tokens=analysis_tokens,
         replay_tokens=replay_tokens,
