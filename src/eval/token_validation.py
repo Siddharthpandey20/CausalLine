@@ -545,25 +545,51 @@ def run_live(
     token: str = DEFAULT_TOKEN,
     workdir: str | Path = "data/runs/token",
     channels: Iterable[str] = ("web", "memory", "agent_message"),
-) -> list[ValidationResult]:
-    """The live pass. Needs GEMINI_API_KEY and spends real quota."""
+) -> tuple[list[ValidationResult], list[str]]:
+    """The live pass. Needs GEMINI_API_KEY and spends real quota.
+
+    Returns `(results, unfinished_channels)`. A channel that ran out of quota
+    part-way through is in the second list, and the caller reports it rather
+    than pretending the pass was complete.
+
+    THIS LOOP STOPS AT THE FIRST QUOTA WALL AND KEEPS WHAT IT HAS.
+    The first version let `QuotaExhausted` propagate out of the whole
+    function. That is expensive in a way worth spelling out: the free tier is
+    20 requests per day and one scenario costs about 24, so the wall is not an
+    edge case, it is the normal end of a run. On the first live execution the
+    `web` scenario completed -- 19 events, 15 sources, 20 influence edges, 10
+    counterfactual calls, a real measurement that cost most of a day's quota
+    -- and was then discarded, unscored and unwritten, because `memory` raised
+    on its second call. The result had to be recovered afterwards by scoring
+    the trace off disk.
+
+    A day's quota is too small to spend twice, so completed scenarios are
+    scored and handed back as they finish.
+    """
     from src.common.config import load_settings
-    from src.common.llm import GeminiClient
+    from src.common.llm import GeminiClient, QuotaExhausted
 
     settings = load_settings()
     results: list[ValidationResult] = []
-    for scenario in scenarios(token):
-        if scenario.channel not in channels:
-            continue
+    unfinished: list[str] = []
+    selected = [s for s in scenarios(token) if s.channel in channels]
+    for index, scenario in enumerate(selected):
         client = GeminiClient(settings)
-        results.append(
-            run_scenario(
-                scenario,
-                Path(workdir) / f"{scenario.name}.jsonl",
-                client=client,
+        try:
+            results.append(
+                run_scenario(
+                    scenario,
+                    Path(workdir) / f"{scenario.name}.jsonl",
+                    client=client,
+                )
             )
-        )
-    return results
+        except QuotaExhausted:
+            # This scenario and every one after it did not run. Its trace is
+            # on disk but incomplete, so it is not scored -- a partial trace
+            # scored as if it were whole is a wrong number, not a partial one.
+            unfinished = [s.channel for s in selected[index:]]
+            break
+    return results, unfinished
 
 
 class TokenEchoClient:
@@ -721,7 +747,7 @@ if __name__ == "__main__":
         raise SystemExit(0)
 
     try:
-        results = run_live(channels=channels)
+        results, unfinished = run_live(channels=channels)
     except Exception as exc:
         print()
         print(f"live run unavailable: {type(exc).__name__}: {exc}")
@@ -732,11 +758,45 @@ if __name__ == "__main__":
         raise SystemExit(1)
 
     print()
-    print(render(results))
+    if results:
+        print(render(results))
+    else:
+        print("no scenario completed; nothing to score.")
+
+    # Write whatever completed, merged over any earlier partial file, so a run
+    # spread across several days accumulates instead of overwriting itself.
     out = Path("data/results/token-validation.json")
     out.parent.mkdir(parents=True, exist_ok=True)
+    merged: dict[str, dict] = {}
+    if out.exists():
+        try:
+            for row in json.loads(out.read_text(encoding="utf-8")):
+                merged[str(row.get("scenario", row.get("channel")))] = row
+        except (json.JSONDecodeError, TypeError):
+            merged = {}  # unreadable previous file is replaced, not trusted
+    for result in results:
+        row = result.to_dict()
+        merged[str(row.get("scenario", row.get("channel")))] = row
     out.write_text(
-        json.dumps([r.to_dict() for r in results], indent=2), encoding="utf-8"
+        json.dumps(list(merged.values()), indent=2), encoding="utf-8"
     )
     print()
-    print(f"written to {out}")
+    print(f"written to {out} ({len(merged)} scenario(s) on file)")
+
+    if unfinished:
+        print()
+        print(
+            f"QUOTA WALL: {len(unfinished)} channel(s) did not run: "
+            f"{', '.join(unfinished)}."
+        )
+        print(
+            "The free tier is 20 requests/day and a scenario costs ~"
+            f"{per_scenario}, so this is the expected end of a day's run, not"
+            " a failure."
+        )
+        print("Resume tomorrow with:")
+        print(
+            "    python -m src.eval.token_validation --channels "
+            + ",".join(unfinished)
+        )
+        raise SystemExit(2)
