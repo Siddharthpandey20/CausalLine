@@ -172,6 +172,12 @@ def latest_before(
     return max(candidates, key=lambda c: position[c.event_id])
 
 
+# DEAD CODE -- no caller, kept for reference.
+# Superseded by `safe_frontier()` in src/recovery/planner.py, which asks
+# whether a checkpoint's causal past is clean instead of only where it sits in
+# the event order, and then runs the cross-agent domino pass this never did
+# (D-038). Kept because planner.py's docstring names it as the thing it
+# replaced, so deleting it would leave that explanation pointing at nothing.
 def safe_checkpoint_for(
     checkpoints: list[Checkpoint], invalidated: set[str], order: list[str]
 ) -> Checkpoint | None:

@@ -95,6 +95,11 @@ class Tools:
                 json.dumps(self.memory, indent=2), encoding="utf-8"
             )
 
+    # DEAD CODE -- no caller, kept for reference.
+    # Recovery computes a rollback *plan* (`memory_rollback_plan()` in
+    # src/tracing/checkpoints.py) and verification checks whether live memory
+    # still holds an invalidated value, but nothing executes the undo -- see
+    # docs/06-limitations.md. This is the executor that would do it.
     def memory_rollback(self, key: str, previous: str | None) -> None:
         """Undo one write. Called by src/recovery/ when the event that made
         the write turns out to be contaminated."""

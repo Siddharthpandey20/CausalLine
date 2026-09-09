@@ -133,6 +133,11 @@ class NullAttributor:
         return None
 
 
+# DEAD CODE -- no caller, kept for reference.
+# The conservative fallback written down as an attributor. Never selected: the
+# fallback is what happens when nothing is recorded, so running this produces
+# the same verdicts at the cost of one record per exposure. Kept as the named
+# control condition the module docstring describes.
 class AssumeInfluenced:
     """Every exposure is an influence, recorded as `assumed`.
 
@@ -162,6 +167,12 @@ class AssumeInfluenced:
 # --- self-report -------------------------------------------------------------
 
 
+# DEAD CODE -- no caller, kept for reference.
+# A second, independent implementation of the self-report path. The one that
+# actually runs is `HybridAttributor` in src/provenance/estimator.py with
+# `mode="self_report"`, which shares `selfreport.ask()` with this class but
+# adds the counterfactual escalation and the budget. Two implementations of
+# one policy is a drift hazard; this is the one nothing calls.
 @dataclass
 class SelfReportAttributor:
     """One structured self-report call per event.

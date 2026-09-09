@@ -397,6 +397,10 @@ def total_cost(
     )
 
 
+# DEAD CODE -- no caller, kept for reference.
+# Convenience wrapper over `total_cost()` for a scored row. The economics
+# report builds its Deployment objects directly from traces instead, so this
+# has never been on a path that runs.
 def cost_of(
     row: RecoveryScore,
     residual_risk: float = 0.0,

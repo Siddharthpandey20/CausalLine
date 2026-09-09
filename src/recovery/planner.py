@@ -39,6 +39,10 @@ from src.tracing.logger import Trace
 # --- event-to-event influence ----------------------------------------------
 
 
+# DEAD CODE -- no caller, kept for reference.
+# The inverse of `source_producer()` below, which is the direction every
+# caller actually needs. Kept because the pairing is what makes the D-012
+# event/source correspondence readable.
 def derived_source_of(trace: Trace, event_id: str) -> list[str]:
     """Sources that *are* this event's output (D-012)."""
     return [s.id for s in trace.sources if s.derived_from == event_id]

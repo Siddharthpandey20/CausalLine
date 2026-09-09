@@ -178,7 +178,26 @@ def recover(
     task_success = False
     notes: list[str] = []
 
-    while scope != "exhausted" and escalations <= max_escalations:
+    # `escalations` counts WIDENINGS ACTUALLY REPLAYED, and is bounded by
+    # max_escalations. The budget check is at the bottom of the loop, not in
+    # this guard, and that placement is the fix rather than an accident:
+    #
+    #   was:  while scope != "exhausted" and escalations <= max_escalations:
+    #             ... replay ...
+    #             scope = next_scope(scope); escalations += 1
+    #
+    # `next_scope("restart_all")` is `"exhausted"`, which is a terminal marker
+    # and not a scope anything is replayed at. The old loop incremented on that
+    # transition too, so a run that exhausted the ladder reported
+    # `escalations=3` against `max_escalations=2` -- three counted, two
+    # performed. Every blind-detector cell in the campaign printed 3.
+    #
+    # Moving the guard to `<` in the header, which is the obvious-looking fix,
+    # is worse: with max=2 it stops after agent_restart and `restart_all` --
+    # the strongest recovery the ladder has -- becomes unreachable. So the
+    # count is fixed where the count was wrong, and the ladder still reaches
+    # its top rung.
+    while scope != "exhausted":
         invalidation = invalidation_for_scope(
             scope, plan.invalidation_set, agent_scope, all_events
         )
@@ -230,6 +249,13 @@ def recover(
             notes.append(f"succeeded at scope={scope}")
             break
         notes.append(f"verify failed at scope={scope}: {last_verify.reasons}")
+        if escalations >= max_escalations:
+            notes.append(
+                f"escalation budget spent ({escalations}/{max_escalations}); "
+                f"stopping at scope={scope}"
+            )
+            scope = "exhausted"
+            break
         scope = next_scope(scope)
         escalations += 1
 
