@@ -1839,3 +1839,77 @@ That last number is worth stating plainly as a limitation of the estimator
 rather than of the recovery method: redundancy in an agent's context is a blind
 spot for leave-one-out attribution, it gets worse as a workflow gets longer,
 and subset-testing is exponential.
+
+
+---
+
+## D-050  The Young/Daly interval is wired, and GC is inert for a reason the interval cannot fix
+Date: 09-09-2026
+Decided by: forced by measurement, Final Push brief Phase D
+Choice: consume `measured_interval()` in the pipeline via
+`Pipeline(checkpoint_interval=...)`, additive to the agent-boundary
+checkpoints, defaulting to None. Report GC as inert **by precondition**, and
+stop attributing it to checkpoint density.
+Rejected: docs/07's prediction that the interval would make GC matter.
+
+**The interval, measured.** Young (1974) / Daly (2006), `T ~ sqrt(2*delta*M)`,
+in events:
+
+| workflow | delta | M | interval | current spacing |
+|---|---|---|---|---|
+| short | 0.407 | 8.67 | **2.66 events** | ~4.75 (4 checkpoints / 19 events) |
+| long | 0.336 | 8.67 | **2.41 events** | ~3.38 (8 checkpoints / 27 events) |
+
+Wiring it does what it should. Checkpoints go 4 -> 9 on the short workflow and
+8 -> 15 on the long one; checkpoint bytes roughly double (3 551 -> 7 418 and
+7 688 -> 13 401). It is additive rather than replacing, because dropping a
+boundary checkpoint would remove a rewind point Step 1's safe frontier depends
+on and would confound this with a recovery regression.
+
+**GC still frees zero bytes. At every density measured.** docs/07 section 3a
+predicted the opposite: "GC and the interval are complementary and neither does
+anything alone -- the interval would create the denser stream GC exists to
+bound." That prediction is **wrong**, and the reason is not density.
+
+The blocker is `confirmed_clean()`, which requires every (event, source)
+exposure pair in a checkpoint's prefix to be **cleared**. Four measurements
+narrow it down, each ruling out one explanation:
+
+| configuration | pairs cleared | bytes freed |
+|---|---|---|
+| attacked run, hybrid estimator | 79/156 (51%) | 0 |
+| attacked run, `audit_rate=1.0` | 93/156 (60%) | 0 |
+| **clean** run, `audit_rate=1.0` | 87/156 (56%) | 0 |
+| clean run, `accept_self_report=True` | 129/156 (83%) | 0 |
+
+So it is not the attack, not estimator coverage, not the clearance policy, and
+not checkpoint count. Breaking the uncleared pairs down by event kind gives the
+answer: `tool_call`, `tool_response`, `message` and memory events clear at
+96-100%, while `agent_output`, `decision` and `plan` -- the model-written
+events -- clear at **0%**.
+
+**Clearing a pair means showing it did not influence the event.** A pair that
+genuinely did influence is therefore never cleared, and that is correct. One
+such pair anywhere in a prefix blocks that checkpoint permanently. Real
+influence is not an anomaly; it is what a working agent run is made of. Every
+model-written event in these runs has at least one.
+
+So GC's precondition is "a prefix provably free of influence", which a run that
+did useful work essentially never has. GC is not broken and is not waiting on
+density: it is asking for a condition the system is not built to produce. The
+conservative direction is right -- rewinding to a checkpoint whose prefix
+carries contamination would carry it forward, so demanding clean rather than
+merely *examined* is the safe choice -- but it should be stated as a design
+tension rather than reported as a mechanism that will start working at scale.
+
+`tests/test_checkpoint_interval.py` pins both halves: the interval produces a
+denser stream and never removes a boundary checkpoint, and GC frees zero at
+three densities with an explicit note to rewrite this entry if that ever
+changes. An influencing pair being uncleanable under even a permissive policy
+is asserted directly.
+
+**What would make GC collect**, stated so nobody re-runs this hoping: a weaker
+precondition -- every pair *examined* rather than every pair *cleared* -- plus
+an argument that rewinding past a known contamination is safe because recovery
+will replay it anyway. That argument may well hold. It is a design change with
+a safety proof attached, not a tuning exercise, and it is out of scope here.

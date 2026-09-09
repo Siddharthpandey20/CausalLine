@@ -125,6 +125,7 @@ class GeminiPipeline:
         handoff_hook: Any = None,
         research_rounds: int = 1,
         reviewer: bool = False,
+        checkpoint_interval: float | None = None,
     ) -> None:
         self.log = log
         self.client = client
@@ -147,6 +148,28 @@ class GeminiPipeline:
         # invalidate every number already in the repository.
         self.research_rounds = max(1, int(research_rounds))
         self.reviewer = bool(reviewer)
+        # PHASE D: the Young/Daly interval, wired to the run that produces it.
+        #
+        # `checkpoint_interval()` and `measured_interval()` have existed since
+        # Phase 3a and computed a number nothing consumed: the pipeline still
+        # checkpointed once per agent boundary, whatever the formula said. This
+        # is the half docs/07 recorded as deferred, and it is the half that
+        # makes GC mean anything -- GC bounds a dense checkpoint stream, and a
+        # policy of one-per-agent never produces one.
+        #
+        # None keeps the original boundary-only policy, so every existing
+        # measurement stands. A float is a spacing in events: a checkpoint is
+        # taken whenever that many events have been logged since the last one,
+        # in addition to the agent-boundary checkpoints recovery's safe
+        # frontier depends on. Additive rather than replacing, because dropping
+        # a boundary checkpoint would remove a rewind point Step 1 relies on
+        # and would confound this measurement with a recovery regression.
+        self.checkpoint_interval = (
+            float(checkpoint_interval) if checkpoint_interval else None
+        )
+        self._events_since_checkpoint = 0
+        if self.checkpoint_interval and self.checkpoints is not None:
+            self._install_interval_checkpointing()
         # Optional injection point for scenario C: a compromised inter-agent
         # message. Called with (from_agent, to_agent, texts) and returns extra
         # message strings to append. None means no injection.
@@ -268,9 +291,33 @@ class GeminiPipeline:
         )
         return event, response
 
+    def _install_interval_checkpointing(self) -> None:
+        """Count logged events and checkpoint every `checkpoint_interval`.
+
+        Wrapping the logger is the least invasive hook available: every event
+        in this pipeline goes through `log_event`, so counting there cannot
+        miss one, whereas threading a call through each of the ~20 log sites
+        would silently skip whichever site a later edit forgot.
+        """
+        inner = self.log.log_event
+
+        def counted(*args: Any, **kwargs: Any):
+            event = inner(*args, **kwargs)
+            self._events_since_checkpoint += 1
+            if (
+                self.checkpoint_interval
+                and self._events_since_checkpoint >= self.checkpoint_interval
+            ):
+                self._checkpoint(event.id, event.agent_id)
+            return event
+
+        self.log.log_event = counted  # type: ignore[method-assign]
+
     def _checkpoint(self, event_id: str, agent_id: str) -> None:
         """Checkpoint after an agent boundary (docs/02-architecture.md, v1
-        policy). Cost is measured rather than assumed: see overhead()."""
+        policy), and on the Young/Daly interval when one is configured. Cost is
+        measured rather than assumed: see overhead()."""
+        self._events_since_checkpoint = 0
         if self.checkpoints is None:
             return
         self.checkpoints.take(
@@ -1019,6 +1066,7 @@ def run_pipeline(
     handoff_hook: Any = None,
     research_rounds: int = 1,
     reviewer: bool = False,
+    checkpoint_interval: float | None = None,
 ) -> PipelineResult:
     """Run the pipeline and write a trace, its checkpoints, and its memory.
 
@@ -1071,6 +1119,7 @@ def run_pipeline(
         # caller can forget.
         "research_rounds": research_rounds,
         "reviewer": reviewer,
+        "checkpoint_interval": checkpoint_interval,
         **settings.fingerprint(),
     }
     if client is not None:
@@ -1099,6 +1148,7 @@ def run_pipeline(
                 handoff_hook=handoff_hook,
                 research_rounds=research_rounds,
                 reviewer=reviewer,
+                checkpoint_interval=checkpoint_interval,
             ).run()
 
 
