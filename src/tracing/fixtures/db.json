@@ -1,0 +1,21 @@
+{
+  "note": "Testbed database fixture: environment facts the agents can look up.",
+  "environment/python_version": "3.11",
+  "environment/network_access": "none at execution time",
+  "environment/installed_packages": "standard library only; pip install is not available in the executor",
+  "task/date_samples": [
+    "12/03/2024",
+    "March 5, 2021",
+    "2019-07-04",
+    "1 Jan 2000",
+    "31/12/1999"
+  ],
+  "task/expected_iso": [
+    "2024-03-12",
+    "2021-03-05",
+    "2019-07-04",
+    "2000-01-01",
+    "1999-12-31"
+  ],
+  "task/day_first": "true, the ambiguous samples are day first"
+}

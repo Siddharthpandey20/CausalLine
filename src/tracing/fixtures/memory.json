@@ -1,0 +1,4 @@
+{
+  "style/preferences": "An earlier run in this project preferred standard library solutions where possible.",
+  "style/output": "Scripts in this project print one result per line."
+}

@@ -1,0 +1,310 @@
+"""
+Contamination propagation.
+
+Given the detector's verdict -- "these sources are malicious" -- work out
+which events actually became contaminated, and which stayed clean.
+
+THE RULE THIS MODULE EXISTS TO ENFORCE
+--------------------------------------
+Contamination walks exactly two kinds of edge:
+
+    influence edge   source -> event    this source changed this output
+    derived_from     event  -> source   this source *is* that event's output
+
+It never walks `Event.parents`. Those are execution history: they record what
+ran after what, not what was derived from what. Walking them transitively
+gives you everything downstream, which is precisely baseline B2. A method that
+silently reproduces its own baseline has no result left to report, and the
+failure is invisible -- the numbers still come out, they are just the
+baseline's numbers wearing our name.
+
+`derived_from` is the other half and is the easy one to forget. An agent
+output exists twice in a trace: as the event that produced it (e0006) and as
+the source a later agent consumed (S6). Those are one piece of work (D-012).
+Without this edge contamination stops dead at every agent boundary, and we
+would report a contaminated set that is too small -- an unsafe preservation,
+which is the dangerous direction of error.
+
+WHAT THIS MODULE MUST NOT READ
+------------------------------
+`Source.malicious` is ground truth, for src/eval/ scoring only. Nothing here
+reads it. Malicious ids arrive as an argument, standing in for the detector
+this project assumes exists and does not build (docs/01-scope.md). Reading the
+label would hand the method the answer it is meant to derive, and every
+accuracy number after that would be worthless.
+"""
+
+from dataclasses import dataclass, field
+from typing import Iterable
+
+from src.common.models import sort_source_ids
+from src.provenance.checks import CheckLedger
+from src.tracing.logger import Trace
+
+
+@dataclass(frozen=True)
+class Policy:
+    """The knobs that decide how cautious the walk is.
+
+    Both default to the safe setting. docs/04 asks for an ablation with the
+    conservative fallback turned off ("how much does unsafe preservation
+    rise?"), which is the only reason these are switches rather than
+    hardcoded behaviour. Turning one off makes the method less safe on
+    purpose, in order to measure what the safety was buying.
+    """
+
+    # An exposure nobody checked is treated as influence. docs/02:
+    # "Anything we cannot establish confidently is treated as contaminated."
+    assume_unchecked_exposures: bool = True
+
+    # An influence edge recorded without confidence still contaminates. It is
+    # not evidence of influence -- influence_graph() excludes it from the
+    # figure for exactly that reason -- but it is equally not evidence of
+    # *non*-influence, and only the second one would justify keeping the work.
+    unconfident_edges_contaminate: bool = True
+
+
+@dataclass
+class ContaminatedRegion:
+    """What the detector's verdict actually reaches.
+
+    `events` is the answer. Work is counted in events, never sources (D-012),
+    so every metric in docs/04 starts from this set.
+
+    `precautionary` is the subset of `events` that is in there only because
+    nobody examined the pair, as opposed to because influence was established.
+    Both are contaminated and both get recovered, so the safety of the answer
+    does not depend on the split -- but the two cost different amounts to
+    *resolve*, and that is what Step 2 of the recovery algorithm chooses
+    between. A precautionary event can be cleared by spending one
+    counterfactual check; a confirmed one can only be recomputed.
+    """
+
+    seeds: frozenset[str]
+    sources: frozenset[str]
+    events: frozenset[str]
+    precautionary: frozenset[str] = frozenset()
+    # id -> why it ended up in here. Kept because "these events are
+    # contaminated" is not usable in a paper without "and this is why this
+    # one" -- and because a wrong answer is unreadable without it.
+    reasons: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def confirmed(self) -> frozenset[str]:
+        """Events an established influence edge put here."""
+        return frozenset(self.events - self.precautionary)
+
+    def clean_events(self, trace: Trace) -> list[str]:
+        """Everything the run did that survives. The work we preserve."""
+        return [e.id for e in trace.events if e.id not in self.events]
+
+    def explain(self) -> list[str]:
+        lines = [
+            f"seeds     {sort_source_ids(list(self.seeds))}",
+            f"sources   {sort_source_ids(list(self.sources))}",
+            f"events    {sorted(self.events)}",
+            f"  of which {len(self.precautionary)} precautionary "
+            f"(unchecked, not established): {sorted(self.precautionary)}",
+        ]
+        for key in sort_source_ids(list(self.sources)) + sorted(self.events):
+            if key in self.reasons:
+                lines.append(f"  {key:<7} {self.reasons[key]}")
+        return lines
+
+
+def contaminate(
+    trace: Trace,
+    malicious: Iterable[str],
+    policy: Policy | None = None,
+    checked: set[tuple[str, str]] | None = None,
+    ledger: CheckLedger | None = None,
+    influence: set[tuple[str, str]] | None = None,
+) -> ContaminatedRegion:
+    """Propagate contamination from the sources the detector flagged.
+
+    `checked` is the set of (source id, event id) pairs that were examined and
+    cleared. It matters only when `policy.assume_unchecked_exposures` is on: a
+    pair nobody looked at is assumed to be influence, a cleared pair is not.
+
+    Where that set comes from, in order of preference:
+
+      1. `ledger`, a CheckLedger, which applies a clearance policy to the
+         trace's `check` records -- how much a `clean` verdict is worth is
+         itself a decision, and one docs/04 wants an ablation over.
+      2. `checked`, passed explicitly.
+      3. the trace's own `check` records under the default clearance policy.
+
+    What it no longer does is infer the checked set from the influence edges.
+    That was the D-024 defect: a counterfactual check that finds **no**
+    influence recorded nothing at all, so a pair that had been tested and
+    cleared looked identical to a pair nobody had examined, and both were
+    assumed contaminated. It cost 17 points of work preserved on
+    `data/runs/fake.jsonl` and could never cause an unsafe preservation, which
+    is why it survived unnoticed -- it made the method look worse than it is.
+    A trace with no `check` records now clears nothing, which is the correct
+    reading of "nothing was examined".
+
+    `influence` replaces the trace's own edges with an explicit (source, event)
+    relation. It exists for one caller: `metrics.ground_truth_events()`, which
+    must walk **true** influence rather than estimated influence. Both walking
+    the same records is the circularity metrics.py warns about, and it is not
+    fixed by the edges merely being estimates -- if ground truth reads the
+    estimator's edges then ground truth inherits the estimator's mistakes, the
+    two sets agree wherever the estimator was wrong, and the unsafe-preservation
+    count comes out zero for that reason alone.
+    """
+    policy = policy or Policy()
+
+    known = {s.id for s in trace.sources}
+    unknown = [sid for sid in malicious if sid not in known]
+    if unknown:
+        # A detector naming a source this trace never saw means the verdict
+        # and the trace belong to different runs. Propagating nothing would
+        # look exactly like a clean run, which is the worst way to fail.
+        raise ValueError(f"trace has no source(s) {sorted(unknown)}")
+
+    influenced_events: dict[str, set[str]] = {}
+    if influence is not None:
+        for sid, eid in influence:
+            influenced_events.setdefault(sid, set()).add(eid)
+    else:
+        for edge in trace.influence:
+            if edge.confident or policy.unconfident_edges_contaminate:
+                influenced_events.setdefault(edge.source_id, set()).add(edge.target_event)
+
+    if ledger is not None:
+        checked = ledger.cleared_pairs()
+    elif checked is None:
+        checked = CheckLedger.from_trace(trace).cleared_pairs()
+
+    exposed_events: dict[str, set[str]] = {}
+    for event in trace.events:
+        for sid in event.exposures:
+            exposed_events.setdefault(sid, set()).add(event.id)
+
+    # event -> the source(s) that wrap its output for a later agent (D-012)
+    wraps: dict[str, set[str]] = {}
+    for source in trace.sources:
+        if source.derived_from:
+            wraps.setdefault(source.derived_from, set()).add(source.id)
+
+    seeds = frozenset(malicious)
+    bad_sources: set[str] = set()
+    bad_events: set[str] = set()
+    precautionary: set[str] = set()
+    reasons: dict[str, str] = {sid: "flagged by the detector" for sid in seeds}
+
+    # Alternating walk: contaminated source -> the events it influenced ->
+    # the sources those events became -> the events *those* influenced.
+    pending = list(seeds)
+    while pending:
+        sid = pending.pop()
+        if sid in bad_sources:
+            continue
+        bad_sources.add(sid)
+
+        targets: dict[str, str] = {}
+        assumed: set[str] = set()
+        for eid in influenced_events.get(sid, ()):
+            targets[eid] = f"influenced by {sid}"
+        if policy.assume_unchecked_exposures:
+            for eid in exposed_events.get(sid, ()):
+                if eid not in targets and (sid, eid) not in checked:
+                    verdict = trace.checked(eid, sid)
+                    targets[eid] = (
+                        f"exposed to {sid}, influence never checked"
+                        if verdict == "unchecked"
+                        else f"exposed to {sid}, checked {verdict} but not accepted"
+                    )
+                    assumed.add(eid)
+
+        for eid, why in targets.items():
+            if eid in bad_events:
+                # An event already reached by an established edge stays
+                # confirmed: arriving a second time via a precautionary route
+                # must not downgrade it.
+                if eid not in assumed:
+                    precautionary.discard(eid)
+                continue
+            bad_events.add(eid)
+            if eid in assumed:
+                precautionary.add(eid)
+            reasons[eid] = why
+            for derived in wraps.get(eid, ()):
+                if derived not in bad_sources:
+                    reasons.setdefault(derived, f"output of contaminated {eid}")
+                    pending.append(derived)
+
+    return ContaminatedRegion(
+        seeds=seeds,
+        sources=frozenset(bad_sources),
+        events=frozenset(bad_events),
+        precautionary=frozenset(precautionary),
+        reasons=reasons,
+    )
+
+
+def downstream_closure(trace: Trace, malicious: Iterable[str]) -> set[str]:
+    """Everything downstream of where the bad sources entered, by parent edges.
+
+    This is what current practice discards, and it is the set our answer has
+    to be smaller than for the week-2 exit test. It is built here **only** as
+    the thing we compare against -- see the warning in src/tracing/graphs.py
+    about never deciding contamination this way. The real baselines B0/B1/B2
+    live in src/eval/ and are scored there.
+    """
+    from src.tracing.graphs import EventGraph
+
+    graph = EventGraph.from_trace(trace)
+    entry = {
+        s.origin_event
+        for s in trace.sources
+        if s.id in set(malicious) and s.origin_event
+    }
+    return set(entry) | graph.descendants(*entry)
+
+
+if __name__ == "__main__":
+    import sys
+
+    from src.tracing.logger import read_trace
+
+    args = sys.argv[1:]
+    path = args[0] if args else "data/runs/fake.jsonl"
+    # Seeds come from the command line, never from Source.malicious -- that
+    # field is eval's ground truth and reading it here would leak the answer.
+    seeds = args[1:] or ["S5"]
+
+    trace = read_trace(path)
+    trace.validate()
+    region = contaminate(trace, seeds)
+    naive = downstream_closure(trace, seeds)
+    total = len(trace.events)
+
+    print(f"trace     {path}  ({total} events)")
+    print(f"detector  flagged {seeds}")
+    print()
+    for line in region.explain():
+        print(line)
+    print()
+    print(f"ours              {len(region.events):>2} of {total} events contaminated")
+    print(f"everything down-  {len(naive):>2} of {total} events discarded")
+    print(f"  stream of entry    {sorted(naive)}")
+    print()
+
+    kept_ours = total - len(region.events)
+    kept_naive = total - len(naive)
+    print(f"work preserved    ours {kept_ours}/{total} ({kept_ours / total:.0%})"
+          f"   downstream closure {kept_naive}/{total} ({kept_naive / total:.0%})")
+    print()
+
+    smaller = region.events < naive
+    print(f"EXIT TEST (week 2): contaminated set is a strict subset of "
+          f"everything downstream -> {'PASS' if smaller else 'FAIL'}")
+    if not smaller:
+        extra = sorted(region.events - naive)
+        if extra:
+            print(f"  contaminated but not downstream: {extra}")
+            print("  that means contamination crossed an edge the parent graph")
+            print("  does not have, which is possible and worth reading closely.")
+    raise SystemExit(0 if smaller else 1)
