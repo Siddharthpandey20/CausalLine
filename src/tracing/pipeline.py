@@ -61,9 +61,24 @@ from src.provenance.attribution import (
     AttributionRequest,
     Attributor,
     NullAttributor,
+    derived_links_for,
     record_carrier,
     record_structural,
 )
+
+
+def source_producer_of(source: Any) -> str | None:
+    """The event a source is the output of, if any.
+
+    Mirrors `planner.source_producer()` but takes the Source object, because
+    the pipeline holds sources in a dict and has no Trace to look them up in
+    while the run is still going.
+    """
+    if source is None:
+        return None
+    return getattr(source, "derived_from", None) or getattr(
+        source, "origin_event", None
+    )
 from src.tracing.checkpoints import CheckpointStore, checkpoint_path_for, overhead
 from src.tracing.logger import TraceLogger, read_trace
 from src.tracing.tools import Tools
@@ -286,6 +301,16 @@ class GeminiPipeline:
                 prompt=prompt,
                 source_block=source_block,
                 system=system,
+                # Recorded derived_from links among what this agent can see,
+                # so the estimator can merge a summary with its own inputs
+                # into one atomic test unit (D-051). Read off the partial log
+                # mid-run; `request_for()` computes the same thing from a
+                # finished trace, through the same helper.
+                derived_links=derived_links_for(
+                    list(event.exposures),
+                    lambda sid: source_producer_of(self._sources.get(sid)),
+                    self._influenced_by,
+                ),
             ),
             self.log,
         )

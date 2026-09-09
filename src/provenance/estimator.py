@@ -51,7 +51,11 @@ from typing import Any, Callable, Iterable
 from src.common.models import InfluenceEdge
 from src.common.prompts import SourceNotInPrompt, redact_in_prompt
 from src.provenance import selfreport
-from src.provenance.attribution import AttributionRequest, Sink
+from src.provenance.attribution import (
+    AttributionRequest,
+    Sink,
+    derived_links_for,
+)
 from src.common.models import SOURCE_KINDS as _SOURCE_KINDS
 from src.provenance.signatures import (
     Calibration,
@@ -448,16 +452,111 @@ class HybridAttributor:
                 notes=result.notes(),
             )
 
-        if len(needs_evidence) >= MIN_GROUP_TEST_CANDIDATES:
+        # ATOMIC UNITS BEFORE ANY REMOVAL TEST (D-051).
+        # A source and the sources it was recorded as derived from are
+        # individually unnecessary and jointly necessary, so testing them
+        # apart clears both. Merge them first; every test below -- single or
+        # recursive -- then operates on whole units and never splits one.
+        from src.provenance.group_test import merge_derived_units
+
+        units = merge_derived_units(needs_evidence, request.derived_links)
+        merged = [u for u in units if len(u) > 1]
+        if merged:
+            self._bump("derived_units_merged", len(merged))
+            self._bump(
+                "derived_sources_merged", sum(len(u) for u in merged)
+            )
+
+        # The threshold counts units, not sources: units are what halving
+        # actually splits, so three sources merged into one unit is one test,
+        # not three.
+        if len(units) >= MIN_GROUP_TEST_CANDIDATES:
             self._group_investigate(
-                sink, request, needs_evidence, comparator, context
+                sink, request, units, comparator, context
             )
         else:
             # Too few to halve profitably. One call each, which is what group
             # testing would have cost more than.
-            self._bump("group_testing_skipped_small", len(needs_evidence))
-            for sid in needs_evidence:
-                self._single_investigate(sink, request, sid, comparator, context)
+            self._bump("group_testing_skipped_small", len(units))
+            for unit in units:
+                if len(unit) == 1:
+                    self._single_investigate(
+                        sink, request, unit[0], comparator, context
+                    )
+                else:
+                    self._merged_investigate(
+                        sink, request, unit, comparator, context
+                    )
+
+    def _merged_investigate(
+        self,
+        sink: Sink,
+        request: AttributionRequest,
+        unit: tuple[str, ...],
+        comparator: Comparator,
+        context: dict[str, Any] | None,
+    ) -> None:
+        """One atomic unit, one counterfactual, removing every member together.
+
+        The small-candidate path still has to respect units, or the fix would
+        apply only above `MIN_GROUP_TEST_CANDIDATES` and the exact case it
+        exists for -- a summary beside its two inputs, three candidates -- would
+        slip through the cheap path untouched.
+
+        The verdict is recorded against **every** member. That is the honest
+        reading of the evidence: the removal shows the unit mattered, and which
+        member carried it is precisely what single-source testing cannot
+        determine here. Calling one member influenced and the others clean
+        would be inventing a distinction the measurement does not support, and
+        it would be the unsafe direction.
+        """
+        from src.provenance.group_test import CounterfactualDecision
+
+        decision = CounterfactualDecision(
+            client=self.client,
+            request=request,
+            comparator=comparator,
+            calibration=self.calibration,
+            context=context,
+        )
+        influenced = bool(decision(list(unit)))
+        self.budget.charge(decision.calls)
+        self._bump("counterfactual_calls", decision.calls)
+        self._bump("merged_unit_tests")
+        self._bump(f"counterfactual_{'tainted' if influenced else 'clean'}")
+        sink.log_usage(
+            "counterfactual",
+            model=self.model,
+            prompt_tokens=0,
+            output_tokens=0,
+            total_tokens=decision.tokens,
+            event_id_=request.event_id,
+            agent_id=request.agent_id,
+        )
+        error = decision.errors[0] if decision.errors else None
+        for sid in unit:
+            if influenced:
+                sink.log_influence(
+                    InfluenceEdge(
+                        sid, request.event_id, method="counterfactual",
+                        confident=error is None,
+                    )
+                )
+            sink.log_check(
+                sid, request.event_id,
+                "tainted" if influenced else "clean",
+                "counterfactual",
+                confidence=0.5 if error else 1.0,
+                signature_before=decision._before.value,
+                signature_after="",
+                comparator=comparator.name,
+                repeats=1,
+                notes=(
+                    f"removed as one atomic unit with {list(unit)} -- these "
+                    "carry a recorded derived_from link, so testing them "
+                    "separately clears both (D-051)"
+                ) + (f"; error: {error}" if error else ""),
+            )
 
     def _single_investigate(
         self,
@@ -510,7 +609,7 @@ class HybridAttributor:
         self,
         sink: Sink,
         request: AttributionRequest,
-        candidates: list[str],
+        units: list[tuple[str, ...]],
         comparator: Comparator,
         context: dict[str, Any] | None,
     ) -> None:
@@ -547,7 +646,20 @@ class HybridAttributor:
             context=context,
         )
         diagnostics = GroupTestDiagnostics()
-        influential = set(group_test(candidates, decision, diagnostics))
+
+        # `group_test` halves a flat list, so it is handed one KEY per atomic
+        # unit and the decision function expands a key back to every source in
+        # that unit before removing it. The recursion therefore cannot split a
+        # unit: it never sees the members, only the key.
+        by_key = {unit[0]: unit for unit in units}
+        keys = [unit[0] for unit in units]
+
+        def unit_decision(group: list[str]) -> bool:
+            return decision([sid for key in group for sid in by_key[key]])
+
+        influential_keys = set(group_test(keys, unit_decision, diagnostics))
+        influential = {sid for key in influential_keys for sid in by_key[key]}
+        candidates = [sid for unit in units for sid in unit]
 
         self._bump("group_tests", diagnostics.groups_tested)
         self._bump("group_calls", decision.calls)
@@ -559,12 +671,17 @@ class HybridAttributor:
         if diagnostics.sparsity_failing():
             self._bump("sparsity_failing")
             fitted = budget_attribute(
-                candidates, decision, budget=max(16, len(candidates) + 2)
+                keys, unit_decision, budget=max(16, len(keys) + 2)
             )
             self._bump("budget_fallback_calls", fitted.calls)
             self._bump("budget_fallback_invocations")
             if not fitted.degenerate:
-                influential = set(fitted.influential)
+                # Fitted over unit keys, so expand before reporting -- the
+                # fallback must respect atomic units for the same reason the
+                # halving does.
+                influential = {
+                    sid for key in fitted.influential for sid in by_key[key]
+                }
 
         self.budget.charge(decision.calls)
         self._bump("counterfactual_calls", decision.calls)
@@ -650,6 +767,10 @@ class RefineResult:
     aborted_early: bool = False
     calibration_skips: int = 0
     fallback_invocations: int = 0
+    # How often a summary and its own recorded inputs were removed together
+    # instead of separately (D-051), and how many sources that covered.
+    derived_units_merged: int = 0
+    derived_sources_merged: int = 0
 
     def summary(self) -> str:
         parts = [
@@ -748,6 +869,7 @@ def refine_for_verdict(
         CounterfactualDecision,
         GroupTestDiagnostics,
         group_test,
+        merge_derived_units,
     )
     from src.recovery.sprt_investigate import SPRTConfig, SPRTState
     from src.risk.attack_model import channel_for
@@ -848,20 +970,46 @@ def refine_for_verdict(
                 context=context,
             )
 
-            batched = use_group_testing and len(group) >= MIN_GROUP_TEST_CANDIDATES
+            # --- ATOMIC UNITS BEFORE ANY REMOVAL TEST (D-051) ---------------
+            # A source and the sources it was recorded as derived from are
+            # individually unnecessary and jointly necessary, so removing
+            # either alone clears both. Merge them into units removed whole and
+            # never split -- including inside the halving, which only ever sees
+            # unit keys.
+            units = merge_derived_units(group, request.derived_links)
+            merged_units = [u for u in units if len(u) > 1]
+            result.derived_units_merged += len(merged_units)
+            result.derived_sources_merged += sum(len(u) for u in merged_units)
+
+            by_key = {unit[0]: unit for unit in units}
+            unit_keys = [unit[0] for unit in units]
+
+            def unit_decision(keys, _d=decision, _m=by_key):
+                return _d([sid for key in keys for sid in _m[key]])
+
+            # The threshold counts units, not sources: units are what halving
+            # splits, so three sources in one unit are one test, not three.
+            batched = use_group_testing and len(units) >= MIN_GROUP_TEST_CANDIDATES
             if batched:
                 diagnostics = GroupTestDiagnostics()
-                influential = set(group_test(group, decision, diagnostics))
+                influential_keys = set(
+                    group_test(unit_keys, unit_decision, diagnostics)
+                )
                 result.groups_tested += diagnostics.groups_tested
                 # What leave-one-out would have spent on the same group.
                 result.group_calls_saved += len(group) - decision.calls
 
                 # --- 2b fallback: sparsity assumption failing ---------------
                 if diagnostics.sparsity_failing():
-                    fitted = budget_attribute(group, decision, budget=max(16, len(group) + 2))
+                    fitted = budget_attribute(
+                        unit_keys, unit_decision, budget=max(16, len(unit_keys) + 2)
+                    )
                     result.fallback_invocations += 1
                     if not fitted.degenerate:
-                        influential = set(fitted.influential)
+                        influential_keys = set(fitted.influential)
+                influential = {
+                    sid for key in influential_keys for sid in by_key[key]
+                }
 
                 for sid in sorted(group):
                     _record(
@@ -878,6 +1026,40 @@ def refine_for_verdict(
                 budget.charge(decision.calls)
                 result.calls += decision.calls
                 result.tokens += decision.tokens
+            elif len(by_key[unit_keys[0]]) > 1:
+                # Below the batching threshold, but the first unit is a merged
+                # one and still has to be removed whole -- otherwise the fix
+                # would apply only above MIN_GROUP_TEST_CANDIDATES and the
+                # exact case it exists for, a summary beside its inputs, would
+                # slip through the cheap path untouched.
+                unit = by_key[unit_keys[0]]
+                influenced = bool(unit_decision([unit_keys[0]]))
+                budget.charge(decision.calls)
+                result.calls += decision.calls
+                result.tokens += decision.tokens
+                error = decision.errors[0] if decision.errors else None
+                for sid in unit:
+                    # Recorded against every member. The removal shows the unit
+                    # mattered; which member carried it is exactly what
+                    # single-source testing cannot determine here, and
+                    # splitting the verdict would invent a distinction the
+                    # measurement does not support, in the unsafe direction.
+                    _record(
+                        log, sid, target_event, request,
+                        influenced=influenced,
+                        error=error,
+                        before=decision._before.value,
+                        after="" if influenced else decision._before.value,
+                        repeats_done=1,
+                    )
+                    if sprt is not None:
+                        sprt.observe(influenced)
+                        result.sprt_trajectory.append(round(sprt.log_lr, 3))
+                log.log_usage(
+                    "counterfactual", model=model, prompt_tokens=0,
+                    output_tokens=0, total_tokens=decision.tokens,
+                    event_id_=target_event, agent_id=request.agent_id,
+                )
             else:
                 sid = group[0]
                 outcome = counterfactual(
@@ -992,6 +1174,17 @@ def request_for(
         source = trace.source(sid)
         where = source.metadata.get("url") or source.metadata.get("key") or source.kind
         labels[sid] = f"{source.kind}, {where}"
+    # Recorded derived_from links among the exposed sources, so the
+    # investigation loop can merge a summary with its own inputs into one
+    # atomic test unit (D-051). Computed from the finished trace here; the
+    # pipeline computes the same thing mid-run off its partial log.
+    def _producer(sid: str) -> str | None:
+        source = trace.source(sid)
+        return source.derived_from or source.origin_event
+
+    def _influencers(event: str) -> list[str]:
+        return [e.source_id for e in trace.influence if e.target_event == event]
+
     return AttributionRequest(
         event_id=event_id,
         agent_id=event.agent_id,
@@ -1002,4 +1195,7 @@ def request_for(
         prompt=prompt,
         source_block=trace.source_block_text(event_id),
         system=trace.system_text(event_id),
+        derived_links=derived_links_for(
+            list(event.exposures), _producer, _influencers
+        ),
     )

@@ -46,7 +46,7 @@ a trade we are making.
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterable, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from src.common.prompts import (
     SourceNotInPrompt,
@@ -109,6 +109,81 @@ class GroupTestDiagnostics:
                 else ""
             )
         )
+
+
+def merge_derived_units(
+    candidates: Sequence[str],
+    derived_links: Mapping[str, Sequence[str]] | None = None,
+) -> list[tuple[str, ...]]:
+    """Group candidates joined by a recorded `derived_from` link into atomic units.
+
+    THE PROBLEM THIS SOLVES (D-051)
+    -------------------------------
+    A summary and the raw inputs it was built from are each individually
+    unnecessary: remove either alone and the other still carries the fact, so
+    the decision does not move and single-source removal clears **both**.
+    Removing them *together* does move it. Leave-one-out and recursive group
+    testing both split them apart, so both miss it.
+
+    That is not a hypothetical. In the long workflow the Coder sees five
+    Researcher findings; no single finding is necessary; the script is
+    attributed to the memory source alone, contamination never reaches the
+    Executor, and A-influencing/oracle recovers 11.1% against B1's 14.8%.
+
+    WHAT THIS DOES
+    --------------
+    Union linked candidates into one unit that is removed as a whole and never
+    split -- including inside `group_test()`'s recursion, since the recursion
+    only ever sees whole units. Nothing else about the estimator changes: the
+    same comparator, the same budget, the same halving.
+
+    Linking is transitive. If a summary is built from two findings and one of
+    those is itself derived from a third, all four are one unit -- an
+    intermediate that is redundant with both ends would otherwise reintroduce
+    the same blind spot one level up.
+
+    WHAT THIS DOES NOT DO
+    ---------------------
+    Only links the trace **recorded** are used. Two unrelated sources that
+    happen to state the same fact are not merged, and this returns them as
+    separate units. Catching those needs testing subsets rather than single
+    variables, which is exponential. See docs/06 section 2.2 and D-051.
+
+    Returns units in the order candidates were given, each unit's members in
+    that order too, so a rerun tests the same groups and call counts stay
+    comparable.
+    """
+    candidates = list(candidates)
+    if not derived_links:
+        return [(sid,) for sid in candidates]
+
+    index = {sid: i for i, sid in enumerate(candidates)}
+    parent = list(range(len(candidates)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def union(i: int, j: int) -> None:
+        ri, rj = find(i), find(j)
+        if ri != rj:
+            # Lower index wins, so a unit's identity does not depend on the
+            # order links happened to be discovered in.
+            parent[max(ri, rj)] = min(ri, rj)
+
+    for sid, parents in derived_links.items():
+        if sid not in index:
+            continue
+        for other in parents:
+            if other in index:
+                union(index[sid], index[other])
+
+    grouped: dict[int, list[str]] = {}
+    for sid in candidates:
+        grouped.setdefault(find(index[sid]), []).append(sid)
+    return [tuple(grouped[root]) for root in sorted(grouped)]
 
 
 def split_in_half(candidates: Sequence[str]) -> tuple[list[str], list[str]]:

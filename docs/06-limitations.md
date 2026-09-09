@@ -100,9 +100,54 @@ fact, removing either one changes nothing and **both** are called clean
 (D-030). This is a property of counterfactual influence, not of our
 implementation. Testing every subset is exponential and we do not do it.
 
-Our scenarios avoid it because the poisoned source carries a directive no clean
-source carries, so it stays individually necessary. That is a fact about our
-fixtures and must not be presented as a property of the method.
+**Partially addressed (D-051, 09-09-2026).** This stopped being a footnote when
+the workflow got longer. With five Researcher findings in the Coder's context
+instead of three, no single finding was individually necessary, the script was
+attributed to a memory source alone, contamination never reached the Executor,
+and A-influencing/oracle recovered **11.1%** against B1's 14.8% — the method
+losing a cell it should win.
+
+Where redundancy is **recorded in the trace**, we now merge the redundant
+sources into one atomic unit that is removed together and never split, in
+leave-one-out and inside the recursive halving alike. Two recorded shapes
+qualify: a summary sitting beside its own inputs, and two summaries of an
+upstream source that is not itself in context (the shape that actually bit —
+the findings share the poisoned page as an ancestor, but the page is not in the
+Coder's context, so no finding is derived from another). Measured: the cell
+moves **11.1% → 37.0%**, escalations 1 → 0, and it now beats B1 by +22.2
+points. Across the 48-configuration matrix the merge fires in 11 of them,
+forming 25 units over 82 sources, with **zero** change to any short-workflow
+cell.
+
+**What is still not handled, and why we stop here.** Two sources that state the
+same fact with *no recorded provenance link between them* are not merged and
+are not caught. Our own scenarios sidestep this because the poisoned source
+carries a directive no clean source carries, so it stays individually
+necessary — a fact about our fixtures, not a property of the method, and it
+must not be presented as one.
+
+Closing that gap is not an engineering oversight. It is the known limit of
+**single-variable counterfactual testing**, and it is precisely why Halpern and
+Chockler's actual-causality framework exists. Their definition of an actual
+cause quantifies over *contingencies*: `X = x` is a cause of `φ` when there is
+some setting of a subset of the other variables under which changing `X`
+changes `φ` — the "AC2" condition. Naive but-for testing, which is what
+leave-one-out is, is exactly the special case where that subset is empty, and
+it is exactly the case that fails under redundancy: with two symmetric
+over-determining causes present, neither is a but-for cause of the outcome even
+though together they determine it. Halpern's modified definition (2015) makes
+this explicit by requiring a witness subset, and finding one is
+`Sigma-2-complete` in the general case (Eiter and Lukasiewicz; Aleksandrowicz
+et al.) — which is the formal statement of "testing every subset is
+exponential".
+
+So the honest position is: our recorded-provenance merge closes the subset of
+this problem where the trace already tells us which sources are redundant, at
+no extra counterfactual calls. The remainder is not a bug we have not got
+around to; it is a complexity result. A trace-based system can be *sound* about
+recorded redundancy and can only ever be heuristic about the rest, and any
+future work here should be framed as choosing which contingencies to test
+under a budget, not as making leave-one-out complete.
 
 ### 2.3 Group testing assumes no interaction effects
 

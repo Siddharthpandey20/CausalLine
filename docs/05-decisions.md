@@ -1913,3 +1913,84 @@ precondition -- every pair *examined* rather than every pair *cleared* -- plus
 an argument that rewinding past a known contamination is safe because recovery
 will replay it anyway. That argument may well hold. It is a design change with
 a safety proof attached, not a tuning exercise, and it is out of scope here.
+
+
+---
+
+## D-051  Recorded redundancy is removed as one atomic unit
+Date: 09-09-2026
+Decided by: group directive, derived_from-aware grouping brief
+Choice: before any removal test, merge candidates joined by a **recorded**
+provenance link into a single atomic unit, removed together and never split --
+in leave-one-out, in the recursive halving, and in the Lasso fallback alike.
+Everything else about the estimator is unchanged.
+Rejected: exponential subset testing; and leaving the case documented-only.
+
+**The failure.** Two sources carrying the same fact are each individually
+unnecessary, so single-source removal clears **both** and removing them
+together is never tried. That is not a lost percentage point: a false clean
+severs the contamination chain, and every event downstream of it is preserved
+unsafely. It is the estimator's half of `unsafe preservation`.
+
+It stopped being a footnote when the workflow got longer (D-049). With five
+Researcher findings in the Coder's context instead of three, no single finding
+was necessary, the script was attributed to a memory source alone,
+contamination never reached the Executor, and A-influencing/oracle recovered
+**11.1% against B1's 14.8%** -- the method losing a cell it should win.
+
+**Two recorded shapes qualify, and the second is the one that bit.**
+
+| shape | rule | example |
+|---|---|---|
+| direct | A's producing event was influenced by B, both in context | a summary beside its own inputs |
+| shared ancestor | A's and B's producing events share an influencing source that is **not** in context | two findings derived from the same poisoned page |
+
+The direct shape is the obvious one and is worth almost nothing here: measured
+alone it fired in **2 of 48** configurations and moved the target cell not at
+all. The Coder sees five findings and no web pages, so no finding is derived
+from another -- the redundancy runs through an ancestor that is not in the
+context being tested. Adding the shared-ancestor shape is what made the fix
+reach the failure it was written for.
+
+An ancestor that *is* itself exposed is deliberately excluded from the
+sibling rule: both children can be tested against it directly, so merging them
+as well would over-merge and lose resolution for nothing.
+
+**Measured.**
+
+| cell | before | after |
+|---|---|---|
+| long A-influencing / oracle | 11.1%, 1 escalation, `agent_restart` | **37.0%, 0 escalations, `selective`** |
+| B1 on the same cell | 14.8% | 14.8% |
+| long A-exposed-only | 92.6% | 92.6% (unchanged) |
+| short workflow, all 96 rows | -- | **0 rows changed** |
+
+Reach across the 48-configuration matrix: **25 merged units covering 82
+sources, firing in 11 configurations**. Event-level unsafe preservation stays
+0. Analysis tokens on the short matrix fell 18 400 -> 18 000, so the merge is
+very slightly *cheaper* -- one removal for a unit costs less than one per
+member.
+
+**Verdicts are recorded against every member of a merged unit.** The removal
+shows the unit mattered; which member carried it is exactly what single-source
+testing cannot determine here. Splitting the verdict would invent a
+distinction the measurement does not support, in the unsafe direction.
+
+**Where this stops, and why that is a result rather than a TODO.** Two sources
+that state the same fact with no recorded link between them are not merged and
+are not caught. That is the known limit of single-variable counterfactual
+testing -- the reason Halpern and Chockler's actual-causality framework exists.
+Their AC2 condition quantifies over *contingencies*: `X = x` causes `phi` when
+some setting of a subset of the other variables makes changing `X` change
+`phi`. Leave-one-out is the special case where that subset is empty, which is
+exactly the case that fails under over-determination. Finding a witness subset
+is `Sigma-2-complete` in general, which is the formal version of "testing every
+subset is exponential". A trace-based system can be sound about recorded
+redundancy and only ever heuristic about the rest; future work here should be
+framed as choosing which contingencies to test under a budget, not as making
+leave-one-out complete. Written up in docs/06 section 2.2.
+
+`tests/test_derived_from_grouping.py`, 13 tests. It asserts the bug first --
+leave-one-out and plain group testing both find nothing on a jointly
+influential pair -- so the fix cannot pass for the wrong reason, and it asserts
+that the recursion never splits a unit.
