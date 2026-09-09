@@ -213,7 +213,7 @@ oracle detector, 30 repetitions, 95% CIs, `data/results/campaign.json`:
 | B influencing | 65.1% ± 1.0% | 57.9% | **+7.2** |
 | B exposed-only | 95.6% ± 3.1% | 57.9% | **+37.7** |
 | C influencing | 66.5% ± 1.1% | 52.6% | **+13.9** |
-| C exposed-only | 93.7% ± 6.3% | 52.6% | **+41.1** |
+| C exposed-only | 96.5% ± 3.2% | 52.6% | **+43.9** |
 
 The exposed-only column is where the claim pays off most directly: those are
 incidents where a poisoned source was *present but unused*, and everything a

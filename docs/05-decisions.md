@@ -1965,6 +1965,14 @@ as well would over-merge and lose resolution for nothing.
 | long A-exposed-only | 92.6% | 92.6% (unchanged) |
 | short workflow, all 96 rows | -- | **0 rows changed** |
 
+**30-repetition campaign, 96 cells** (`data/results/campaign-d051.txt`): no
+cell regressed, and one improved -- oracle C exposed-only **93.7% +/- 6.3 ->
+96.5% +/- 3.2**, gain over B1 41.1 -> 43.9. Every other cell is identical and
+event-level unsafe preservation stays 0% everywhere. The deterministic
+single-seed matrix showed 0 of 96 rows changing; the campaign varies the seed,
+and the merge bites on the seeds where redundancy actually arises, which is why
+the improvement shows up only here.
+
 Reach across the 48-configuration matrix: **25 merged units covering 82
 sources, firing in 11 configurations**. Event-level unsafe preservation stays
 0. Analysis tokens on the short matrix fell 18 400 -> 18 000, so the merge is
