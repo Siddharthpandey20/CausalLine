@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # The core claim this job defends: the whole offline pipeline, the whole test
+  # suite and the trace contract run on a bare Python with NO third-party
+  # packages installed. If someone adds an unguarded `import numpy` to
+  # src/tracing/ or src/recovery/, this is what fails.
+  core-no-dependencies:
+    name: core, no third-party deps (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install pytest only
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Show that nothing else is installed
+        run: pip list
+
+      - name: Test suite
+        run: python -m pytest tests/ -q
+
+      - name: Trace contract
+        # The contract checker needs a trace, and data/runs/ is gitignored, so
+        # generate one first. ScriptedClient means no API key and no quota.
+        run: |
+          python - <<'PY'
+          from src.eval.scripted import ScriptedClient
+          from src.tracing.pipeline import run_pipeline
+          run_pipeline("data/runs/ci.jsonl", client=ScriptedClient(seed=20260906))
+          print("trace written")
+          PY
+          python -m src.eval.contract data/runs/ci.jsonl
+
+  # The analysis extra is a separate job so a numpy or matplotlib problem can
+  # never be mistaken for a core failure.
+  analysis-extra:
+    name: analysis extra (numpy, matplotlib)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install pinned versions
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-lock.txt
+
+      - name: Test suite
+        run: python -m pytest tests/ -q
+
+      - name: Economics report and required figures
+        # docs/04 lists the attack-rate threshold and contamination sweep plots
+        # as required figures. This is what proves they still render.
+        run: python -m src.eval.economics

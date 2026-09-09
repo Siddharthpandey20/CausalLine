@@ -17,6 +17,21 @@ import tempfile
 import unittest
 from pathlib import Path
 
+# The Lasso fit in src/provenance/budget_attribution.py is the one piece of
+# this project that needs numpy, and requirements.txt is explicit that the core
+# must run on a bare interpreter -- "a research prototype that cannot run its
+# own test suite offline is worse than one with an optional component". These
+# tests were the exception to that: they failed with an ImportError rather than
+# skipping, so the suite did not in fact pass without numpy installed. Skipping
+# keeps the claim true and keeps the coverage wherever numpy is present, which
+# includes the analysis-extra CI job.
+try:  # `import` rather than `find_spec`: a finder may raise, and either way
+    import numpy  # noqa: F401
+    HAS_NUMPY = True
+except ImportError:
+    HAS_NUMPY = False
+NEEDS_NUMPY = "needs numpy (pip install -r requirements.txt); Lasso fallback"
+
 from src.provenance.budget_attribution import (
     attribute,
     attribute_if_sparsity_failed,
@@ -338,6 +353,7 @@ class TestRedactGroup(unittest.TestCase):
 # --- 11.3 budget fallback -----------------------------------------------------
 
 
+@unittest.skipUnless(HAS_NUMPY, NEEDS_NUMPY)
 class TestBudgetAttribution(unittest.TestCase):
     def test_spends_a_fixed_budget_that_does_not_scale_with_n(self) -> None:
         """The whole point of the fallback: cost is flat in n.
@@ -372,6 +388,7 @@ class TestBudgetAttribution(unittest.TestCase):
         self.assertEqual(attribute([], lambda _g: True).calls, 0)
 
 
+@unittest.skipUnless(HAS_NUMPY, NEEDS_NUMPY)
 class TestFallbackOnlyFiresWhenSparsityFails(unittest.TestCase):
     def test_sparse_case_never_reaches_the_budget(self) -> None:
         decision = _OracleDecision({"S3"})

@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "causalline"
+version = "0.1.0"
+description = "Selective recovery for compromised multi-agent LLM systems: find what a malicious source actually influenced, preserve the rest."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+# Deliberately empty. The core -- tracing, provenance, recovery, and the
+# scripted evaluation -- has no third-party dependencies and runs on a bare
+# Python 3.11+. That is a property worth protecting, so it is expressed here
+# rather than only asserted in requirements.txt: `pip install .` gets you a
+# package that can run the whole offline pipeline and the whole test suite.
+# Everything else is an extra, imported lazily at its call site.
+dependencies = []
+
+[project.optional-dependencies]
+# The Lasso fit in src/provenance/budget_attribution.py and the two required
+# figures from `python -m src.eval.economics`.
+analysis = [
+    "numpy>=1.26",
+    "matplotlib>=3.8",
+]
+# Phase 13.3's TransformerInjectionDetector. Not in `analysis` because it wants
+# a ~180M-parameter download; the heuristic detector needs nothing and the
+# suite must stay runnable offline.
+transformer = [
+    "transformers>=4.40",
+    "torch>=2.2",
+]
+dev = [
+    "pytest>=8.0",   # measured with 9.0.1; see requirements-lock.txt
+]
+
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+[tool.setuptools.package-data]
+"src.tracing.fixtures" = ["*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Quiet by default; the suite is ~210 tests and its value is the failures.
+addopts = "-q"
