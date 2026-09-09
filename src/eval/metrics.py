@@ -251,6 +251,27 @@ class RecoveryScore:
     pipeline_tokens: int
     unsafe_preservations: int
     unsafe_ids: tuple[str, ...] = ()
+    # PAIR-LEVEL unsafe preservation: of the (source, event) influences that
+    # really existed, the fraction the estimator called clean
+    # (src/eval/influence_eval.py). Reported ALONGSIDE the event-level count
+    # above, never instead of it, because they answer different questions and
+    # routinely disagree:
+    #
+    #   event-level  did recovery keep an event that was truly contaminated?
+    #                This is what a deployment experiences, and it is 0 across
+    #                the campaign.
+    #   pair-level   did the estimator clear a (source, event) pair that was
+    #                really an influence? This runs 0.14-0.60 depending on
+    #                ablation.
+    #
+    # A pair-level false clean does not have to become an event-level unsafe
+    # preservation -- the event is often contaminated by another route -- so
+    # quoting only the event-level 0% overstates how well the estimator works.
+    # Quoting only the pair-level rate overstates the risk a deployment runs.
+    # Both, always.
+    pair_unsafe_rate: float = 0.0
+    pair_false_negatives: int = 0
+    pair_scored: int = 0
     task_success: bool = False
     wall_clock_s: float = 0.0
     storage_bytes: int = 0
@@ -269,7 +290,7 @@ def recovery_table(rows: list[RecoveryScore]) -> str:
     head = (
         f"{'scenario':<10}{'variant':<14}{'method':<22}"
         f"{'preserved':>10}{'rec.tok':>9}{'anal':>7}{'replay':>8}"
-        f"{'unsafe':>8}{'ok':>5}{'blast':>7}  notes"
+        f"{'unsafe':>8}{'pairUNSF':>9}{'ok':>5}{'blast':>7}  notes"
     )
     lines = [head, "-" * len(head)]
     for r in rows:
@@ -283,6 +304,7 @@ def recovery_table(rows: list[RecoveryScore]) -> str:
             f"{r.analysis_tokens:>7}"
             f"{r.replay_tokens:>8}"
             f"{r.unsafe_preservations:>8}"
+            f"{r.pair_unsafe_rate:>8.0%} "
             f"{'Y' if r.recovery_success else 'n':>5}"
             f"{r.blast_radius_events:>7}"
             f"  {note}"

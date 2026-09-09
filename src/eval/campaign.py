@@ -64,6 +64,7 @@ METRIC_FIELDS: tuple[str, ...] = (
     "analysis_tokens",
     "replay_tokens",
     "unsafe_preservations",
+    "pair_unsafe_rate",
     "blast_radius_events",
     "blast_radius_agents",
     "escalations",
@@ -272,7 +273,7 @@ def render(cells: list[CampaignCell]) -> str:
     head = (
         f"{'det':<12}{'scen':<6}{'variant':<14}{'method':<22}"
         f"{'work preserved':>20}{'recovery tokens':>20}"
-        f"{'unsafe%':>9}{'ok%':>7}"
+        f"{'unsafe%':>9}{'pairUNSF%':>11}{'ok%':>7}"
     )
     lines = [head, "-" * len(head)]
     order = {name: i for i, name in enumerate(METHODS)}
@@ -286,6 +287,7 @@ def render(cells: list[CampaignCell]) -> str:
             f"{cell.intervals['work_preserved'].render(percent=True):>20}"
             f"{cell.intervals['recovery_tokens'].render():>20}"
             f"{cell.unsafe_run_rate:>8.0%} "
+            f"{cell.intervals['pair_unsafe_rate'].mean:>10.0%} "
             f"{cell.recovery_success_rate:>6.0%}"
         )
     return "\n".join(lines)
@@ -296,8 +298,8 @@ def render_headline(cells: list[CampaignCell]) -> str:
     lines = [
         "CausalLine vs B1 (agent taint), work preserved, mean +/- 95% CI",
         f"{'det':<12}{'scen':<6}{'variant':<14}"
-        f"{'CausalLine':>20}{'B1':>20}{'gain':>10}{'unsafe%':>9}",
-        "-" * 91,
+        f"{'CausalLine':>20}{'B1':>20}{'gain':>10}{'unsafe%':>9}{'pairUNSF%':>11}",
+        "-" * 102,
     ]
     keyed = {
         (c.detector, c.scenario, c.variant, c.method): c for c in cells
@@ -318,6 +320,7 @@ def render_headline(cells: list[CampaignCell]) -> str:
                     f"{ours.intervals['work_preserved'].render(percent=True):>20}"
                     f"{b1.intervals['work_preserved'].render(percent=True):>20}"
                     f"{gain:>9.1%} {ours.unsafe_run_rate:>8.0%}"
+                    f"{ours.intervals['pair_unsafe_rate'].mean:>10.0%}"
                 )
     return "\n".join(lines)
 

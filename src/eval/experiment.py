@@ -27,6 +27,7 @@ from src.eval.baselines import (
     discarded_events,
 )
 from src.eval.detectors import Oracle, build as build_detector
+from src.eval.influence_eval import score_estimator
 from src.eval.metrics import RecoveryScore, ground_truth_events, recovery_table
 from src.eval.scripted import ScriptedClient, ground_truth_influence
 from src.provenance.estimator import CheckBudget, HybridAttributor, refine_for_verdict
@@ -119,6 +120,9 @@ def _score_row(
     blast_agents: int,
     escalations: int = 0,
     notes: str = "",
+    pair_unsafe_rate: float = 0.0,
+    pair_false_negatives: int = 0,
+    pair_scored: int = 0,
 ) -> RecoveryScore:
     discarded_set = set(discarded)
     unsafe = sorted(truth_events - discarded_set)
@@ -144,6 +148,9 @@ def _score_row(
         blast_radius_agents=blast_agents,
         escalations=escalations,
         notes=notes,
+        pair_unsafe_rate=pair_unsafe_rate,
+        pair_false_negatives=pair_false_negatives,
+        pair_scored=pair_scored,
     )
 
 
@@ -196,6 +203,14 @@ def run_cell(
     verdict = build_detector(detector_name, **detector_kwargs).flag(original)
     flagged = verdict.sources()
     truth_events = ground_truth_events(original, true_influence=true_inf)
+    # Pair-level estimator accuracy, scored against the scripted client's own
+    # leave-one-out record (which the estimator never sees). Computed once and
+    # attached to every row so the event-level and pair-level unsafe numbers
+    # are never reported apart -- see the note on RecoveryScore.
+    estimator_score = score_estimator(original, client)
+    pair_rate = estimator_score.unsafe_preservation_rate
+    pair_fn = estimator_score.false_negative
+    pair_n = estimator_score.true_positive + estimator_score.false_negative
     store = overhead(orig_path)
     analysis = original.analysis_tokens()
     checkpoints = CheckpointStore.load(checkpoint_path_for(orig_path))
@@ -240,6 +255,9 @@ def run_cell(
                 storage_bytes=store["total_bytes"],
                 blast_events=len(redone),
                 blast_agents=len({original.event(e).agent_id for e in redone} - {"user"}),
+                pair_unsafe_rate=pair_rate,
+                pair_false_negatives=pair_fn,
+                pair_scored=pair_n,
             )
         )
 
@@ -277,6 +295,9 @@ def run_cell(
             blast_agents=recovered.blast_radius_agents,
             escalations=recovered.escalations,
             notes=f"scope={recovered.scope}",
+            pair_unsafe_rate=pair_rate,
+            pair_false_negatives=pair_fn,
+            pair_scored=pair_n,
         )
     )
     return rows

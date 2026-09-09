@@ -17,8 +17,8 @@ from src.recovery.verify import (
     Escalation,
     VerifyResult,
     invalidation_for_scope,
-    live_memory_points_at_invalidated,
     next_scope,
+    verify,
 )
 from src.tracing.checkpoints import (
     Checkpoint,
@@ -265,25 +265,21 @@ def recover(
         )
         recovered = read_trace(result.trace_path)
         region = _post_recovery_region(original, recovered, report, flagged_list)
-        refs = live_memory_points_at_invalidated(
+        # One implementation, shared. This block used to reimplement
+        # `verify()` inline and, in doing so, dropped its missing-flagged-source
+        # warning: a flagged source absent from the recovered trace cannot seed
+        # a walk, the walk comes back empty, and an empty walk is
+        # indistinguishable from a clean recovery. The region is computed here
+        # rather than inside verify() because the post-recovery walk needs the
+        # splice/replay bookkeeping -- see `_post_recovery_region`.
+        last_verify = verify(
             recovered,
-            invalidation,
-            dict(tools.memory) if tools is not None else {},
-            original=original,
-        )
-        reasons: list[str] = []
-        if region.events:
-            reasons.append("Taint(new_graph) is non-empty")
-        if refs:
-            reasons.append("referential inconsistency")
-        if not result.task_success:
-            reasons.append("task-level check failed")
-        last_verify = VerifyResult(
-            ok=not reasons,
-            tainted_events=frozenset(region.events),
-            referential_failures=refs,
+            flagged_list,
             task_success=result.task_success,
-            reasons=reasons,
+            invalidated=invalidation,
+            current_memory=dict(tools.memory) if tools is not None else None,
+            original=original,
+            region=region,
         )
 
         last_report = report
