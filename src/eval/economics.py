@@ -65,6 +65,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from src.eval.metrics import CostWeights
+from src.risk.attack_model import run_probability
 
 # Default sweep for the attack-rate axis. Log-spaced because the interesting
 # region is small rates: at 1-in-10 runs attacked nobody needs this analysis.
@@ -416,6 +417,38 @@ def plot_attack_rate(
     return out
 
 
+# --- the ex-ante gate: is this run even likely to have been attacked? ---------
+
+# Below this compromise probability, investigation is not launched at all.
+#
+# NOT a tuned value and not a safety knob: it is the point below which the
+# *expected* saving from investigating cannot cover A. Set deliberately low,
+# because skipping investigation does not preserve anything -- an uninvestigated
+# pair stays `unchecked`, which the contamination walk treats as contaminated.
+# So a wrong skip costs preserved work and never costs safety, exactly like
+# running out of budget.
+SKIP_INVESTIGATION_BELOW = 0.05
+
+
+def should_investigate(compromise_probability: float) -> bool:
+    """Whether a trace is worth spending analysis tokens on.
+
+    `src/risk/attack_model.py` computes P from the trace's own exposure-edge
+    counts per channel. This is the only consumer of it that changes behaviour
+    -- the planner and metrics still ignore it, which is the honest state.
+
+    READ THE SATURATION WARNING FIRST. `run_probability()` combines every
+    exposure edge as an independent attempt, and at ~64 edges per run of this
+    pipeline it returns 1.000. So on our own traces this gate never fires, and
+    that is a property of the testbed rather than of the gate: a short workflow
+    with heavy re-retrieval saturates the formula. The gate is written for the
+    regime where P is genuinely small -- a run with two or three exposures --
+    and the measured value is reported alongside so a reader can see which
+    regime a number came from.
+    """
+    return compromise_probability >= SKIP_INVESTIGATION_BELOW
+
+
 # --- the contamination sweep, run on real scripted traces ---------------------
 
 
@@ -437,6 +470,12 @@ class SweepPoint:
     # hides which one a result is about (D-032).
     self_report_tokens: int = 0
     counterfactual_tokens: int = 0
+    # P = 1 - PROD_i (1 - pa_i)^{m_i} over this trace's actual exposure-edge
+    # counts per channel (src/risk/attack_model.py). The ex-ante question:
+    # how likely is it that this run was compromised at all, before any
+    # analysis token is spent finding out.
+    compromise_probability: float = 0.0
+    investigation_skipped: bool = False
 
     @property
     def targeted_analysis_tokens(self) -> int:
@@ -462,7 +501,9 @@ class SweepPoint:
 
     def line(self) -> str:
         return (
-            f"{self.scenario}-{self.variant:<12} seeds={self.seeds:<3} "
+            f"P={self.compromise_probability:.3f} "
+            + ("SKIP " if self.investigation_skipped else "     ")
+            + f"{self.scenario}-{self.variant:<12} seeds={self.seeds:<3} "
             f"taint={self.contaminated_events:>2}/{self.total_events:<3} "
             f"f={self.f:.3f}  A+fN={self.selective_cost:>7.0f}  "
             f"N={self.restart_tokens:>6}  "
@@ -548,6 +589,7 @@ def contamination_sweep(
 
             N = restart_all_cost(trace)
             A = trace.analysis_tokens()
+            compromise_p = run_probability(trace)
             by_purpose = trace.tokens_by_purpose()
             A_self = by_purpose.get("self_report", 0)
             A_cf = by_purpose.get("counterfactual", 0)
@@ -587,6 +629,8 @@ def contamination_sweep(
                         restart_tokens=N,
                         self_report_tokens=A_self,
                         counterfactual_tokens=A_cf,
+                        compromise_probability=compromise_p,
+                        investigation_skipped=not should_investigate(compromise_p),
                     )
                 )
     return points

@@ -20,7 +20,13 @@ from src.recovery.verify import (
     live_memory_points_at_invalidated,
     next_scope,
 )
-from src.tracing.checkpoints import Checkpoint, CheckpointStore, checkpoint_path_for
+from src.tracing.checkpoints import (
+    Checkpoint,
+    CheckpointStore,
+    checkpoint_path_for,
+    gc_checkpoints,
+    recovery_mode_for,
+)
 from src.tracing.graphs import CallGraph
 from src.tracing.logger import Trace, read_trace
 from src.tracing.tools import Tools
@@ -168,7 +174,39 @@ def recover(
         checkpoints = CheckpointStore.load(checkpoint_path_for(original.path))
     checkpoints = checkpoints or []
 
+    # --- Phase 3a: checkpoint lifecycle, on the path that actually runs ------
+    # `gc_checkpoints()` was built and tested (20 tests) and called by no
+    # experiment. Run it here, before planning, so the frontier is chosen over
+    # the checkpoints a real deployment would still be holding rather than over
+    # every checkpoint ever written.
+    #
+    # Dropping a checkpoint cannot make recovery less safe: GC only removes a
+    # checkpoint that a *later* confirmed-clean one dominates, and it never
+    # removes an agent's most recent one. If nothing has been examined, nothing
+    # is dropped -- which is what happens on a lightly-analysed trace, and is
+    # the conservative direction.
+    gc = gc_checkpoints(checkpoints, original)
+    checkpoints = gc.retained
+    notes: list[str] = []
+    if gc.deleted:
+        notes.append(
+            f"checkpoint GC dropped {len(gc.deleted)} of "
+            f"{len(gc.deleted) + len(gc.retained)} checkpoints "
+            f"({gc.bytes_freed}B freed, {gc.bytes_retained}B retained)"
+        )
+
     plan = plan_recovery(original, flagged_list, checkpoints, policy=policy)
+
+    # --- Phase 3a: the recovery horizon -------------------------------------
+    # An incident reaching back past the horizon cannot be replayed selectively
+    # -- the prompts behind it have been downgraded to their hashes -- so the
+    # scope widens to a coarse agent restart rather than a selective plan that
+    # would silently skip the events it cannot re-issue.
+    mode = recovery_mode_for(original, plan.invalidation_set)
+    horizon_scope: set[str] | None = None
+    if mode.mode == "coarse":
+        horizon_scope = set(mode.invalidation)
+        notes.append(f"recovery horizon: {mode.reason}")
     agent_scope = _compromised_and_downstream(original, flagged_list)
     all_events = {e.id for e in original.events}
 
@@ -180,7 +218,6 @@ def recover(
     last_report: ReplayReport | None = None
     recovered_path: Path | None = None
     task_success = False
-    notes: list[str] = []
 
     # `escalations` counts WIDENINGS ACTUALLY REPLAYED, and is bounded by
     # max_escalations. The budget check is at the bottom of the loop, not in
@@ -205,6 +242,10 @@ def recover(
         invalidation = invalidation_for_scope(
             scope, plan.invalidation_set, agent_scope, all_events
         )
+        if scope == "selective" and horizon_scope is not None:
+            # The selective plan is not replayable at this horizon; use the
+            # coarse fallback instead of a plan that cannot be carried out.
+            invalidation = frozenset(horizon_scope)
         target = Path(out_path)
         if escalations:
             target = target.with_name(f"{target.stem}-esc{escalations}{target.suffix}")
