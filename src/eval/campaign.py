@@ -384,3 +384,92 @@ if __name__ == "__main__":
         print()
         print("No cell recorded an unsafe preservation, INCLUDING the blind")
         print("control -- which would be suspicious. Check the control fired.")
+
+
+# --- detector sensitivity sweep (Phase 7.3) -----------------------------------
+#
+# The experiment the detector socket was built to support, and which had never
+# been run. `Simulated` degrades a perfect verdict at a KNOWN miss rate and
+# false-positive rate, which is the only way to ask "how does CausalLine
+# degrade as detection degrades" and get an answer rather than an anecdote.
+#
+# A missed source is the dangerous failure and it is not recoverable by any
+# method: everything it influenced is preserved, and unsafely. So the expected
+# shape is unsafe preservations rising roughly with the miss rate, for every
+# method including ours. Reporting that CausalLine is unaffected would mean the
+# sweep was not wired to anything.
+#
+# Needs no API quota: `Simulated` is a function of the ground-truth labels.
+
+DEFAULT_MISS_RATES: tuple[float, ...] = (0.0, 0.25, 0.5, 0.75, 1.0)
+
+
+def detector_sweep(
+    miss_rates: Iterable[float] = DEFAULT_MISS_RATES,
+    false_positive_rate: float = 0.0,
+    repetitions: int = 5,
+    scenarios: Iterable[str] = SCENARIOS,
+    workdir: str | Path = "data/runs/sweep",
+    base_seed: int = BASE_SEED,
+) -> list[CampaignCell]:
+    """Run the matrix against `Simulated` at each miss rate."""
+    workdir = Path(workdir)
+    workdir.mkdir(parents=True, exist_ok=True)
+    cells: dict[tuple[str, str, str, str], list[RecoveryScore]] = {}
+
+    for miss in miss_rates:
+        for scenario in scenarios:
+            for _variant_name, influencing in VARIANTS:
+                for rep in range(repetitions):
+                    rows = run_cell(
+                        scenario,
+                        influencing,
+                        detector_name="simulated",
+                        estimator_mode="hybrid",
+                        workdir=workdir,
+                        seed=base_seed + rep,
+                        miss_rate=miss,
+                        false_positive_rate=false_positive_rate,
+                    )
+                    for row in rows:
+                        key = (str(miss), row.variant, row.method, row.scenario)
+                        cells.setdefault(key, []).append(row)
+
+    out: list[CampaignCell] = []
+    for (miss, _variant, _method, _scenario), rows in cells.items():
+        cell = _aggregate(rows, len(rows))
+        cell.detector = f"miss={miss}"
+        out.append(cell)
+    return out
+
+
+def render_sweep(cells: list[CampaignCell]) -> str:
+    """Work preserved and unsafe preservation against detector miss rate."""
+    by_key: dict[tuple[str, str], list[CampaignCell]] = {}
+    for cell in cells:
+        by_key.setdefault((cell.detector, cell.method), []).append(cell)
+
+    misses = sorted(
+        {c.detector for c in cells}, key=lambda d: float(d.split("=")[1])
+    )
+    methods = [m for m in METHODS]
+    head = f"{'method':<22}" + "".join(f"{m:>22}" for m in misses)
+    lines = [
+        "work preserved / unsafe-run-rate, by detector miss rate",
+        head,
+        "-" * len(head),
+    ]
+    for method in methods:
+        row = f"{method:<22}"
+        for miss in misses:
+            group = by_key.get((miss, method), [])
+            if not group:
+                row += f"{'-':>22}"
+                continue
+            wp = statistics.fmean(
+                [c.intervals["work_preserved"].mean for c in group]
+            )
+            un = statistics.fmean([c.unsafe_run_rate for c in group])
+            row += f"{wp:>13.0%} /{un:>7.0%}"
+        lines.append(row)
+    return "\n".join(lines)

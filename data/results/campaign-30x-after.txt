@@ -1,0 +1,26 @@
+campaign: 3 scenarios x 2 variants x 4 detectors x 30 repetitions = 720 cells, 3600 pipeline runs
+detectors: ['oracle', 'heuristic', 'pessimistic', 'blind']
+offline: scripted agent, no API calls, no quota.
+
+  10/720 cells (8s elapsed, ~536s left)
+  20/720 cells (15s elapsed, ~522s left)
+  30/720 cells (22s elapsed, ~517s left)
+  40/720 cells (28s elapsed, ~474s left)
+  50/720 cells (33s elapsed, ~443s left)
+  60/720 cells (38s elapsed, ~418s left)
+  70/720 cells (44s elapsed, ~406s left)
+  80/720 cells (50s elapsed, ~396s left)
+  90/720 cells (55s elapsed, ~387s left)
+  100/720 cells (60s elapsed, ~374s left)
+  110/720 cells (65s elapsed, ~363s left)
+  120/720 cells (71s elapsed, ~354s left)
+  130/720 cells (78s elapsed, ~353s left)
+  140/720 cells (85s elapsed, ~351s left)
+  150/720 cells (92s elapsed, ~349s left)
+  160/720 cells (97s elapsed, ~339s left)
+  170/720 cells (102s elapsed, ~330s left)
+  180/720 cells (107s elapsed, ~322s left)
+  190/720 cells (115s elapsed, ~319s left)
+  200/720 cells (122s elapsed, ~317s left)
+  210/720 cells (129s elapsed, ~314s left)
+  220/720 cells (135s elapsed, ~306s left)
