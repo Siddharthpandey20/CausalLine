@@ -1529,3 +1529,82 @@ Three readings that belong in the paper and not only in a table:
 - **Most intervals are zero-width.** The graph and set operations do not depend
   on which self-report claims were wrong; the ones that move (A exposed-only,
   +/- 3.0%) are where a mis-claimed source changes the contaminated region.
+
+---
+
+## D-047  Step 2 covers the contamination closure, because that is what Step 4 checks
+Date: 09-09-2026
+Decided by: group directive, Final Push brief Phase A
+Choice: change Step 2's covering target from "every MaliciousSource ->
+FinalOutput path" to "every event in `taint.events`". `greedy_cover`, its cost
+function and the NP-hardness framing are untouched -- only the thing being
+covered changed.
+Rejected: loosening Step 4 to match Step 2's old, narrower target.
+
+**The mismatch.** Step 2 minimised cost subject to cutting every source ->
+output path. Step 4 accepts a recovery only when `Taint(new_graph)` is empty.
+Those are different conditions: a tainted event lying on no source -> output
+path satisfies the first and fails the second. Step 2 would leave such an event
+alone to save cost, Step 4 would correctly reject the plan, and the run would
+escalate.
+
+It was invisible for the project's whole life because
+`malicious_to_output_paths()` returned nothing on every trace, so a "treat each
+tainted event as a sink" fallback fired unconditionally and made the cover
+satisfy Step 4 *by accident*. The Coder->Executor bridge produced real paths,
+the two objectives came apart immediately, and every influencing scenario
+regressed -- A-influencing/oracle from 67.8% preserved to 15.8% with an
+escalation to `agent_restart`.
+
+**Why this direction and not the other.** Narrowing Step 4 would mean accepting
+that genuinely tainted state can survive a "successful" recovery whenever it
+does not happen to feed the current output. That is the silent residual risk
+this project refuses everywhere else, and the whole safety claim rests on Step 4
+being strict. So Step 4 does not move; Step 2 moves to meet it.
+
+**Mechanically** it is one singleton path per tainted event. `breaks_path()` on
+a singleton is true iff the event is in the action's `invalidates`, so "cover
+every singleton" is literally "the invalidation set covers Taint" -- Step 4's
+condition, now satisfied by construction instead of by accident.
+`malicious_to_output_paths()` is still computed and still reported on the plan;
+it is a real provenance result and the path count is a reported number. It is
+simply no longer what Step 2 optimises against.
+
+**What it produced** (24 configurations, deterministic seed; full 30-repetition
+campaign in docs/08). CausalLine work preserved, before -> after:
+
+| detector | scenario | before | after | B1 | escalations |
+|---|---|---|---|---|---|
+| oracle | A influencing | 15.8% | **52.6%** | 21.1% | 1 -> 0 |
+| oracle | B influencing | 57.9% | **63.2%** | 57.9% | 1 -> 0 |
+| oracle | C influencing | 15.8% | **63.2%** | 52.6% | 1 -> 0 |
+| heuristic | A influencing | 15.8% | **52.6%** | 21.1% | 1 -> 0 |
+| heuristic | C influencing | 15.8% | **63.2%** | 52.6% | 1 -> 0 |
+| pessimistic | B influencing | 57.9% | **63.2%** | 57.9% | 1 -> 0 |
+
+Every exposed-only cell is unchanged, which is the expected result: those have
+an empty or near-empty closure, so the covering target barely differs. Total
+escalations across the matrix fell 22 -> 16; A/N improved 1.67 -> 1.50 (inline
+A 1000 -> 900), because escalation was the cost driver. Event-level unsafe
+preservations remain 0 everywhere.
+
+**The predicted pessimistic regression did not happen.** The brief expected
+that covering a large false-positive closure might exceed the restart cap and
+fall back to `restart_all`, costing pessimistic cells their work-preserved
+figure. Measured: pessimistic A and C were **already** at 0% and
+`scope=exhausted` before this change, so there was nothing to lose, and
+pessimistic B *improved*. No cell regressed anywhere in the matrix.
+
+**A number in docs/07 does not reproduce.** That report's Section 4.1 gives the
+shipped planner's A-influencing/pessimistic as 68.4%, and quotes it as the
+reason option (c) was not obviously right. Re-measured on the shipped code, at
+both the default and a fresh workdir, that cell is **0.0% with 2 escalations**.
+The "neither arrangement dominates" conclusion rested on that figure; with the
+correct one, covering the closure dominates on every cell measured. Recorded
+here rather than silently corrected, because it is why this decision looked
+harder than it was.
+
+**Nothing in the suite caught the mismatch.** All 201 tests passed unchanged
+after the covering target was replaced -- the relationship between Steps 2 and
+4 was pinned by nothing. `tests/test_step2_covers_step4.py` now asserts the
+invariant across every scenario x variant x detector.

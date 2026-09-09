@@ -669,13 +669,34 @@ if __name__ == "__main__":
     dry = "--dry-run" in args
     workdir = Path("data/runs/token")
 
+    # --channels web,memory  restricts the live pass to those channels.
+    # `run_live()` always supported the argument; there was no way to reach it
+    # from the command line, so the documented command ran all three channels
+    # at ~24 requests each -- 72 against a free-tier quota of 20/day. That is
+    # not a preference, it is the difference between a run that completes and
+    # one that dies partway through the second channel. It also makes the run
+    # resumable: when the quota does run out, the remaining channels are a
+    # separate invocation rather than a repeat of the whole thing.
+    all_channels = ("web", "memory", "agent_message")
+    channels = all_channels
+    if "--channels" in args:
+        channels = tuple(
+            c.strip() for c in args[args.index("--channels") + 1].split(",") if c.strip()
+        )
+        unknown = [c for c in channels if c not in all_channels]
+        if unknown:
+            raise SystemExit(
+                f"unknown channel(s) {unknown}; have {list(all_channels)}"
+            )
+
     novel, why = token_is_novel(DEFAULT_TOKEN)
     print(f"token {DEFAULT_TOKEN}: {'novel' if novel else 'COLLIDES -- ' + why}")
     per_scenario = request_budget()
     print(
         f"cost: ~{per_scenario} requests per scenario, "
-        f"{per_scenario * len(scenarios())} for all three, against a free-tier "
-        "quota of 20/day (D-017)"
+        f"{per_scenario * len(channels)} for the {len(channels)} channel(s) "
+        f"selected ({', '.join(channels)}), against a free-tier quota of "
+        "20/day (D-017)"
     )
     if dry:
         raise SystemExit(0)
@@ -694,12 +715,13 @@ if __name__ == "__main__":
                 refine=False,
             )
             for scenario in scenarios()
+            if scenario.channel in channels
         ]
         print(render(results))
         raise SystemExit(0)
 
     try:
-        results = run_live()
+        results = run_live(channels=channels)
     except Exception as exc:
         print()
         print(f"live run unavailable: {type(exc).__name__}: {exc}")
