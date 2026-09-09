@@ -40,12 +40,23 @@ from src.tracing.pipeline import run_pipeline
 from src.tracing.tools import Tools
 
 SCENARIOS = ("A", "B", "C")
+# PHASE C: workflow length is a named configuration, not a constant. "short"
+# is the original 19-event pipeline every existing measurement used; "long"
+# adds two more research rounds and a Reviewer agent between Coder and
+# Executor. Both are kept so the scaling claim can be measured as a
+# comparison rather than asserted -- see docs/06 section 4.
+WORKFLOWS: dict[str, dict[str, Any]] = {
+    "short": {},
+    "long": {"research_rounds": 3, "reviewer": True},
+}
 VARIANTS = (("influencing", True), ("exposed_only", False))
 METHODS = ("B0 full restart", "B1 agent taint", "B2 topology closure", "CausalLine")
 
 
-def _fresh_tools(attack, path: Path) -> Tools:
-    clean = Tools.from_fixtures(memory_path=path.with_suffix(".memory.json"))
+def _fresh_tools(attack, path: Path, extended: bool = False) -> Tools:
+    clean = Tools.from_fixtures(
+        memory_path=path.with_suffix(".memory.json"), extended=extended
+    )
     return attack.apply(clean)
 
 
@@ -55,10 +66,12 @@ def _original_run(
     path: Path,
     seed: int,
     estimator_mode: str = "hybrid",
+    workflow: str = "short",
+    cost_model: str = "flat",
 ) -> tuple[Any, ScriptedClient, set[tuple[str, str]]]:
     attack = build(scenario, influencing)
-    tools = _fresh_tools(attack, path)
-    client = ScriptedClient(seed=seed)
+    tools = _fresh_tools(attack, path, extended=(workflow == "long"))
+    client = ScriptedClient(seed=seed, cost_model=cost_model)
     # D-032: self-report inline, counterfactual only on the detector's
     # region. The `hybrid` mode here means that targeted pass, not the
     # inline-everything ablation.
@@ -80,6 +93,7 @@ def _original_run(
         tools=tools,
         attributor=attributor,
         handoff_hook=attack.handoff_hook,
+        **WORKFLOWS[workflow],
     )
     marked = label_malicious(path, attack.marker)
     if not marked:
@@ -185,6 +199,7 @@ def run_cell(
     estimator_mode: str = "hybrid",
     workdir: Path | None = None,
     seed: int = 20260906,
+    workflow: str = "short",
     **detector_kwargs: Any,
 ) -> list[RecoveryScore]:
     """One (scenario, variant) against every method."""
@@ -192,10 +207,12 @@ def run_cell(
     workdir = workdir or Path("data/runs")
     workdir.mkdir(parents=True, exist_ok=True)
     stem = f"exp-{scenario}-{variant}-{estimator_mode}-{detector_name}"
+    if workflow != "short":
+        stem = f"{stem}-{workflow}"
     orig_path = workdir / f"{stem}.jsonl"
 
     _outcome, client, true_inf = _original_run(
-        scenario, influencing, orig_path, seed, estimator_mode
+        scenario, influencing, orig_path, seed, estimator_mode, workflow=workflow
     )
     original = read_trace(orig_path)
     original.validate()
@@ -263,7 +280,7 @@ def run_cell(
 
     out = workdir / f"{stem}-CausalLine.jsonl"
     replay_client = ScriptedClient(seed=seed + 1)
-    tools = _fresh_tools(attack, out)
+    tools = _fresh_tools(attack, out, extended=(workflow == "long"))
     recovered = recover(
         original,
         flagged,

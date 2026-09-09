@@ -46,8 +46,24 @@ class Tools:
     memory_path: Path | None = None
 
     @classmethod
-    def from_fixtures(cls, memory_path: str | Path | None = None) -> "Tools":
+    def from_fixtures(
+        cls, memory_path: str | Path | None = None, extended: bool = False
+    ) -> "Tools":
+        """The clean fixture corpus.
+
+        `extended=True` appends `web_corpus_extended.json`, which exists only
+        so the Phase C long workflow has material for a second research round
+        to find. It is a separate file rather than more entries in the base
+        corpus because `web_search` returns the top `limit` pages by keyword
+        overlap: adding six pages to the base re-ranked round one's top four,
+        which would have changed every measurement in the repository for a
+        reason that has nothing to do with workflow length.
+        """
         corpus = json.loads((FIXTURES / "web_corpus.json").read_text(encoding="utf-8"))
+        if extended:
+            corpus["pages"] = corpus["pages"] + json.loads(
+                (FIXTURES / "web_corpus_extended.json").read_text(encoding="utf-8")
+            )["pages"]
         db = json.loads((FIXTURES / "db.json").read_text(encoding="utf-8"))
         memory = json.loads((FIXTURES / "memory.json").read_text(encoding="utf-8"))
         return cls(

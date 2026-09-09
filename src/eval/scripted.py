@@ -159,6 +159,14 @@ class CallRecord:
         return [s for s in self.present if s not in set(self.used)]
 
 
+def _looks_like_script(text: str) -> bool:
+    """Is this source the draft script rather than prose or a JSON blob?"""
+    return any(
+        marker in text
+        for marker in ("import ", "print(", "def ", "strptime", "isoformat")
+    )
+
+
 @dataclass
 class ScriptedClient:
     """Drop-in for GeminiClient. No network, no key, no quota.
@@ -175,6 +183,25 @@ class ScriptedClient:
     samples: list[str] = field(default_factory=lambda: list(DEFAULT_SAMPLES))
     seed: int = 20260906
     tokens_per_call: int = 100
+    # PHASE 8.1: how a call is priced.
+    #
+    # "flat"          every call costs `tokens_per_call`, whatever it carried.
+    # "proportional"  prompt and output are priced by their actual length.
+    #
+    # Flat is the default because every number in the repository was measured
+    # under it and changing the default would silently move all of them. It is
+    # also wrong in a specific direction: a flat price makes a full restart look
+    # as expensive as the analysis that avoids it, because both are counted in
+    # calls rather than in tokens. A restart re-runs a few large prompts; the
+    # analysis issues many small counterfactual ones. A/N is therefore an
+    # unknown degree of worst-case pessimism under "flat", which is exactly
+    # what docs/07 recorded as Phase 8.1 not done.
+    cost_model: str = "flat"
+    # Characters per token. The usual rule of thumb for English and code, and
+    # stated as an assumption rather than buried: it scales both halves of the
+    # ratio, so A/N is insensitive to the exact divisor, but the absolute
+    # token counts are not.
+    chars_per_token: int = 4
 
     calls: int = 0
     total_tokens: int = 0
@@ -197,7 +224,6 @@ class ScriptedClient:
         temperature: float | None = None,
     ) -> LLMResponse:
         self.calls += 1
-        self.total_tokens += self.tokens_per_call
 
         if "Which of them actually changed what you wrote?" in prompt:
             text = self._answer_self_report(prompt)
@@ -210,18 +236,45 @@ class ScriptedClient:
             self.usage.append(record)
             self.by_prompt[prompt] = record
 
+        prompt_tokens, output_tokens = self._price(prompt, system, text)
+        self.total_tokens += prompt_tokens + output_tokens
+
         return LLMResponse(
             text=text,
             model="scripted",
-            prompt_tokens=int(self.tokens_per_call * 0.6),
-            output_tokens=int(self.tokens_per_call * 0.4),
+            prompt_tokens=prompt_tokens,
+            output_tokens=output_tokens,
             thoughts_tokens=0,
-            total_tokens=self.tokens_per_call,
+            total_tokens=prompt_tokens + output_tokens,
             attempts=1,
             latency_s=0.0,
             slept_s=0.0,
             finish_reason="STOP",
         )
+
+    def _price(
+        self, prompt: str, system: str | None, text: str
+    ) -> tuple[int, int]:
+        """(prompt_tokens, output_tokens) for one call.
+
+        Under "flat" this reproduces the original 60/40 split of a constant,
+        exactly, so traces measured before Phase 8.1 are unchanged.
+        """
+        if self.cost_model == "flat":
+            return (
+                int(self.tokens_per_call * 0.6),
+                int(self.tokens_per_call * 0.4),
+            )
+        if self.cost_model != "proportional":
+            raise ValueError(
+                f"unknown cost_model {self.cost_model!r}; "
+                "have 'flat' or 'proportional'"
+            )
+        divisor = max(1, self.chars_per_token)
+        billed = len(prompt) + len(system or "")
+        # A call always costs something: a request with an empty prompt is
+        # still a request, and a zero would make a restart look free.
+        return (max(1, billed // divisor), max(1, len(text) // divisor))
 
     # --- the agent's actual policy -----------------------------------------
 
@@ -300,6 +353,9 @@ class ScriptedClient:
         if "Reply with the complete Python script" in prompt:
             samples = _samples_in(prompt) or self.samples
             return "agent_output", lambda avail: self._code(avail, samples)
+        if "Review the script below" in prompt:
+            samples = _samples_in(prompt) or self.samples
+            return "agent_output", lambda avail: self._review(avail, samples)
         return "agent_output", lambda avail: "Acknowledged."
 
     # --- what each agent's answer is a function of --------------------------
@@ -417,6 +473,30 @@ class ScriptedClient:
             f"{'DD-MM-YYYY' if day_first_output else 'ISO (YYYY-MM-DD)'}. "
             f"{dependency}"
         )
+
+    def _review(
+        self, available: dict[str, tuple[str, str]], samples: list[str]
+    ) -> str:
+        """The Reviewer. Without a script in context there is nothing to review.
+
+        The empty branch is doing the same job as `_plan`'s: it is what makes
+        the draft **detectable** under leave-one-out. `_code` reads its sources
+        only through `_intent`, which looks for library names, so a Reviewer
+        whose answer was just `_code(available)` came out independent of the
+        draft whenever the draft named the same library the other sources did.
+        Measured, that is not a corner case: the Reviewer's `agent_output` had
+        no influence edges at all, contamination stopped before the Executor,
+        and every influencing run escalated to restart_all at 0% preserved.
+
+        A reviewer's output depending on the artefact it reviewed is also the
+        honest model of the job. Both edges are now visible to leave-one-out:
+        remove the draft and the answer collapses to the no-script branch;
+        remove a source that changed the draft's library and the returned
+        script changes with it.
+        """
+        if not any(_looks_like_script(content) for _, content in available.values()):
+            return "No script was provided to review."
+        return self._code(available, samples)
 
     def _code(self, available: dict[str, tuple[str, str]], samples: list[str]) -> str:
         """The script. `CodeComparator` reads its imports, calls, format literals,

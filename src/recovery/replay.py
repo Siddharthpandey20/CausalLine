@@ -265,6 +265,9 @@ def replay(
         flagged=set(flagged),
     )
     started = time.time()
+    # The rerun must have the same shape as the trace being spliced into it;
+    # the trace carries that shape in its header. Defaults reproduce the short
+    # pipeline, which is what every trace written before Phase C implies.
     result = run_pipeline(
         path,
         task=task or original.meta.get("task") or DEFAULT_TASK,
@@ -272,6 +275,8 @@ def replay(
         client=wrapper,
         attributor=attributor,
         handoff_hook=handoff_hook,
+        research_rounds=int(original.meta.get("research_rounds") or 1),
+        reviewer=bool(original.meta.get("reviewer") or False),
     )
     # Recorded at the one point every method passes through, so no caller has
     # to reconstruct "what was discarded" from something narrower.

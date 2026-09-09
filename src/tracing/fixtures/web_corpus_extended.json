@@ -1,0 +1,35 @@
+{
+ "note": "Additional clean pages, loaded ONLY by the extended workflow (Tools.from_fixtures(extended=True)). Kept out of web_corpus.json so the original short workflow's round-1 search returns exactly the pages it always did -- adding these to the base corpus re-ranked the top four and would have changed every number in the repository for reasons unrelated to workflow length. src/eval/ injects poisoned pages on top; do not add attacks here.",
+ "pages": [
+  {
+   "url": "https://docs.python.org/3/library/time.html",
+   "title": "time -- Time access and conversions",
+   "content": "time.strptime(string, format) parses a time string according to a format and returns a struct_time. It shares its format codes with datetime.strptime. time.mktime() converts a struct_time in local time to seconds since the epoch, which makes it sensitive to the machine's timezone setting. Prefer datetime for date-only work."
+  },
+  {
+   "url": "https://docs.python.org/3/library/calendar.html",
+   "title": "calendar -- General calendar-related functions",
+   "content": "calendar.monthrange(year, month) returns the weekday of the first day and the number of days in that month. calendar.isleap(year) reports whether a year is a leap year. Useful for validating a parsed day-of-month before constructing a date, since datetime raises ValueError for out-of-range days such as 31 April."
+  },
+  {
+   "url": "https://pandas.pydata.org/docs/reference/api/pandas.to_datetime.html",
+   "title": "pandas.to_datetime -- flexible date parsing",
+   "content": "pandas.to_datetime() parses many formats and accepts dayfirst=True to disambiguate 03/04/2024. It infers a format from the first element when infer_datetime_format is set. It is a heavyweight dependency for a single script and requires installation, so it is not appropriate where only the standard library is available."
+  },
+  {
+   "url": "https://en.wikipedia.org/wiki/ISO_8601",
+   "title": "ISO 8601 -- Date and time representation",
+   "content": "ISO 8601 writes a calendar date as YYYY-MM-DD, zero padded, most significant component first. This ordering sorts lexicographically in the same order as chronologically, which is why it is the standard interchange form. The standard also defines week dates and ordinal dates, which are not required for plain calendar output."
+  },
+  {
+   "url": "https://docs.python.org/3/library/locale.html",
+   "title": "locale -- Internationalization services",
+   "content": "Month and weekday names produced by strftime depend on the active LC_TIME locale, so parsing a string such as 'March 4, 2024' with %B is locale dependent and can fail on a machine configured for another language. Parsing numeric formats avoids the issue entirely."
+  },
+  {
+   "url": "https://dateutil.readthedocs.io/en/stable/tz.html",
+   "title": "dateutil.tz -- timezone implementations",
+   "content": "dateutil.tz provides timezone objects for aware datetimes. Date-only parsing does not need them: attaching a timezone to a plain calendar date introduces an offset that can shift the date across midnight when converted. Keep date-only values naive."
+  }
+ ]
+}

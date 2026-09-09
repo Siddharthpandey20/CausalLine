@@ -1716,3 +1716,126 @@ work is memory + agent_message (~48 requests, 3 days) and four comparator
 noise floors (~40 requests, 2 days). The prose, decision and code comparators
 did each run live in this trace (2, 3 and 3 calls), which is exercise, not a
 floor -- a floor needs repeated identical requests and none was done.
+
+
+---
+
+## D-049  Workflow length is a parameter, and most of the inert machinery wakes up at the longer one
+Date: 09-09-2026
+Decided by: group directive, Final Push brief Phase C
+Choice: add a `long` workflow (three research rounds + a Reviewer agent
+between Coder and Executor) and a proportional token cost model, both
+**opt-in**, and measure the short and long pipelines side by side.
+Rejected: replacing the 19-event pipeline with the longer one.
+
+Keeping both is the whole point. The scaling claim in docs/06 section 4 is a
+statement about how the method behaves *as length grows*, and one operating
+point cannot test it. Replacing the short workflow would have moved the
+measurement rather than extended it, and silently invalidated every number in
+the repository. `short` is bit-for-bit the original: re-running the full 96-row
+matrix after the change produced **0 differing rows**.
+
+**What the long workflow is.** 27 events against 19, 22 sources against 15, six
+agents against five, mean exposures per event 5.8 against 3.8, and 8
+checkpoints against 4. Extra research rounds search again with a query built
+from the previous round's findings, so later sources are causally downstream of
+earlier ones rather than a second independent batch.
+
+**The four negative results from docs/07, re-measured at length:**
+
+| mechanism | short (19 events) | long (27 events) |
+|---|---|---|
+| SPRT | 3 observations, `continue` -- never fires | **9 observations, `proceed_selective`** |
+| GC bytes freed | 0 (4 checkpoints, 1 per agent) | **0** (8 checkpoints, researcher 3, coder 2) |
+| `run_probability` | 1.000 | 1.000 |
+| per-node `P` | 6 distinct, max 0.920 | 8 distinct, max 0.978 |
+
+**SPRT fires.** The first time in the project's life. The log-LR trajectory is
+`[+0.847, 0.0, -0.847, -1.695, -2.542, -3.389, -4.236, -5.084, -5.931]`,
+crossing the -2.197 threshold at the fifth observation and early-aborting.
+docs/07 section 4.4 called this "structural, not a tuning problem" -- correct
+about the cause, wrong about the remedy. The step size and thresholds never
+changed; the trace simply got long enough to produce more than three
+observations. This is now an implemented, measured, *active* mechanism.
+
+**GC still frees nothing**, and doubling the checkpoint count did not help.
+The researcher now has three checkpoints and the coder two, so the "never drop
+an agent's most recent" rule is no longer what blocks it -- and it still drops
+none. The remaining cause is that every checkpoint is still one an agent could
+usefully rewind to. Report this as unresolved at both lengths, not as fixed by
+scale.
+
+**`P` was never the saturated quantity.** Per-node `P` varies at both lengths
+(6 and 8 distinct values, maxima 0.920 and 0.978) and varies *more* at the
+longer one. What saturates is `run_probability`, the aggregate over all nodes,
+which is 1.000 at both lengths and gets there faster with more exposures.
+docs/07's "P = 1.000 on all 12 sweep points" was reporting the aggregate.
+Longer traces make the aggregate worse, not better; the ex-ante gate stays
+useless and no length fixes it.
+
+### The cost model was hiding the scaling answer (Phase 8.1)
+
+`ScriptedClient` charged a flat 100 tokens per call, which prices a restart's
+few large prompts and the analysis's many small counterfactual ones the same.
+`cost_model="proportional"` bills prompt and output by length (4 chars/token,
+stated as an assumption). Default stays `flat` so prior numbers hold.
+
+| workflow | cost model | events | N | A | A/N |
+|---|---|---|---|---|---|
+| short | flat | 19 | 600 | 900 | 1.50 |
+| short | proportional | 19 | 2759 | 3386 | **1.23** |
+| long | flat | 27 | 900 | 1600 | 1.78 |
+| long | proportional | 27 | 5319 | 6585 | **1.24** |
+
+Two things, and the second is the answer to the scaling question:
+
+1. **The flat model was pessimistic, and now we know by how much**: A/N 1.50 ->
+   1.23 at the short length. docs/07 recorded this as "an unknown degree of
+   worst-case pessimism"; it is about 22%.
+2. **Under flat, A/N appears to get worse with length (1.50 -> 1.78). Under a
+   real cost model it does not move at all (1.23 -> 1.24)** across a 42% longer
+   trace. The apparent degradation was an artefact of pricing calls instead of
+   tokens.
+
+So the docs/06 claim that savings *scale* with workflow length is **not
+supported**: the ratio is flat, not improving. It is also not the regression
+the flat model suggested. A/N stays above 1 at both lengths, so the analysis
+still does not pay for itself, and claim 4 in docs/07 section 6 is unchanged.
+
+### Two bugs found by building this
+
+**`read_trace()` destroyed the trace header.** `refine_for_verdict()` reopens
+the log with `append=True, meta={"record_kind": "refinement"}`, writing a
+second meta record, and the reader **replaced** rather than merged. So every
+trace that went through refinement -- the entire hybrid campaign path -- lost
+its model, task, attributor and settings fingerprint. It surfaced twice: the
+live token-validation result had to be labelled `gemini-3.6-flash` by hand
+because `score_run()` read "unknown", and replay could not find the workflow
+shape it needed. Fixed by merging.
+
+**The Reviewer's influence edges came out empty, twice, for the same reason.**
+First when it was exposed to the Coder's whole context: the draft script and
+the sources behind it carry the same fact, leave-one-out found neither
+individually necessary, `e0022` had no influence edges, contamination stopped
+before the Executor and every influencing run escalated to restart_all at 0%.
+Then again when its scripted answer was `_code(available)`, which reads sources
+only through library detection and so ignored the draft. Fixed by scoping the
+Reviewer to the artefact plus environment facts, and by giving it a `_review`
+substance function with a no-script branch -- the same device `_plan` uses to
+make the task source detectable.
+
+Both are instances of one real limit: **put a summary and its own inputs in the
+same context and single-source counterfactuals report nothing.** It is
+documented in `_answer_task` as a property of counterfactual influence; what is
+new is that a pipeline can walk into it just by being generous with context,
+and that it silently severs the contamination chain when it happens. It also
+still bites at the Coder in the long workflow: with five findings in context
+instead of three, no single finding is necessary, the script is attributed to
+the memory source alone, and A-influencing/oracle escalates once (11.1%
+preserved against B1's 14.8%). The exposed-only cell is unaffected and strong:
+**92.6% against B1's 14.8%**.
+
+That last number is worth stating plainly as a limitation of the estimator
+rather than of the recovery method: redundancy in an agent's context is a blind
+spot for leave-one-out attribution, it gets worse as a workflow gets longer,
+and subset-testing is exponential.
