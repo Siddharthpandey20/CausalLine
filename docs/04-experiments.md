@@ -91,3 +91,47 @@ time, break-even point where analysis cost equals rerun cost.
 - Cap spend per scenario; log token counts per run from day one
 - Never re-run a scenario after tables are drafted without re-running all
   methods on it
+
+---
+
+## Real-LLM evaluation (added 10-09-2026)
+
+A second mode, beside the one above rather than replacing it. Full design in
+`docs/09-real-llm-evaluation.md`; the parts that belong in this file:
+
+**Scenarios are generated, not authored.** Instead of three hand-written
+attacks, scenarios are drawn without replacement from a 240-point structural
+space — injection channel × influencing/exposed-only × attack style × workflow
+length × decoy count × source redundancy. We choose the structure; a hosted
+model writes the payload text, the decoys and a paraphrase of the task.
+
+**Ground truth is observed, not known.** Every influencing payload carries a
+canary token and asks the agent to repeat it, so *the token is in this output*
+is a substring test on bytes. Union'd with the pipeline's own code-path
+records. It sees influence that leaves a token behind and nothing else, so a
+run **understates** contamination if some other influence occurred — the
+dangerous direction, and the reason this mode supplements rather than replaces
+the scripted matrix.
+
+**Metrics are the same ones.** Work preserved, recovery tokens split into
+analysis and replay, unsafe preservation, recovery success, blast radius,
+escalations — all through the existing `RecoveryScore`. Two things are added
+because they only exist here:
+
+- **Landing rate.** How often a planted instruction actually changed anything.
+  Above, the influencing / exposed-only distinction is a rule we wrote; here it
+  is measured. **Check it before reading any other number on a real-LLM row** —
+  a run the model ignored has zero unsafe preservations for reasons that have
+  nothing to do with the method.
+- **Pair-level agreement**, in two forms: *operative* (what recovery does, with
+  unchecked counted as recompute) and *examined* (the estimator's own accuracy),
+  plus the count of pairs cleared while the token demonstrably landed.
+
+**Run hygiene, additions.** Record the execution model and its API identifier,
+the generating model, the prompt version, the seed, the retry and rate-limit
+counts, and the timestamp. Do **not** claim exact reproducibility: a hosted
+model does not guarantee it, and the scripted matrix remains the deterministic
+component.
+
+**Do not pool the two modes in one table.** Different ground truth, different
+determinism, different repetition structure.

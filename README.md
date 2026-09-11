@@ -7,6 +7,44 @@ dependencies in the core.
 
 ---
 
+## Quickstart
+
+**Offline — no API key, no quota, nothing to sign up for.** This runs the whole
+scripted evaluation, which is where every headline number in this repository
+comes from.
+
+```bash
+git clone <this repo> && cd CausalLine
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install pytest
+
+python -m pytest tests/              # 327 passed, 7 skipped
+python -m src.eval.experiment        # the full method comparison, ~1 min
+```
+
+**With one API key — the real-LLM mode.** A free key from
+[build.nvidia.com](https://build.nvidia.com) is enough; the second and third
+slots are a fallback chain for long campaigns, not a requirement.
+
+```bash
+cp .env.example .env                 # Windows: copy .env.example .env
+# put your key in NVIDIA_API_KEY_1
+
+python -m src.common.nvidia --doctor           # checks setup, says what to do next
+python -m src.eval.real_campaign --plan --n 3  # free: what it would do and cost
+python -m src.eval.real_campaign --n 3         # live: generate, run, score
+```
+
+`--doctor` is the one to run when something is wrong. It reports whether your
+`.env` was found, how many keys loaded, whether each model actually answers,
+and what to type next — and it never prints a key.
+
+> **Before quoting any real-LLM number, read `docs/09-real-llm-evaluation.md`
+> §9.** Those runs use a narrower, observed ground truth and a single model.
+> They do not replace the scripted numbers and must not be pooled with them.
+
+---
+
 ## 1. The problem: everyone stops at detection
 
 A multi-agent LLM system can be attacked through prompt injection, poisoned
@@ -309,11 +347,11 @@ python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install pytest
 
-python -m pytest tests/            # 219 passed, 7 skipped
+python -m pytest tests/            # 327 passed, 7 skipped
 ```
 
 The 7 skips are the Lasso fallback tests, which need numpy. With the analysis
-extra installed the suite is **225 passed, 1 skipped**. Both are enforced by CI
+extra installed the suite is **333 passed, 1 skipped**. Both are enforced by CI
 in separate jobs, so an unguarded third-party import in the core fails the build.
 
 ```bash
@@ -341,17 +379,59 @@ python -m src.eval.token_validation --offline          # harness check
 python -m src.eval.token_validation --channels web     # ~20 live requests
 ```
 
+### Real-LLM mode
+
+A second evaluation mode where hosted models drive the agents and the test
+scenarios are generated rather than hand-written. It **extends** the scripted
+evaluation above; it does not replace it, and every number in §5 is still the
+scripted one. Full account: `docs/09-real-llm-evaluation.md`.
+
+Set `NVIDIA_API_KEY_1..3` in `.env`. Three keys are a fallback chain — a key
+that answers 429 cools and the next takes over, a key that answers 401 leaves
+the rotation — not a way of getting more throughput. One key is enough to run
+everything, just less resiliently.
+
+```bash
+python -m src.common.nvidia --models              # the registry, free
+python -m src.common.nvidia --smoke               # one live call per model
+python -m src.eval.llm_scenarios --space          # the 240-point design space, free
+python -m src.eval.real_campaign --plan --n 6     # what it would cost, free
+python -m src.eval.real_campaign --n 6            # generate, run, score
+```
+
+**We choose the structure, the model writes the words.** Scenarios are drawn
+without replacement from an enumerated space — injection channel × influencing
+or exposed-only × attack style × workflow length × decoy count × source
+redundancy — so two tests differ because their causal graph differs, not
+because their prose does. The model supplies the payload text, the decoys and a
+paraphrase of the task.
+
+**Ground truth is mechanical, never generated.** Every influencing payload
+carries a canary token and asks the agent to repeat it, so *the token is in this
+output* is a substring test on bytes rather than any model's opinion. The
+generating model's own predictions are recorded with `authoritative: false` and
+scored as a separate result. Where the token cannot settle a pair, the run says
+so instead of guessing.
+
+**Read `docs/09` §9 before quoting a real-LLM number.** Two of the three
+specified models were unreachable at measurement time (one retired, one
+unresponsive) and nothing was substituted, so these are single-model numbers;
+and a run whose payload the model ignored has zero unsafe preservations for
+reasons that have nothing to do with the method.
+
 ---
 
 ## 9. Layout
 
 ```
+src/common/       shared models, config, LLM clients (Gemini, NVIDIA), prompts
 src/tracing/      event logging, call graph, event graph, checkpoints
 src/provenance/   source IDs, influence edges, counterfactual checking
 src/recovery/     contaminated region, recovery planner, selective replay
 src/eval/         attack injection, baselines, metrics, economics, run harness
+                  + real-LLM mode: llm_scenarios, real_llm, real_campaign
 src/risk/         attack-probability model (per-channel pa)
-data/             traces, results (gitignored except small samples)
+data/             traces, results, generated suites (gitignored except samples)
 paper/            LaTeX / drafts
 docs/             design, decisions, limitations, results
 ```

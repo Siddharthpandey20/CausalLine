@@ -65,6 +65,14 @@ The core problem is unchanged from `docs/03-open-issues.md` #1: we cannot see
 inside an LLM call. Everything the method preserves rests on a `clean` verdict,
 and a wrong `clean` is an unsafe preservation.
 
+**Now demonstrated on a real model, not only on the scripted one.** In the
+first real-LLM campaign (11-09-2026) exactly one test had a payload the model
+actually obeyed. On that test the estimator cleared **both** of the pairs it
+examined while the corresponding outputs demonstrably carried the canary token
+— a pair-level unsafe rate of 2/2. n=2 on one run is far too small to be a
+rate, and it is an existence proof of the thing this section describes,
+produced by a model rather than by a rule we wrote. `docs/09` §7.5.
+
 Four distinct ways a `clean` verdict can be wrong, all measured:
 
 ### 2.1 The comparator vocabulary has a blind spot
@@ -261,8 +269,54 @@ the influencing / exposed-only distinction is under our control — which D-025
 records as being untrue of live runs, where the variant labels mean intent
 only.
 
-The only non-circular live measurement in the repository is Phase 13.2's token
-validation, and its scope is narrow by construction (see §2.1).
+**Reduced, not removed, 10-09-2026.** `src/eval/real_llm.py` adds a second
+evaluation mode in which real hosted models drive the agents and the scenarios
+are generated rather than hand-written, and the whole recovery pipeline —
+attribution, refinement, contamination, planning, selective replay,
+verification, escalation, all four methods — runs against it. The full account
+is `docs/09-real-llm-evaluation.md`; what matters here is what it does and does
+not buy.
+
+**What it buys.** The live evidence is no longer one channel and five pairs
+from Phase 13.2. Whether an attack *lands* is now measured per run rather than
+asserted by us, which is exactly the thing D-025 says we cannot control. And
+the tests are drawn from an enumerated design space by seed, with the payload
+text written by a model, so a scenario cannot have been tuned to a result
+nobody had yet.
+
+**What it does not buy, and this is the part that belongs in the paper:**
+
+- **It is effectively one model, and the second one makes that worse rather
+  than better.** Of the three models the evaluation was specified against,
+  `minimaxai/minimax-m3` returns 410 Gone (end of life 2026-09-09) and
+  `deepseek-ai/deepseek-v4-flash-0731` is *intermittent* — stalling past 300s
+  across a whole day, then answering in 0.7s the next, and still timing out
+  inside a campaign minutes after its own preflight passed. Both identifiers
+  were verified against the live API; neither was substituted.
+
+  A flat outage would leave a clean single-model result. Flakiness leaves a
+  worse one: which model generated or executed any given test depends on
+  whether the endpoint answered at that moment, so **model assignment is not a
+  controlled variable** and any per-model comparison is confounded by
+  availability. The question *does CausalLine's behaviour depend on which LLM
+  is behind the agents* is **open**, and no split of these results by model
+  answers it.
+- **Ground truth there is observed, not known.** It rests on canary-token
+  presence plus the pipeline's own code-path records. An influence that leaves
+  no token behind is invisible to it, so such a run **understates**
+  contamination — the dangerous direction. An unsafe-preservation count of zero
+  under that yardstick is weaker evidence than the same count in the scripted
+  matrix, and the two must not be quoted as if they were the same measurement.
+- **The two modes cannot be pooled.** Different ground truth, different
+  determinism, different repetition structure.
+
+The limitation therefore moves from *"we have essentially no real-model
+evidence"* to *"we have real-model evidence on one model, under a token-scoped
+ground truth, and the cross-model question is open."*
+
+The scripted mode stays, unchanged, and stays the deterministic
+ground-truth component: it is the only place a per-pair accuracy number is
+possible at all.
 
 ---
 

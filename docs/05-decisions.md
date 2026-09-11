@@ -2002,3 +2002,295 @@ leave-one-out complete. Written up in docs/06 section 2.2.
 leave-one-out and plain group testing both find nothing on a jointly
 influential pair -- so the fix cannot pass for the wrong reason, and it asserts
 that the recursion never splits a unit.
+
+---
+
+## D-052 — Real-LLM evaluation runs on NVIDIA-hosted models, through one client layer
+
+**10-09-2026.** `docs/06` section 5 is the limitation this addresses: every
+accuracy number in the project is measured against `ScriptedClient`, whose
+usage rule we wrote. That answers "does the estimator recover a usage pattern
+that is really there" and cannot answer "do real models use sources this way".
+
+**Decision: add a second evaluation mode rather than replace the first.**
+`src/eval/experiment.py` and `src/eval/campaign.py` are untouched; the scripted
+matrix, its exact per-pair ground truth and every number already recorded stand
+as they are. The real-LLM mode is `src/eval/real_llm.py` and
+`src/eval/real_campaign.py`, and the two are separately runnable.
+
+Reason: the scripted mode is the only place a *per-pair* accuracy number is
+possible at all. Losing it to gain realism would be a straight downgrade.
+
+**One integration layer, `src/common/nvidia.py`.** Authentication, the model
+registry, retry, backoff, key rotation and rate limiting live in one module,
+and the rest of the project sees only the `generate()` contract every client in
+this repository already answers. No NVIDIA call is made anywhere else.
+
+**Three keys, used one at a time.** `KeyPool` is sticky: a key is used until it
+says it cannot serve us, then it cools and the next takes over; 401/403 removes
+one permanently. This is fallback for a campaign that must not die on a single
+rate limit, not a way of getting more throughput out of three accounts.
+
+## D-053 — Generated scenarios: we choose the structure, the model writes the words
+
+**10-09-2026.** An LLM asked to "generate tests" produces rewordings of one
+test and asserts its own expected outcomes. Both halves of that are useless
+here — the first gives no behavioural coverage, the second is a claim being
+treated as evidence, which is the exact error this project has a word for.
+
+**Decision: split the scenario in two.** `DesignPoint` is a point in an
+enumerated 240-point structural space (channel x intent x attack style x
+workflow length x decoy count x redundancy), walked deterministically from a
+seed and stratified so a six-test suite still covers every injection route and
+both variants. The model writes only the surface form: the cover story, the
+phrasing, the task paraphrase.
+
+Consequence: two tests in a suite differ because their *causal graph* differs,
+not because their prose does. `sample_design()` draws without replacement, so a
+duplicate structure is impossible rather than unlikely.
+
+**The generating model's predictions are kept and never believed.**
+`ScenarioAnnotation` carries `expected_influence`, `expected_exposure` and the
+rest with `authoritative=False`, and `annotation_summary()` scores them against
+what actually happened. "Can a frontier model predict which agent an injected
+source will influence" is an interesting question and a terrible yardstick.
+
+## D-054 — Ground truth for a real-LLM run is observed, and its coverage is stated
+
+**10-09-2026.** Nobody knows the truth on a live run (docs/03 issue #1), so it
+has to be observed. Two mechanical relations, unioned in
+`real_llm.observed_influence()`:
+
+* **canary token.** Every influencing payload carries a per-test token and asks
+  the agent to repeat it. An output either contains it or does not — a
+  substring test on bytes, not a comparator's opinion. Phase 13.2's trick
+  (`src/eval/token_validation.py`), reused because it is the one non-circular
+  live measurement the project already had.
+* **code path.** Events our own code computed have an input relation read off
+  `src/tracing/pipeline.py`. Those are the `record_structural()` verdicts.
+
+**`record_carrier()` records are excluded, and that is the load-bearing part.**
+They also store `method="structural"`, but what they store is inherited from
+the *estimator's* edges upstream. Reading them back as ground truth would score
+the estimator against its own answers, and the circle would be invisible.
+`code_path_pairs()` filters them out by note text and a test pins the phrase.
+
+**Prompts are not searched for the token, only outputs and tool arguments.**
+The first version also searched inputs, so that the Executor's `tool_call` --
+which has no output -- could be reached. It made every agent that had merely
+*seen* the payload look influenced, including a run in which the model ignored
+the instruction entirely, which then scored as a landed attack with three
+contaminated findings. That is exposure counted as influence, inside the
+yardstick. The guard is
+`tests/test_real_llm_eval.py::test_exposure_is_never_counted_as_influence_in_ground_truth`.
+
+**Coverage is stated on every result.** An influence the token does not express
+is invisible here, so a run understates contamination if one occurred. Same
+narrowness as docs/06 section 2.1, carried on `TruthReport.coverage_note`
+rather than left to a reader.
+
+## D-055 — A run the model ignored is reported, not dropped
+
+**10-09-2026.** A real model may simply not follow a planted instruction. When
+it does not, no output carries the token, there is no contamination to find,
+and every method scores zero unsafe preservations for a reason that has nothing
+to do with the method.
+
+**Decision: keep the run, mark `payload_landed=False`, and print it.** Dropping
+it would over-sample the attacks that worked, which is D-025's rule applied to
+a new source of the same bias. `landing_summary()` reports the compliance rate
+per model, because it is a property of the model and needs to be visible before
+any row is read.
+
+## D-056 — Degenerate JSON is a transient failure, handled in the client
+
+**10-09-2026.** Measured: Nemotron 3.5 Lightning intermittently answers a JSON
+request with an opening brace followed by ~3000 tab characters — temperature 0,
+`finish_reason=stop`, plausible token count. The same prompt a minute later
+returns correct JSON. As a caller-side `LLMError: expected JSON` it killed a
+live pipeline at its second call, after the Planner's tokens were spent.
+
+**Decision: validate the response inside `NVIDIAClient` and raise `Retryable`.**
+It is a transient generation failure in the same category as a 503, and the
+retry loop is already there. Bounded by the same `max_attempts`, counted in
+`stats.malformed_json`, and the tokens a rejected attempt burned are charged
+because they were spent. A model that keeps producing garbage still fails, and
+loudly.
+
+Also measured, and the reason the request looks the way it does:
+`chat_template_kwargs={"thinking": false}` plus `response_format=json_object`
+returns clean JSON in about 4s. With thinking on the model spends its whole
+budget narrating and returns prose — the same reasoning D-015 records for
+Gemini's `thinking_level="minimal"`.
+
+## D-057 — A trace records the model that produced it, even under an injected client
+
+**10-09-2026.** `run_pipeline()` built its header fingerprint from
+`load_settings()`, which is the *Gemini* configuration, whatever client was
+passed in. Every NVIDIA run was therefore writing `model: gemini-3.6-flash`.
+
+Not cosmetic: docs/04's run-hygiene rule is that a trace records the model that
+produced it, `token_validation.run_scenario()` reads the model straight off
+this header, and a per-model comparison built on it would have attributed every
+run to one model. A client carrying its own `settings.fingerprint()` now
+overwrites the fields it owns. Cassette replays are excluded, so D-019's
+marking is unchanged.
+
+## D-058 — Two of the three specified models are unavailable, and no substitute is made
+
+**10-09-2026.** Verified against the live API, not taken from display names:
+
+| requested | verified identifier | state |
+|---|---|---|
+| MiniMax M3 | `minimaxai/minimax-m3` | **410 Gone** — end of life 2026-09-09T09:00:00Z |
+| Nemotron-3.5-Lightning-30B-A3B | `nvidia/nemotron-3.5-lightning-30b-a3b` | works, ~0.5-4s |
+| DeepSeek-V4-Flash-0731 | `deepseek-ai/deepseek-v4-flash-0731` | **intermittent** — see the correction below |
+
+The DeepSeek stall is not a rate limit (a 429 has a body) and not an
+entitlement problem (that returns 404 with a "not found for account" detail,
+which a sibling model does return).
+
+**Corrected 11-09-2026.** The original entry above said DeepSeek "never
+answers". That was true of every observation available on 10-09 and it is not
+true. On 11-09 the same 8-token request returned in 0.7s, a 768-token JSON
+request returned in 0.7s, and a generation call inside a live campaign *still*
+exhausted its retry budget on timeouts and fell back to Nemotron — minutes
+after that model's own preflight had passed.
+
+Three consecutive requests to the same endpoint on the same key, seconds
+apart, returned in **0.9s, 0.7s, and then timed out at 240s**. The variation is
+per-request — not per-day, not per-key. The correction is recorded
+rather than edited in silently because it changes what the campaign's model
+assignment means: which model generated or executed a test depends on whether
+the endpoint answered at that instant, so model assignment is not a controlled
+variable and a per-model comparison drawn from it is confounded by
+availability. `GenerationRecord.fallback_from` is what makes that visible per
+scenario.
+
+**Decision: run on what answers, and report the gap.** Both unavailable models
+stay in the registry under their verified identifiers with their exact failure
+reasons; `--plan` and every results file print them. Nothing is substituted
+under their names.
+
+Consequence, stated rather than hidden: **model diversity was not achieved.**
+The question of whether CausalLine's behaviour depends on which LLM is behind
+the agents is not answered by this work, and the real-LLM numbers are
+single-model numbers.
+
+## D-059 — A client's trace header names the model the client uses, not the default
+
+**11-09-2026.** D-057 fixed this for the Gemini path. It came back one level
+down: `NVIDIASettings.fingerprint()` reports `settings.model`, which is the
+*configured default*, and `ModelPool.client_for(handle)` routinely points a
+client at a different model. So a DeepSeek client wrote
+`model: nvidia/nemotron-3.5-lightning-30b-a3b` into its trace header.
+
+Caught by reading a live campaign's traces, not by a test — the results file
+was right (it reads the client's `spec`) while the trace header was wrong, so
+nothing downstream failed.
+
+**Decision: a fingerprint on the client wins over one on its settings.**
+`NVIDIAClient.fingerprint()` overrides the two fields it owns (`model`,
+`model_handle`) and inherits the rest; `run_pipeline()` asks the client first
+and falls back to `client.settings`. Pinned by tests on both sides.
+
+Worth recording as a pattern rather than a bug: **identity fields belong to
+whatever is closest to the call.** Settings describe a configuration, a client
+describes one endpoint, and a trace header is a claim about what actually
+answered. Each layer that narrows the previous one has to say so, or the header
+quietly reports the widest of them.
+
+## D-060 — Execution has no per-call model fallback, and a failed test cools the model
+
+**11-09-2026.** Two halves of one decision, and they pull in opposite
+directions, so both are stated.
+
+**No fallback inside a run.** When a model refuses mid-pipeline, the test dies
+and is recorded as void. It is *not* retried on another model. A trace is a
+trace of one model; splicing two into one workflow would make its `model`
+header false (D-057, D-059) and would make any per-model reading of the results
+meaningless. Generation is different — there the unit is a whole scenario, so
+`ModelPool.run()` may fall back and records `fallback_from`.
+
+**But a failed test cools the model.** Nothing was telling the pool that a
+model had just failed an entire test, so the next test was handed to it anyway.
+On a flaky endpoint that is half a campaign lost to one outage: three of six
+tests void, in a run costing over an hour.
+
+`RealRunResult.model_failure` distinguishes the two cases that must not be
+confused:
+
+* the endpoint would not answer — `LLMError`, or the `RuntimeError` that
+  `with_retry` raises on giving up. The model's fault; cool it.
+* the scenario was bad, the payload never ranked, the marker never landed, a
+  splice desynchronised. **Not** the model's fault, and cooling on these would
+  punish an endpoint for our own generator's output.
+
+The cooldown doubles (D-052), so a model having a bad minute returns and a
+model that is down does not. The handle for each test is chosen when that test
+starts rather than when the campaign was planned, or a model cooled by test 2
+still gets test 4.
+
+**Why this is a research decision and not just plumbing:** a campaign that
+silently loses half its cells to one provider outage does not report that it
+did. It reports a smaller table. Cooling keeps the cells, and the void rows
+that remain name the endpoint rather than the method.
+
+## D-061 — A source that quotes its own labels is defused, not rejected
+
+**11-09-2026. Changes a shared file (`src/common/prompts.py`) and one existing
+test's expectation, so the reasoning is spelled out in full.**
+
+**What happened.** The Researcher is told to answer "using only the numbered
+sources given to you", and those sources are rendered as `[S6] (web, ...)`. On a
+live run the model did the natural thing and quoted the labels back, at the
+start of a line, inside its answer:
+
+```
+[S6] (web, https://example.invalid/gen001-d0)
+[S9] (database, task/day_first)
+[S8] (database, task/date_samples)
+```
+
+That answer became a source for the Coder. Rendering the Coder's context then
+re-parsed the quoted labels as real block boundaries: **five sources in, eight
+blocks out.** `render_sources()` caught the mismatch and raised
+`PromptFormatError`, exactly as designed.
+
+**Why the correct behaviour was still the wrong outcome.** The raise happened
+*inside a recovery replay*. CausalLine escalated twice, hit it again, and the
+whole recovery died — so that test produced rows for B0, B1 and B2 and **no
+CausalLine row at all**. The method under evaluation was the only one that
+could not be scored, for a reason that has nothing to do with the method.
+
+**Decision: `defuse()` indents a header-looking line by one space.** A header is
+anchored at column zero (`HEADER` is `^...$` under `re.MULTILINE`), so one space
+makes the line content again. `render_sources()` round-trips against the
+*defused* text, because that is what actually goes into the prompt and therefore
+what a later redaction has to find and remove.
+
+**Three properties that make this safe rather than a loosening:**
+
+1. **It is a no-op on every existing measurement.** A source whose text contains
+   no line matching `^\[S\d+\] \(...\)$` is returned byte-for-byte unchanged,
+   and `ScriptedClient` cannot produce one — its answers come from a fixed
+   vocabulary with no brackets in it. Every number in `docs/07` and `docs/08`
+   was produced through content this function does not touch.
+2. **The guarantee the raise protected is preserved, and now holds by
+   construction.** The point was never the exception; it was that a block
+   round-trips so a redaction removes exactly the source it names. The updated
+   test asserts that directly: two sources in, two blocks out, and redacting S2
+   leaves S1.
+3. **It neutralises a spoof rather than merely tolerating one.** A planted
+   source containing a fake `[S1] (web, spoofed)` header was previously a hard
+   error; it is now visibly indented text that creates no phantom block. That is
+   strictly better for an adversarial setting, which is the setting this project
+   is about.
+
+**Why escaping and not rejecting.** The content is not malformed. It is a
+perfectly good answer that happens to quote its inputs, and on the replay path
+the alternative to escaping it is losing the recovery.
+
+**This is a real-model-only failure mode**, and finding it is the kind of thing
+`docs/09`'s evaluation mode exists for: no scripted run in the history of this
+repository could have produced it.

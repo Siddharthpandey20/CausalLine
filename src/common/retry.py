@@ -13,6 +13,7 @@ plain functions.
 """
 
 import random
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Callable, TypeVar
@@ -63,7 +64,11 @@ class RateLimiter:
     20 requests per minute on Flash, and counterfactual replay in week 2 will
     sit right against that ceiling.
 
-    Not thread-safe. One run is sequential; if that changes, this needs a lock.
+    Thread-safe as of the real-LLM campaign, which shares one limiter across
+    the clients running two tests at once. The lock is held across the sleep on
+    purpose: releasing it first lets both threads compute a gap from the same
+    stale `_last_call` and then fire together, which is the burst the limiter
+    exists to prevent.
     """
 
     min_interval_s: float = 0.0
@@ -71,21 +76,23 @@ class RateLimiter:
     clock: Callable[[], float] = time.monotonic
     total_waited_s: float = 0.0
     _last_call: float | None = None
+    _lock: threading.Lock = field(default_factory=threading.Lock)
 
     def wait(self) -> float:
         """Block until the next call is allowed. Returns seconds waited."""
         if self.min_interval_s <= 0:
             return 0.0
-        now = self.clock()
-        if self._last_call is not None:
-            remaining = self.min_interval_s - (now - self._last_call)
-            if remaining > 0:
-                self.sleep(remaining)
-                self.total_waited_s += remaining
-                self._last_call = self.clock()
-                return remaining
-        self._last_call = now
-        return 0.0
+        with self._lock:
+            now = self.clock()
+            if self._last_call is not None:
+                remaining = self.min_interval_s - (now - self._last_call)
+                if remaining > 0:
+                    self.sleep(remaining)
+                    self.total_waited_s += remaining
+                    self._last_call = self.clock()
+                    return remaining
+            self._last_call = now
+            return 0.0
 
 
 @dataclass
