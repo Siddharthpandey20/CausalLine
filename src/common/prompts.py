@@ -84,19 +84,68 @@ def render_source(source_id: str, kind: str, where: str, content: str) -> str:
     The id is visible to the agent deliberately: self-report asks which inputs
     it used and it can only answer in ids if it saw them.
     """
-    return f"[{source_id}] ({kind}, {where})\n{content}"
+    return f"[{source_id}] ({kind}, {where})\n{defuse(content)}"
+
+
+# The same shape as HEADER, matched against one line rather than a whole block.
+_HEADER_LINE = re.compile(r"\[S\d+\] \([^\n]*\)$")
+
+
+def defuse(content: str) -> str:
+    """Stop a source's own text from being read as a block header.
+
+    WHY THIS EXISTS -- MEASURED ON A LIVE MODEL, 11-09-2026.
+    The Researcher is told to answer "using only the numbered sources given to
+    you", and those sources are labelled `[S6] (web, ...)`. A real model did the
+    natural thing and quoted the labels back, at the start of a line, inside its
+    answer:
+
+        [S6] (web, https://example.invalid/gen001-d0)
+        [S9] (database, task/day_first)
+
+    That answer became a source for the Coder, and rendering the Coder's context
+    re-parsed the quoted labels as real block boundaries: five sources in, eight
+    blocks out. `render_sources` caught it and raised, which is correct and safe
+    -- but it happened *inside a recovery replay*, so the recovery died and the
+    test produced no CausalLine row at all.
+
+    `ScriptedClient` cannot do this: its answers come from a fixed vocabulary
+    with no brackets in it. So this is a failure mode only a real model
+    produces, and it is exactly the kind the real-LLM mode exists to find.
+
+    THE FIX IS ONE SPACE, AND IT IS A NO-OP ON EVERY EXISTING RUN.
+    A header is anchored at column zero (see HEADER), so indenting a
+    header-looking line by one space makes it content again. A source whose text
+    contains no such line is returned unchanged -- which is every source in every
+    measurement this project has recorded.
+
+    Escaping rather than rejecting is the right call: the content is not
+    malformed, it is a good answer that happens to quote its inputs, and the
+    alternative on the replay path is losing the recovery entirely.
+    """
+    if not content or "[" not in content:
+        return content
+    return "\n".join(
+        " " + line if _HEADER_LINE.match(line) else line
+        for line in content.split("\n")
+    )
 
 
 def render_sources(items: list[tuple[str, str, str, str]]) -> str:
     """items: [(source_id, kind, where, content), ...] -> one prompt block.
 
     Round-trips through the parser before returning. See PromptFormatError.
+
+    The round-trip compares against the **defused** content, because that is
+    what actually goes into the prompt and therefore what a later redaction has
+    to find and remove. Comparing against the raw content would fail for every
+    source `defuse()` had to touch, which is the bug it exists to fix.
     """
     block = BLOCK_SEPARATOR.join(
         render_source(sid, kind, where, content) for sid, kind, where, content in items
     )
     parsed = parse_sources(block)
-    expected = [(sid, content) for sid, _, _, content in items]
+    expected = [(sid, defuse(content)) for sid, _, _, content in items]
     got = [(sid, content) for sid, _, content in parsed]
     if got != expected:
         mismatched = [

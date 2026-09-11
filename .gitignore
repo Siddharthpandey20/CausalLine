@@ -14,3 +14,10 @@ data/results/*.png
 data/results/*.json
 data/results/*.csv
 !data/results/.gitkeep
+
+# Generated real-LLM test suites and their runs. Regenerable, and large.
+# Suites carry no credentials (tests assert this), but they are run output,
+# not source, and the sample committed under data/samples/ is the one a reader
+# needs.
+data/generated/
+data/results/real-llm*.json

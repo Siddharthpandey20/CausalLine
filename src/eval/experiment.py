@@ -115,7 +115,7 @@ def _original_run(
     return result, client, truth
 
 
-def _score_row(
+def score_row(
     *,
     scenario: str,
     variant: str,
@@ -168,7 +168,7 @@ def _score_row(
     )
 
 
-def _run_baseline_recovery(
+def run_baseline_recovery(
     method: str,
     discard: set[str],
     original,
@@ -176,8 +176,21 @@ def _run_baseline_recovery(
     flagged: list[str],
     attack,
     out: Path,
+    tools: Tools | None = None,
+    handoff_hook: Any = None,
 ) -> tuple[Any, Any]:
-    tools = _fresh_tools(attack, out)
+    """One baseline's recovery replay.
+
+    `tools` and `handoff_hook` are injectable so the real-LLM path
+    (src/eval/real_llm.py) reaches the replay engine through this function
+    rather than through a copy of it. Every method -- B0, B1, B2 and
+    CausalLine -- must be scored on the set handed to `replay()`, and that is
+    only guaranteed while there is one place that hands it over.
+    """
+    if tools is None:
+        tools = _fresh_tools(attack, out)
+    if handoff_hook is None:
+        handoff_hook = getattr(attack, "handoff_hook", None)
     started = time.time()
     result, report = replay(
         original,
@@ -186,7 +199,7 @@ def _run_baseline_recovery(
         out,
         tools=tools,
         flagged=flagged,
-        handoff_hook=attack.handoff_hook,
+        handoff_hook=handoff_hook,
     )
     report.wall_clock_s = time.time() - started
     return result, report
@@ -244,7 +257,7 @@ def run_cell(
         # A new scripted client so replay calls do not share the original
         # usage log (ground truth is already captured).
         replay_client = ScriptedClient(seed=seed + 1)
-        result, report = _run_baseline_recovery(
+        result, report = run_baseline_recovery(
             method, discard, original, replay_client, flagged, attack, out
         )
         # Read off the replay report rather than from `discard` directly, so
@@ -253,7 +266,7 @@ def run_cell(
         # it stays identical when someone changes one of them.
         redone = discarded_events(report, discard)
         rows.append(
-            _score_row(
+            score_row(
                 scenario=scenario,
                 variant=variant,
                 method=method,
@@ -294,7 +307,7 @@ def run_cell(
     # handed to replay(). See `discarded_events()` in src/eval/baselines.py.
     discarded = discarded_events(recovered.report, recovered.invalidated)
     rows.append(
-        _score_row(
+        score_row(
             scenario=scenario,
             variant=variant,
             method="CausalLine",

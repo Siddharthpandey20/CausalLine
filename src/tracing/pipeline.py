@@ -1152,6 +1152,28 @@ def run_pipeline(
         # run whose responses did not come from the model must never be
         # mistaken for one that did.
         meta["client"] = type(client).__name__
+        # AND, WHEN THE CLIENT KNOWS BETTER, SO IS THE MODEL.
+        # `settings` above is the *Gemini* configuration, because that is what
+        # `load_settings()` returns and it is what a fingerprint is built from.
+        # A run driven by an injected client is not a Gemini run, and until now
+        # its header said `model: gemini-3.6-flash` regardless of what actually
+        # answered. That is not cosmetic: docs/04's run hygiene rule is that a
+        # trace records the model that produced it, `token_validation.
+        # run_scenario` reads the model straight off this header, and a
+        # per-model comparison built on it would have attributed every run to
+        # one model. A client carrying its own settings gets to overwrite the
+        # fields it owns.
+        # A fingerprint on the CLIENT wins over one on its settings. Settings
+        # carry the configured default model; a client can be pointed at a
+        # different one, and then only the client knows which model actually
+        # answered.
+        own = getattr(client, "fingerprint", None)
+        if not callable(own):
+            own = getattr(getattr(client, "settings", None), "fingerprint", None)
+        if callable(own) and type(client).__name__ != "CassetteClient":
+            meta.update(own())
+        elif getattr(client, "model", None):
+            meta["model"] = client.model
     elif cassette_path:
         cassette = Cassette.load(cassette_path)
         live = GeminiClient(settings) if cassette_mode in ("record", "auto") else None

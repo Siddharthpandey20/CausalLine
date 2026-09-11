@@ -405,6 +405,17 @@ class Trace:
         """
         return self._input_of_kind(eid, "source_block")
 
+    def tool_args_text(self, eid: str) -> str | None:
+        """The arguments our own code passed to a tool, or None.
+
+        Distinct from `prompt_text` in the way that matters most here: a prompt
+        is what an agent was *shown*, and tool arguments are what our code
+        actually *handed over*. The Executor's `tool_call` is the case that
+        needs it -- it has no output at all, and the script it is about to run
+        is only visible as its argument.
+        """
+        return self._input_of_kind(eid, "tool_args")
+
     def _input_of_kind(self, eid: str, kind: str) -> str | None:
         for ref in self.event(eid).inputs_ref:
             if self.content is not None and self.content.has(ref):

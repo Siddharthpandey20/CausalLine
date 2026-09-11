@@ -35,16 +35,21 @@ affected part from the nearest trusted checkpoint.
 - `docs/08-final-report.md` — Final Push (Phases A–D) results, and the
   **current** claims-you-can-make / claims-you-cannot lists; supersedes `07`
   where they disagree
+- `docs/09-real-llm-evaluation.md` — the real-LLM mode: NVIDIA models, generated
+  test suites, observed ground truth, and **exactly how far the external-validity
+  limitation moves**; read §9 before quoting a real-LLM number
 
 ## Repo layout
 
 ```
+src/common/       shared models, config, LLM clients (Gemini, NVIDIA), prompts
 src/tracing/      event logging, call graph, event graph, checkpoints
 src/provenance/   source IDs, influence edges, counterfactual checking
 src/recovery/     contaminated region, recovery planner, selective replay
 src/eval/         attack injection, baselines, metrics, economics, run harness
+                  + real-LLM mode: llm_scenarios, real_llm, real_campaign
 src/risk/         attack-probability model (per-channel pa)
-data/             traces, results (gitignored except small samples)
+data/             traces, results, generated suites (gitignored except samples)
 paper/            LaTeX / drafts
 docs/             everything above
 ```
@@ -75,3 +80,27 @@ docs/             everything above
 - **recovery set** — the set of events to invalidate and recompute
 - **unsafe preservation** — we called something clean that was actually
   contaminated. This is the dangerous error and must always be reported.
+
+## Two evaluation modes — do not mix their numbers
+
+- **scripted** (`src/eval/experiment.py`, `campaign.py`) — `ScriptedClient`,
+  whose usage rule we wrote. Ground truth is **known by construction**, per
+  (source, event) pair. Deterministic, free, and the only place a per-pair
+  accuracy number is possible. Every number in `docs/07` and `docs/08` is from
+  here. **Do not weaken it.**
+- **real-LLM** (`src/eval/real_llm.py`, `real_campaign.py`) — hosted models via
+  `src/common/nvidia.py`, on generated scenarios. Ground truth is **observed**:
+  canary-token presence plus the pipeline's own code-path records. Narrower,
+  non-deterministic, single-model. See `docs/09`.
+
+A number from one mode does not belong in a table with a number from the other.
+Before quoting any real-LLM row, check `payload_landed` — a run the model
+ignored has nothing to preserve unsafely, and its zero is arithmetic.
+
+## API keys
+
+All keys are environment-only, loaded from `.env` (gitignored). Never hard-code
+one, never print one, never write one into a trace, a result file or a commit.
+`GEMINI_API_KEY` for the original live pipeline; `NVIDIA_API_KEY_1..3` for the
+real-LLM mode. All NVIDIA traffic goes through `src/common/nvidia.py` — do not
+add an API call anywhere else.
