@@ -6,6 +6,14 @@ disagree; `07` remains the record of the integration sprint that preceded this.
 Every number here was measured in this session. Where something was not run,
 it says so and says what it would cost.
 
+> **Superseded in part, 15-09-2026.** The phase-gated remediation pass
+> (`docs/10-remediation.md`) re-ran the campaign and the economics under a
+> hardened estimator. Seven of the 24 CausalLine cells moved **down** — see
+> `docs/10` §8.2 for the table and the single cause behind every delta — and the
+> claims-you-can-make / claims-you-cannot list in §11 below is replaced by
+> `docs/10` §9. Everything else here still stands, including §7, which is the
+> record of the real-LLM campaign this pass deliberately did not repeat.
+
 ---
 
 ## 1. Verdict

@@ -47,6 +47,7 @@ for recovery rather than improvements to the run:
 """
 
 import json
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -62,6 +63,7 @@ from src.provenance.attribution import (
     Attributor,
     NullAttributor,
     derived_links_for,
+    ABSENT_UPSTREAM,
     record_carrier,
     record_structural,
 )
@@ -229,6 +231,57 @@ class GeminiPipeline:
         """
         return [e.source_id for e in self.log.influence if e.target_event == event_id]
 
+    def _verdict_on(self, *event_ids: str) -> Any:
+        """Lookup: source id -> what a carrier copying `event_ids` inherits.
+
+        A carrier's clearance is an inherited verdict and must not be stronger
+        than what it inherits (D-067). Three answers, and keeping them apart is
+        the whole of the fix:
+
+          ABSENT_UPSTREAM  the source was not in that event's context at all.
+                           Then the output being copied cannot have been
+                           influenced by it, and saying so is a fact about the
+                           code path, not an estimate. This is the common case
+                           -- a tool response carries a call made before half
+                           the sources existed -- and collapsing it into "no
+                           record" would refuse a genuinely structural
+                           clearance and taint most of a trace for nothing.
+          a CheckRecord    the source *was* upstream and a verdict exists.
+                           Inherit it, method and confidence.
+          None             the source was upstream and nobody examined it.
+                           Inherits nothing, which is never a clearance.
+
+        When the carrier copies several upstream events -- the hand-off to the
+        Coder carries every finding -- the honest inheritance is the weakest of
+        them, and an event the source was absent from contributes nothing to
+        that minimum.
+        """
+        rank = {"assumed": 0, "self_report": 1, "counterfactual": 2, "structural": 3}
+        logged = {event.id: event for event in self.log.events}
+        tables: list[tuple[set[str], dict[str, Any]]] = []
+        for eid in event_ids:
+            upstream = logged.get(eid)
+            exposures = set(upstream.exposures) if upstream is not None else set()
+            records = {
+                c.source_id: c for c in self.log.checks if c.target_event == eid
+            }
+            tables.append((exposures, records))
+
+        def lookup(source_id: str) -> Any:
+            found: list[Any] = []
+            for exposures, records in tables:
+                if source_id not in exposures:
+                    continue  # absent upstream: contributes no weakness
+                record = records.get(source_id)
+                if record is None:
+                    return None  # present and unexamined: inherits nothing
+                found.append(record)
+            if not found:
+                return ABSENT_UPSTREAM
+            return min(found, key=lambda r: (rank.get(r.method, 0), r.confidence))
+
+        return lookup
+
     def _call(
         self,
         agent: str,
@@ -253,7 +306,16 @@ class GeminiPipeline:
         instead of inferring where the source list ends -- some of our prompts
         put instructions after it, and a redaction that removes only part of a
         source reports "no influence" for the wrong reason.
+
+        The `announce` hook tells a replay client what this call is for, so it
+        can check that the rerun's call sequence still matches the trace it is
+        splicing into rather than trusting position alone (docs/03 #13). Guarded
+        by `getattr` because it is an optional capability of one client, not a
+        requirement of the client interface.
         """
+        announce = getattr(self.client, "announce", None)
+        if announce is not None:
+            announce(agent, kind)
         response = self.client.generate(prompt, system=system, json_output=json_output)
         prompt_ref = self.log.put_content(prompt, kind="prompt", meta={"agent": agent})
         refs = [prompt_ref]
@@ -442,6 +504,7 @@ class GeminiPipeline:
             list(handoff.exposures),
             self._influenced_by(plan_event.id),
             plan_event.id,
+            upstream_verdict=self._verdict_on(plan_event.id),
         )
         brief_source = remember(
             self.log.log_source(
@@ -478,6 +541,7 @@ class GeminiPipeline:
             list(web_call.exposures),
             self._influenced_by(plan_event.id),
             plan_event.id,
+            upstream_verdict=self._verdict_on(plan_event.id),
         )
         pages = self.tools.web_search(web_query)
         web_response = self.log.log_event(
@@ -497,6 +561,7 @@ class GeminiPipeline:
             list(web_response.exposures),
             self._influenced_by(web_call.id),
             web_call.id,
+            upstream_verdict=self._verdict_on(web_call.id),
         )
         for page in pages:
             source = remember(
@@ -624,6 +689,7 @@ class GeminiPipeline:
                 list(followup_call.exposures),
                 self._influenced_by(findings[-1][0].id),
                 findings[-1][0].id,
+                upstream_verdict=self._verdict_on(findings[-1][0].id),
             )
             fresh = [
                 page
@@ -647,6 +713,7 @@ class GeminiPipeline:
                 list(followup_response.exposures),
                 self._influenced_by(followup_call.id),
                 followup_call.id,
+                upstream_verdict=self._verdict_on(followup_call.id),
             )
             for page in fresh:
                 seen_urls.add(page.url)
@@ -708,6 +775,7 @@ class GeminiPipeline:
             list(to_coder.exposures),
             inherited,
             ", ".join(e.id for e, _ in findings),
+            upstream_verdict=self._verdict_on(*[e.id for e, _ in findings]),
         )
         for event, text in findings:
             source = remember(
@@ -843,6 +911,7 @@ class GeminiPipeline:
                 list(to_reviewer.exposures),
                 self._influenced_by(code_event.id),
                 code_event.id,
+                upstream_verdict=self._verdict_on(code_event.id),
             )
             draft_source = remember(
                 self.log.log_source(
@@ -922,6 +991,7 @@ class GeminiPipeline:
             list(write_event.exposures),
             self._influenced_by(decision_event.id),
             decision_event.id,
+            upstream_verdict=self._verdict_on(decision_event.id),
         )
         self._checkpoint(write_event.id, "coder")
 
@@ -977,6 +1047,7 @@ class GeminiPipeline:
             list(to_executor.exposures),
             self._influenced_by(producer.id),
             producer.id,
+            upstream_verdict=self._verdict_on(producer.id),
         )
         code_source = remember(
             self.log.log_source(
@@ -1013,7 +1084,7 @@ class GeminiPipeline:
         # Checkable outcome: compare against known-correct values, no LLM judge.
         expected = [str(v) for v in (self.tools.db_lookup("task/expected_iso") or [])]
         produced = [ln.strip() for ln in result["stdout"].splitlines() if ln.strip()]
-        success = bool(expected) and produced == expected
+        success, how = task_outcome(expected, result["stdout"])
         final = self.log.log_event(
             "executor",
             "agent_output",
@@ -1021,7 +1092,12 @@ class GeminiPipeline:
             exposures=self.context.get("executor", []),
             output_ref=self.log.put_content(
                 json.dumps(
-                    {"expected": expected, "produced": produced, "success": success},
+                    {
+                        "expected": expected,
+                        "produced": produced,
+                        "success": success,
+                        "matched_by": how,
+                    },
                     sort_keys=True,
                 ),
                 kind="output",
@@ -1068,6 +1144,50 @@ class GeminiPipeline:
                 "code": code,
             },
         )
+
+
+# The shape the task asks for: "prints each one as an ISO date (YYYY-MM-DD),
+# one per line". Fixed here, next to the task statement it comes from.
+ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
+
+
+def task_outcome(expected: list[str], stdout: str) -> tuple[bool, str]:
+    """Did the run do the task? (success, how it was decided)
+
+    WHY THIS IS NOT LINE EQUALITY ANY MORE (D-065)
+    ----------------------------------------------
+    It was `[non-empty stripped lines] == expected`, and that made task success
+    hinge on one formatting detail: a banner line, a "Parsed:" prefix, a summary
+    at the end, and a run that produced every correct date in the right order
+    was recorded as a failure.
+
+    That would be a tolerable testbed quirk except for who pays for it.
+    `verify()` is the only consumer, and only CausalLine verifies -- so an
+    unrelated formatting slip makes the one method that checks its own work look
+    like it failed, while the three methods that never check are untouched. The
+    first real-LLM campaign is exactly this story (docs/03 #15): every original
+    run failed the task on one wrong format code, CausalLine escalated to
+    `restart_all` on all of them, and the baselines were never charged.
+
+    So the check now asks the question the task actually asks: **are the right
+    ISO dates there, in the right order, and nothing else of that shape?** Two
+    acceptance routes, both exact about the values and neither about the layout:
+
+        exact_lines   the original rule, kept first so an unchanged run is
+                      decided by an unchanged test
+        iso_scan      the ISO dates found in stdout, in order, equal `expected`
+
+    What it still refuses, and must: a wrong date, a missing date, a duplicate,
+    a different order, or an extra date. Only decoration is forgiven.
+    """
+    if not expected:
+        return False, "no expected values in the fixture"
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    if lines == expected:
+        return True, "exact_lines"
+    if ISO_DATE.findall(stdout) == expected:
+        return True, "iso_scan"
+    return False, "mismatch"
 
 
 def _strip_fences(text: str) -> str:

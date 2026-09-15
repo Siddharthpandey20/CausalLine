@@ -2294,3 +2294,465 @@ the alternative to escaping it is losing the recovery.
 **This is a real-model-only failure mode**, and finding it is the kind of thing
 `docs/09`'s evaluation mode exists for: no scripted run in the history of this
 repository could have produced it.
+
+## D-062 — The audit's "no escalation ever happens" and ours disagree because they count different things
+
+**15-09-2026. Phase 0 of the remediation pass.** An architectural audit reported
+that across 24 configurations `invalidate` and `replay` were selected 73 and 22
+times and `restart(agent)`, `isolate` and `restart_all` **zero** times, and
+concluded the safe-frontier and checkpoint machinery has no practical effect.
+Earlier campaigns had observed escalation reaching `restart_all`. Both
+observations are correct and they are about different quantities.
+
+`src/eval/action_census.py` measures all three separately. On the same 24
+configurations (3 scenarios x 2 variants x 4 detectors, seed 20260906):
+
+| quantity | invalidate | replay | restart | isolate | restart_all |
+|---|---|---|---|---|---|
+| planner's first choice | 75 | 24 | 0 | 0 | 0 |
+| every scope actually replayed at | 75 | 24 | **4** | 0 | **4** |
+
+**Decision: the audit measured the planner's first-pass selection, and that
+number is right.** Ten of the 24 configurations produce no plan at all (the
+blind control flags nothing, and the heuristic detector misses on four), 10 end
+at `selective`, and 4 climb the whole ladder and end `exhausted` — replaying at
+`agent_restart` and then `restart_all` on the way.
+
+**Why a count of selected actions can never show this:** escalation does not
+select an action. `invalidation_for_scope()` widens the *set of events to
+recompute*; the vocabulary in `policy.py` is not consulted again. So the
+machinery runs and leaves no trace in the thing the audit counted.
+
+## D-063 — The safe frontier is not inert, and it also never wins
+
+**15-09-2026. The other half of Phase 0, and the answer is uncomfortable in
+both directions.**
+
+Two different claims were on the table — "the frontier has no effect" and
+"`invalidate`/`replay` are simply cheaper so they win the greedy" — and the
+measurement supports neither cleanly.
+
+**It is not inert.** Across the 56 `(configuration, agent)` restart actions the
+vocabulary offered, the frontier made 14 of them (25%) strictly cheaper than
+restarting that agent from INIT, removing 3044 tokens of recompute in total.
+Step 1 is computing a real verified recovery line and it is pricing real actions
+with it.
+
+**It also never wins, and not on price.** `greedy_cover` scores
+`cost / tainted-events-broken`. In all 11 configurations that produced a plan the
+best-scoring `restart(agent)` scored **exactly 1.0**, the same as the winning
+`invalidate`, and lost the deterministic `(cost, label)` tiebreak. And in **0 of
+11** did the frontier lower the best-*scoring* restart's score, because the
+best-scoring restart is always a chain of events that spent no tokens and
+therefore cost 1 each.
+
+**Decision: report it as measured, and do not touch the tiebreak.** The honest
+statement for the paper is that on an 18-event workflow whose cheap events
+dominate the cover, agent-level restart is never the cheapest way to cut
+contamination, and the frontier's value shows up as a bound on what that action
+would have cost rather than as a selection. Adjusting the tiebreak to let
+`restart` win would be tuning the planner until the machinery looks used, which
+is the thing `docs/04` names as the dangerous direction.
+
+## D-064 — A removal-aware facet, and the circularity it creates with real-LLM ground truth
+
+**15-09-2026. Changes a shared comparator, so the reasoning is in full.**
+
+**The failure.** A real-model pair was cleared while its output carried the
+planted canary token. The redaction worked, the answer genuinely changed, and
+every facet of the comparator held still — because what moved was a span of
+quoted text and the comparator's vocabulary is library names, format codes and
+AST shapes. No facet can represent *the answer repeats the removed source*.
+
+**Was implementing it now a violation of D-026's pre-registration rule?** D-026
+forbids adjusting a comparator until it reports the result we want. The question
+is whether "add a facet right after seeing what it would have caught" is that.
+
+The distinction that settles it: **D-026's rule is about facets included or
+excluded on the basis of what they say about influence. `carryover` is not a
+vocabulary and has nothing to tune.** It shingles the removed source's own
+content and asks which shingles occur in the answer. There is no list to extend,
+no term to add, no threshold to move — the spans come from the source, not from
+us. A hand-written "does the answer contain the payload" rule would have been
+the violation; this is not that. It is also self-cancelling on redundancy: a
+span present in a source that stayed appears on both sides of the comparison and
+the facet holds still, which is the correct reading and means the facet cannot
+manufacture influence out of boilerplate.
+
+**Decision: implement it, and declare the cost.** `carryover` is a facet of
+every signature a counterfactual compares, subject to the same pre-registered
+exclusion rule as every other facet (its scripted floor is 0%, D-070).
+
+**The cost, and it is the part that must not be buried.** `observed_influence()`
+in the real-LLM mode defines ground truth as *canary token present in the
+output* unioned with code-path records. `carryover` now asks a question of the
+same shape. So on a real-LLM run **the estimator and the ground truth share a
+mechanism**, and pair-level agreement between them is no longer an independent
+measurement of the estimator — a run whose payload lands will agree partly by
+construction. Two consequences, both binding:
+
+1. any future real-LLM pair-level agreement number must be reported with
+   `carryover` **excluded**, or reported as what it is: an instrument scored
+   against a relative.
+2. the scripted matrix is unaffected. Its ground truth is `ScriptedClient`'s own
+   leave-one-out record over a substance function, which has nothing to do with
+   quoted spans.
+
+Measured effect on the scripted matrix: **none.** Every cell produced identical
+work-preserved, unsafe-preservation and escalation numbers with the facet added.
+The facet is dormant on this testbed and exists for the failure mode the real
+model produced.
+
+## D-065 — Task success reads the dates, not the layout
+
+**15-09-2026.** `task_success` was `[non-empty stripped stdout lines] ==
+expected`, so a banner line, a `Parsed:` prefix or a trailing summary failed a
+run that printed every correct date in the right order.
+
+That would be a tolerable testbed quirk except for **who pays for it**.
+`verify()` is the only consumer and only CausalLine verifies, so an unrelated
+formatting slip makes the one method that checks its own work look like it
+failed while the three that never check are untouched. The first real-LLM
+campaign is exactly this story (`docs/03` #15).
+
+**Decision: `task_outcome()` accepts two routes, both exact about the values and
+neither about the layout.** `exact_lines` is the original rule and is tried
+first, so an unchanged run is decided by an unchanged test; `iso_scan` compares
+the ISO dates found in stdout, in order, against `expected`. A wrong date, a
+missing one, a duplicate, an extra one or a different order still fails. Only
+decoration is forgiven, and the trace records which route decided it
+(`matched_by`).
+
+## D-066 — Leave-one-out is only sound when the removal removes something, and now that is checked
+
+**15-09-2026. Answers `docs/03` #16.**
+
+Every counterfactual verdict rests on an unstated premise: deleting the block
+labelled `[S]` removes S's information from the request. When a second,
+unremoved route carries the same material, an unchanged answer is evidence of
+nothing and the verdict is `clean` — a false clean produced by plumbing. Nothing
+in the project enforced the premise anywhere.
+
+**Decision: a nested removability check, and it costs no calls.** The proposal on
+the table was one extra model call per pair. That is not necessary, because the
+question is about the *prompt*, not about the model, and the prompt is on disk.
+`src/provenance/removability.py` redacts the source exactly as the counterfactual
+will, shingles its content with the same extraction `carryover` uses, and asks
+which spans still occur in the redacted prompt — naming the route when it finds
+one (a sibling source, or text outside the source block).
+
+Zero calls and strictly stronger than the call would have been: a model
+answering the same way twice proves nothing, while a span found in the redacted
+prompt proves the route exists.
+
+**How a failure is treated, and the asymmetry is deliberate.** The counterfactual
+still runs and its result is still kept — a *changed* signature is evidence of
+influence whether or not the removal was clean, and short-circuiting before the
+call destroys every real positive edge it would have found. What a failed check
+forbids is only the other verdict: an unchanged answer on an incompletely removed
+source is recorded as influenced, with the residual route named.
+
+**Is this general enforcement or a narrow patch?** General, within one limit
+worth stating. It runs on every counterfactual on every path — single source,
+merged atomic unit and group removal — so no clean verdict anywhere is now
+trusted without it. The limit is that it detects routes that are *textual*: a
+second source that paraphrases rather than quotes passes the check. That is the
+same narrowness the `carryover` facet has and the same narrowness the real-LLM
+ground truth has.
+
+**Recorded as its own evidence type.** `removability=verified` and
+`removability=residual:N` go into the check record's notes and are read back with
+`removability.verdict_of()`. A record written before this existed reads as
+`unchecked`, which is the correct answer: nobody asked.
+
+## D-067 — A derived clearance is never stronger than the one it derives from
+
+**15-09-2026. Answers `docs/03` #17.**
+
+A **carrier** event produces no content of its own — a hand-off message, a tool
+call whose arguments came out of an earlier output. `record_carrier()` wrote its
+clearances as `clean / structural / 1.0`, the strongest label the clearance
+policy has, on the strength of *whatever the upstream event's influence edges
+happened to say at the time*. On a model-written upstream event those edges come
+from the estimator, so an estimated clean — including a wrong one — re-emerged
+one event later wearing the system's highest trust.
+
+Worse than the audit described, in fact. The upstream edges are written by the
+inline self-report pass, which deliberately records **nothing** for a negative.
+So the common case was not "an estimated clean laundered into a structural one",
+it was **silence laundered into a structural clearance**.
+
+`code_path_pairs()` in the real-LLM mode had already had to filter these records
+out of ground truth by matching a phrase in their notes. `ClearancePolicy` had no
+corresponding rule, and the two readers disagreeing about what `structural` meant
+is the whole of the issue.
+
+**Decision, in three parts.**
+
+1. **The marker has one definition.** `CARRIER_NOTE` lives next to the function
+   that writes it and both readers import it. Two copies of the test is how they
+   came apart.
+2. **A carrier clearance inherits method and confidence.** Upstream structural →
+   structural; upstream counterfactual → counterfactual at the same confidence;
+   nothing recorded upstream → `assumed` at 0.0, which no policy accepts. A
+   carrier **taint** stays `structural`: the copy relation really is a code fact
+   and taint is the conservative direction.
+3. **A source that was not in the upstream context at all is a separate answer,
+   and this part is load-bearing.** An output cannot have been influenced by
+   something never in front of it, so that clearance genuinely is structural.
+   Collapsing it into "no record" refused sound clearances on most of the tool
+   and hand-off events in a trace and cost 42 points of work preserved on one
+   cell before it was separated out.
+
+**Resolution happens at read time, and writes nothing.** Carrier records are
+written mid-run, before any counterfactual exists, so they inherit `assumed` and
+would stay that way forever. The obvious fix — append an updated record — is not
+available: `Trace.validate()` refuses two check records for one pair, because two
+verdicts on one pair means one is stale and nothing in the file says which. That
+invariant is worth more than the convenience. So a carrier record is treated as
+what it always was, **a pointer rather than a verdict**, and `carriers.resolve()`
+follows the pointers over the finished trace to a fixed point.
+
+**Measured effect, and it is a real unsafe preservation removed.** On
+A-influencing/oracle, `e0016` — a memory write carrying the Coder's decision —
+was marked `clean / structural` for `S10`, because when the carrier record was
+written the counterfactual establishing `S10 -> e0014` had not run yet. It now
+inherits that influence and is correctly invalidated. Work preserved on that cell
+falls from 53% to 47%: one more event recomputed, and it was contaminated.
+
+## D-068 — Verification reads the recovered bytes instead of trusting the plan
+
+**15-09-2026. Phase 1, from the audit's Q20.**
+
+Post-recovery verification cleared a replayed event of a flagged source on one
+ground: `redact_flagged()` had been called, therefore the source cannot have
+influenced the new output. That is an argument, not a check, and it is the same
+argument both measured false cleans defeated — one because the redaction did not
+remove everything, the other because the payload came back out of the model
+anyway.
+
+**Decision: `surviving_payload()` reads the bytes.** The re-issued prompt (the
+e0014 class), and the recovered output and tool arguments (the e0013 class), are
+scanned for distinctive spans of the flagged source's content, using the same
+extraction as `carryover` and the removability check so all three agree on what
+"present" means. A hit withholds the clearance, which leaves the pair
+contaminated, fails verification and escalates — which is what should happen when
+a recovery did not remove the thing it was recovering from.
+
+**It immediately found a trace-fidelity defect, which is the point of building
+it.** The first run reported a surviving payload on every successful recovery.
+The pipeline writes a prompt into the content store and *then* calls the client,
+and redaction happens inside the client — so for a replayed event **the stored
+prompt is not the prompt that was sent**. Nothing had depended on the difference
+before. `ReplayReport.issued_prompts` now records the text actually issued, and
+the re-check reads that. The stored copy remains the un-redacted one, which is
+worth knowing before anyone runs a post-hoc counterfactual on a recovered trace
+(`docs/03` #18).
+
+Also tightened here: the walk's inherited clearances are read through
+`CheckLedger` under the same policy the walk uses, rather than off the raw
+`verdict == "clean"` field. Verification was more lenient than the thing it was
+verifying.
+
+## D-069 — The task check stays strict, because it is an end-to-end contamination detector
+
+**15-09-2026. This decision REVERSES the recommendation in `docs/03` #15, on a
+measurement, and the reversal is the result.**
+
+`docs/03` #15 recommended relaxing verification from `task_success` to
+`task_success or not original_task_success` — judge recovery against where it
+started, not against perfection — and asserted the change would be "a no-op on
+every existing measurement" because the scripted matrix always succeeds at the
+task.
+
+**The assertion is false and the change costs safety.** In the scripted matrix
+the A-influencing attack breaks the task *by working*, so the original run's
+`task_success` is already False there. With the relaxed predicate, the
+lying-self-reporter condition in `tests/test_validation.py` went from **zero
+unsafe preservations to one**: `e0010` stayed preserved while truly contaminated.
+
+The mechanism is why this matters beyond one test. **The task check is an
+end-to-end detector of surviving contamination.** When the estimator misses an
+influence edge, the taint walk under-covers, the selective plan leaves the
+contaminated event in place — and the contamination shows up in the output the
+task check reads. Verification fails, the ladder climbs, and the unsafe
+preservation is eliminated by a route that never had to identify it. Relaxing the
+predicate removes the last line of defence exactly when the first one has already
+failed.
+
+**Decision: the predicate does not move.** `docs/03` #15's real complaint — that
+CausalLine is charged for a pre-existing failure while B0, B1 and B2 are exempt
+because they never verify — is answered by its *second* option instead:
+`VerifyResult.original_task_success` and
+`RecoveryResult.pre_existing_task_failure` record the condition, and the scored
+row says so in its notes, so a comparison can exclude or annotate those runs. The
+safety rule is not loosened to make a table fairer; the table is labelled.
+
+Consequence for `tests/test_escalation.py`: its fixture used to be "poison the
+run, flag nothing, the task fails, the ladder climbs". That fixture works under
+either predicate but it was testing the ladder through a route this decision
+examined, so it was replaced by one that does what the rule actually forbids — a
+run that **passed** the task, and a recovery that breaks it.
+
+## D-070 — The scripted matrix was calibrated on the wrong model, and now it is not
+
+**15-09-2026. Phase 2, and it is a correction rather than an addition.**
+
+`docs/03` #12 records that only the `decision` comparator has a measured noise
+floor, on eight live Gemini re-sends, and that `prose`, `code`, `json_shape` and
+`tool_args` have none. True, and about the *hosted* model.
+
+But every number in `docs/07` and `docs/08` was produced by `ScriptedClient`, and
+a floor belongs to the thing that produced the answers (D-004, D-026).
+`experiment.py` called `Calibration.load()` with **no model argument**, so the
+guard written to refuse exactly this transfer never fired, and every scripted
+verdict was scored with the decision comparator's `strategy` and `dependency`
+facets excluded — on the strength of a measurement of a different model.
+Excluding a facet is the one place the method knowingly trades safety for signal,
+so two facets were being ignored for no measured reason.
+
+**Decision: measure the client that produced the answers.**
+`python -m src.provenance.scripted_noise` re-sends every stored pipeline prompt
+20 times unchanged and scores every facet of every comparator the long workflow
+exercises. Result: **0% floor on all 18 (comparator, facet) pairs**, `carryover`
+included. Nothing is excluded. `data/noise/calibration-scripted.json` carries
+`model: scripted` so it can never be confused with the Gemini file, and
+`Calibration.load(path, model=...)` is now called with the model, so a future
+mix-up raises.
+
+One methodological note kept because it nearly produced a false result: the first
+version of the measurement built a **fresh** client per trial, which resets the
+counter the client's wording churn is derived from, so every "re-send" came back
+byte-identical and the 0% floor was an artefact of the harness. One client across
+all trials is what makes consecutive identical requests differ, which is the live
+property D-026 measured. The 0% above is from the corrected version.
+
+Two honesty notes. `tool_args` does not appear: tool calls are not model calls,
+are attributed structurally and never counterfactually, so its floor is vacuous
+in this pipeline. The `code` comparator's `stdout`/`returncode` facets do not
+appear either, because no runner is supplied in that context.
+
+Measured effect on the matrix: **none.** The two wrongly-excluded facets do not
+move in these scenarios. The correction changes no number and removes an
+unjustified assumption, which is the right kind of null result.
+
+## D-071 — Selective memory rollback is the deployment's answer; wholesale reset is the replay's
+
+**15-09-2026. Phase 7.**
+
+Memory was reset to the initial fixture on every recovery attempt. The audit read
+that as a coarse shortcut over the per-write rollback the
+`derived_from`/checkpoint infrastructure could support.
+
+**It is not a shortcut, and the reason is about replay rather than about cost.**
+This testbed's replay re-executes the entire workflow from its starting state.
+Every `memory_read` runs again, in order, before the writes that follow it.
+Seeding that replay with writes the *original* run made would show an early read
+a value the original never saw, so the replay would stop being a replay.
+Wholesale reset is what "re-run from the beginning with the same fixtures" means.
+
+**But a deployment asks a different question**, and that one the audit is right
+about: the workflow has already run, the live store holds what it holds, and
+rolling all of it back to discard one contaminated write throws away every clean
+write for nothing.
+
+**Decision: implement the per-write plan, report it, and do not apply it to the
+replay's fixture.** `selective_memory_rollback()` returns `{key -> value to
+restore, or None to delete}` covering only keys an invalidated write touched,
+reverting each to the last *surviving* write, then the fixture value, then
+removal. A key written only by surviving events does not appear at all — absent
+means it stays. `RecoveryResult.memory_rollback` carries it and the notes name
+what was undone and what was kept.
+
+The testbed cannot exercise this well and the test says so: the four-agent
+workflow writes memory exactly once, so the "one clean write survives while a
+different one is rolled back" case is built by hand in
+`tests/test_scope_boundaries.py`.
+
+## D-072 — Self-report's job is not the one the docs claim
+
+**15-09-2026. Phase 6, and the measurement contradicts the design note.**
+
+Self-report has always been described as triage: a cheap call whose positives are
+accepted without verification so the expensive stage has fewer pairs to examine.
+Phases 1-3 made the expensive stage stricter, so the claim was re-measured
+against `targeted_only` — `hybrid` with the inline self-report removed and
+nothing else changed, which is the only comparison that isolates it (the existing
+`--ablation` modes also skip the targeted pass, so they differ in two things at
+once).
+
+Over six CausalLine cells at the oracle detector:
+
+| | hybrid | targeted_only | delta |
+|---|---|---|---|
+| analysis tokens | 4500 | 1600 | **-2900** |
+| recovery tokens | 5300 | 2500 | **-2800** |
+| work preserved (mean) | 78.9% | 73.7% | -5.3% |
+| unsafe preservations | 0 | 0 | 0 |
+| pair-level false negatives | 0 | **1** | +1 |
+| escalations | 0 | **1** | +1 |
+
+**Self-report is not cheaper. It costs 2800 recovery tokens across these cells,
+and it buys safety.** Its over-claimed positives are recorded as `tainted`
+without verification, so they taint pairs the targeted pass alone misses — which
+is why removing it produces a pair-level false negative and an extra escalation.
+
+**Decision: keep it, and describe it correctly.** It is a *conservative bias
+bought with tokens*, not a cost-ordering heuristic. The design note calling it
+cost triage is wrong on this testbed and is corrected here rather than quietly
+left standing. `python -m src.eval.selfreport_value` regenerates the table.
+
+## D-073 — Upstream attribution surfaces candidates and stops there
+
+**15-09-2026. Phase 4.**
+
+Every flagged source was treated as an origin; nothing asked whether it was
+itself produced by something earlier the detector had not named. For a source
+that arrived from outside — a web page, a database row — that is correct. For a
+source that *is* an earlier event's output it is an assumption.
+
+`src/provenance/upstream.py` walks back over `derived_from`, using the trace's
+influence edges into the producing event where they exist and falling back to
+that event's exposures where they do not. On the scripted A-influencing run it
+takes the Coder's script back through the Researcher's findings to the planted
+page, two hops, without reading `Source.malicious`.
+
+**Decision: surface, never seed.** The result is a ranked list of investigation
+candidates on `RecoveryResult.notes`. It does not flag them, does not seed the
+contamination walk, and changes no recovery decision. The relation the walk
+follows is "was an input to", which is **exposure** — so treating its output as
+contamination would re-import the exposure/influence conflation this entire
+project exists to remove, and would grow the contaminated region back towards
+B2's. Deciding what is malicious is the detector's job (`docs/01-scope.md`), and
+promoting a candidate here would be this system quietly doing detection it does
+not claim to do.
+
+`origin_event` is deliberately *not* walked. A web page is not derived from the
+tool response that fetched it; following that link would implicate everything
+else the same tool call happened to see.
+
+## D-074 — Detector confidence orders the investigation, and nothing else
+
+**15-09-2026. Phase 5.**
+
+`Verdict` carries a confidence per flagged source and a detection point, and
+nothing downstream ever read either: a flat list of ids was all that crossed into
+recovery.
+
+**Decision: confidence orders the sources *within* an event, ascending.** The
+least certain flag is checked first, because a low-confidence flag is the one
+that might be a false positive and clearing it removes its whole downstream
+region, while a high-confidence flag mostly confirms taint that was going to be
+recomputed anyway. A source the detector never named sorts last at 1.0, so an
+unflagged derived source never displaces a doubtful flag, and trace position
+breaks ties so the ordering stays deterministic when no confidence is supplied.
+
+**What it deliberately does not reorder** is which *event* is taken next. That
+order is the frontier expansion and it is forward for a reason: an upstream
+verdict can remove downstream pairs from the region entirely, so checking
+downstream first spends calls on pairs that were about to become irrelevant.
+Confidence is a tiebreak inside an event, not a replacement for the frontier.
+
+Detection *timing* stays unread, and `docs/02-architecture.md` now says why: this
+system is post-hoc and batch, and `detected_at` exists to make the batch problem
+harder, not to drive an interrupt.

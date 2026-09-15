@@ -31,7 +31,13 @@ part to be state of the art.
 
 ## Out of scope (say so explicitly in the paper)
 
-- Attack **detection** — we assume a detector exists and is correct
+- Attack **detection** — we assume a detector exists and is correct. What it
+  emits is a set of **source** ids with a confidence each, never "agent X is
+  compromised"; see `docs/02-architecture.md`.
+- **Online / mid-execution** recovery. This system is post-hoc and batch: it
+  runs on a finished trace. The reason is in `02-architecture.md` and it is a
+  property of the evidence, not of the timeline — counterfactual replay needs
+  an output that already exists.
 - Cross-session / long-lived shared memory across separate workflows
 - Adaptive attackers who know our method and try to evade it
 - More than one pipeline topology

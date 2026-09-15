@@ -57,22 +57,63 @@ def _block_from_prompt(prompt: str) -> str | None:
     return prompt[match.start():]
 
 
-def redact_flagged(prompt: str, flagged: Iterable[str]) -> str:
+class RedactionError(RuntimeError):
+    """A flagged source was in the prompt and is still in it afterwards.
+
+    THE FAILURE MODE THIS EXISTS TO MAKE LOUD
+    -----------------------------------------
+    A redaction that does not happen is indistinguishable, downstream, from one
+    that did: the event is replayed, the output comes back, verification is told
+    the source was removed, and the recovery reports success while the payload
+    was in front of the model the whole time. That is the e0014 class, and the
+    only reason it was ever silent is that this function swallowed
+    `SourceNotInPrompt` and moved on.
+
+    Failing here aborts the replay, which `real_llm.run_generated()` already
+    catches per method and records as a note. A recovery that produces no row is
+    a worse result and an honest one; a recovery that produces a wrong row is
+    neither.
+    """
+
+
+def redact_flagged(prompt: str, flagged: Iterable[str], strict: bool = True) -> str:
     """Remove detector-flagged sources from a prompt about to be re-issued.
 
     This is "spliced_clean_upstream_context_only": the recomputed event must
     not see the malicious source. Sources that are not in the prompt are
-    skipped -- they were never rendered, so there is nothing to redact.
+    skipped -- they were never rendered, so there is nothing to redact, and that
+    is not a failure.
+
+    What *is* a failure is a source that is rendered into the prompt and still
+    rendered into it when this returns. `strict` exists so the old permissive
+    behaviour stays reachable for a caller that deliberately wants it; nothing
+    in this repository asks for it.
     """
-    remaining = list(flagged)
-    for sid in remaining:
+    for sid in list(flagged):
         block = _block_from_prompt(prompt)
         if not block or sid not in sources_in(block):
             continue
         try:
             prompt = redact_in_prompt(prompt, block, sid)
-        except SourceNotInPrompt:
+        except SourceNotInPrompt as exc:
+            if strict:
+                raise RedactionError(
+                    f"{sid} is rendered into this prompt and could not be "
+                    f"removed from it: {exc}. Refusing to re-issue a prompt "
+                    "that still contains a source the recovery reports as "
+                    "redacted."
+                ) from exc
             continue
+
+    if strict:
+        block = _block_from_prompt(prompt)
+        still_there = sorted(set(flagged) & set(sources_in(block or "")))
+        if still_there:
+            raise RedactionError(
+                f"flagged source(s) {still_there} are still rendered in the "
+                "prompt after redaction; a partial redaction must not look "
+                "like a complete one"
+            )
     return prompt
 
 
@@ -122,6 +163,17 @@ class ReplayReport:
     invalidation: frozenset[str] = frozenset()
     spliced: list[str] = field(default_factory=list)
     replayed: list[str] = field(default_factory=list)
+    # event id -> the prompt actually sent to the inner client.
+    #
+    # WHY THIS IS NOT READ BACK OFF THE TRACE (D-068)
+    # The pipeline writes a prompt into the content store and *then* calls the
+    # client, and redaction happens inside the client -- so for a replayed event
+    # the stored prompt is the one that would have been sent, not the one that
+    # was. Nothing depended on the difference until verification started reading
+    # prompts back to check that the flagged material was really gone, at which
+    # point reading the stored copy reports a failure on every successful
+    # recovery. The issued text is recorded here, where it is known.
+    issued_prompts: dict[str, str] = field(default_factory=dict)
     replay_tokens: int = 0
     inner_calls: int = 0
     splice_assertions: int = 0
@@ -130,6 +182,12 @@ class ReplayReport:
     stdout: str = ""
     stderr: str = ""
     wall_clock_s: float = 0.0
+
+    # (agent_id, kind) of every pipeline call the rerun made, in order, as the
+    # rerun itself declared it -- against which the original's sequence is
+    # checked. See `SplicingClient.announce`.
+    rerun_shape: list[tuple[str, str]] = field(default_factory=list)
+    original_shape: list[tuple[str, str]] = field(default_factory=list)
 
     def assert_invariants(self, invalidation: set[str]) -> None:
         extra = set(self.replayed) - invalidation
@@ -141,6 +199,12 @@ class ReplayReport:
         if leaked:
             raise SpliceError(
                 f"spliced events that were supposed to be replayed: {sorted(leaked)}"
+            )
+        if len(self.rerun_shape) != len(self.original_shape):
+            raise SpliceError(
+                f"the rerun made {len(self.rerun_shape)} pipeline model calls "
+                f"where the original made {len(self.original_shape)}; the "
+                "splice queue and the rerun are not the same workflow"
             )
 
 
@@ -156,6 +220,29 @@ class SplicingClient:
 
     Self-report questions are passed through: they are analysis, not
     pipeline events, and they are not in `pipeline_model_events`.
+
+    ORDER MATCHING NEEDS AN IDENTITY CHECK BEHIND IT (docs/03 #13)
+    ---------------------------------------------------------------
+    Matching by position assumes the rerun makes the same calls in the same
+    order, which `ScriptedClient` guarantees and a real model does not. The
+    Planner is asked for three research questions and the pipeline takes
+    `questions[:3] or [task]`; a rerun that returns two makes the Researcher
+    loop twice, and from there every splice is matched to the wrong event. Two
+    outcomes, and the second is the dangerous one:
+
+      * the queue runs short, `SpliceError` fires -- loud, and fine
+      * the queue stays long enough that ids still line up, and a stored output
+        is spliced onto an event it did not come from -- **silent**, and
+        nothing downstream can detect it
+
+    So the assumption is now checked instead of relied on. The pipeline
+    announces `(agent_id, kind)` before each model call; if it disagrees with
+    the event the queue is about to hand back, the replay aborts. That turns the
+    silent failure into the loud one, which is the whole of #13's answer.
+
+    A pipeline that does not announce is not penalised: `announce` is optional
+    and an un-announced call is spliced on position as before. That keeps the
+    check from becoming a hard dependency of the replay engine on one pipeline.
     """
 
     original: Trace
@@ -169,8 +256,22 @@ class SplicingClient:
     def __post_init__(self) -> None:
         self._queue = pipeline_model_events(self.original)
         self._index = 0
+        self._pending: tuple[str, str] | None = None
         self.total_tokens = 0
         self.throttled_s = getattr(self.inner, "throttled_s", 0.0)
+        self.report.original_shape = [
+            (self.original.event(eid).agent_id, self.original.event(eid).kind)
+            for eid in self._queue
+        ]
+
+    def announce(self, agent_id: str, kind: str) -> None:
+        """The pipeline says what the next model call is for.
+
+        Optional by design -- see the class docstring. Consumed by the next
+        `generate()` and cleared, so an analysis call made in between (a
+        self-report) cannot inherit it.
+        """
+        self._pending = (agent_id, kind)
 
     def generate(
         self,
@@ -190,6 +291,20 @@ class SplicingClient:
             )
         event_id = self._queue[self._index]
         self._index += 1
+
+        announced, self._pending = self._pending, None
+        if announced is not None:
+            event = self.original.event(event_id)
+            expected = (event.agent_id, event.kind)
+            self.report.rerun_shape.append(announced)
+            if announced != expected:
+                raise SpliceError(
+                    f"call {self._index} of the rerun is {announced} but the "
+                    f"original's call {self._index} was {expected} ({event_id}). "
+                    "The rerun's call sequence has diverged from the trace being "
+                    "spliced into it, so every splice from here on would be "
+                    "matched to the wrong event."
+                )
 
         if event_id not in self.invalidation:
             text = self.original.output_text(event_id)
@@ -228,6 +343,7 @@ class SplicingClient:
         cleaned = redact_flagged(prompt, self.flagged)
         if self.clean_prompt is not None:
             cleaned = self.clean_prompt(event_id, cleaned)
+        self.report.issued_prompts[event_id] = cleaned
         response = self.inner.generate(
             cleaned, system=system, json_output=json_output, temperature=temperature
         )

@@ -57,13 +57,33 @@ from src.provenance.attribution import (
     derived_links_for,
 )
 from src.common.models import SOURCE_KINDS as _SOURCE_KINDS
+from src.provenance import carriers
+from src.provenance import removability as _removability
 from src.provenance.signatures import (
     Calibration,
     Comparator,
     Signature,
     compare,
     for_event,
+    with_carryover,
 )
+
+
+def _content_in_block(block: str | None, source_id: str) -> str:
+    """One source's content, as rendered into the prompt.
+
+    Read back out of the block rather than off the `Source` record, because the
+    block is what the model saw and what a redaction has to remove -- D-061's
+    `defuse()` means the two can differ by an indent.
+    """
+    if not block:
+        return ""
+    from src.common.prompts import parse_sources
+
+    for sid, _header, text in parse_sources(block):
+        if sid == source_id:
+            return text
+    return ""
 
 MODES = ("hybrid", "self_report", "counterfactual")
 
@@ -136,6 +156,10 @@ class CounterfactualResult:
     excluded: list[str] = field(default_factory=list)
     control_stable: bool | None = None
     error: str | None = None
+    # The nested removability check (src/provenance/removability.py). Its own
+    # evidence type, kept apart from `error` because "we could not remove it"
+    # and "the call failed" are different reasons to refuse a clearance.
+    removability: Any = None
 
     @property
     def verdict(self) -> str:
@@ -149,6 +173,8 @@ class CounterfactualResult:
             parts.append("signature unchanged")
         if self.excluded:
             parts.append(f"facets excluded as noisy: {','.join(self.excluded)}")
+        if self.removability is not None:
+            parts.append(self.removability.note())
         if self.control_stable is False:
             parts.append("CONTROL UNSTABLE: unchanged re-run also moved")
         if self.error:
@@ -181,6 +207,23 @@ def counterfactual(
     on the model-wide calibration: if the control moves, this event's signature
     is unstable and the verdict is not evidence, whatever the comparator's
     average floor says.
+
+    TWO THINGS THIS DOES BEYOND COMPARING SIGNATURES (D-064, D-066)
+    ---------------------------------------------------------------
+    Both exist because a measured false clean showed that "the signature did not
+    move" is not by itself sufficient grounds for `clean`.
+
+    `carryover`  a removal-aware facet is added to both signatures: which
+        distinctive spans of the removed source's content survive into the
+        answer. A comparator reading the output alone cannot represent "the
+        answer repeats the removed source", and that is influence by
+        definition. See src/provenance/signatures.py.
+
+    removability  before a `clean` verdict is trusted, the redacted prompt is
+        checked for a *second route* by which the same material reached the
+        model. Leave-one-out is only sound when every route is removable, and
+        nothing enforced that before. A residual route forces the conservative
+        verdict. Costs no calls -- see src/provenance/removability.py.
     """
     if not request.prompt or not request.source_block:
         return CounterfactualResult(
@@ -205,18 +248,33 @@ def counterfactual(
             error=f"could not redact {source_id}: {exc}",
         )
 
-    before = comparator.signature(request.output, context)
+    # The content as it actually appears in the prompt, which is what a second
+    # route would have to repeat. Falls back to empty, which makes the
+    # carryover facet a constant and therefore inert -- never a false positive.
+    removed_content = _content_in_block(request.source_block, source_id)
+    removability = _removability.check(
+        request.prompt, request.source_block, source_id, removed_content
+    )
+
+    before = with_carryover(
+        comparator.signature(request.output, context), request.output, removed_content
+    )
     result = CounterfactualResult(
         source_id, request.event_id, influenced=False,
         before=before, after=before, repeats=0,
         excluded=sorted(excluded),
+        removability=removability,
     )
 
     for _ in range(max(1, repeats)):
         response = client.generate(redacted, system=request.system)
         result.calls += 1
         result.tokens += getattr(response, "total_tokens", 0)
-        after = comparator.signature(response.text, context)
+        after = with_carryover(
+            comparator.signature(response.text, context),
+            response.text,
+            removed_content,
+        )
         result.after = after
         result.repeats += 1
         same, moved = compare(before, after, exclude=excluded)
@@ -225,11 +283,34 @@ def counterfactual(
             result.moved = moved
             break
 
+    # The call is made either way and its result is kept either way: a moved
+    # signature is evidence of influence whether or not the removal was clean,
+    # and discarding it would destroy a real positive edge. What a failed
+    # removability check forbids is only the *other* verdict.
+    if not result.influenced and not removability.verified:
+        result.influenced = True
+        result.error = (
+            "the removal left the source's content reachable in the prompt, so "
+            "an unchanged answer is not evidence of non-influence "
+            f"({removability.note()})"
+        )
+
     if control_run:
         response = client.generate(request.prompt, system=request.system)
         result.calls += 1
         result.tokens += getattr(response, "total_tokens", 0)
-        control = comparator.signature(response.text, context)
+        # The SAME facets on both sides. `before` carries the removal-aware
+        # facet, so a control signature without it differs on that facet
+        # every single time and every event reads as unstable -- a control that
+        # always fires is not a control, it is the conservative fallback with an
+        # extra call. The control re-issues the *unchanged* prompt, so its
+        # carryover is measured against the same removed content and is expected
+        # to match.
+        control = with_carryover(
+            comparator.signature(response.text, context),
+            response.text,
+            removed_content,
+        )
         same, _moved = compare(before, control, exclude=excluded)
         result.control_stable = same
         if not same:
@@ -518,6 +599,8 @@ class HybridAttributor:
             comparator=comparator,
             calibration=self.calibration,
             context=context,
+            repeats=self.repeats,
+            control_run=self.control_run,
         )
         influenced = bool(decision(list(unit)))
         self.budget.charge(decision.calls)
@@ -644,6 +727,8 @@ class HybridAttributor:
             comparator=comparator,
             calibration=self.calibration,
             context=context,
+            repeats=self.repeats,
+            control_run=self.control_run,
         )
         diagnostics = GroupTestDiagnostics()
 
@@ -771,6 +856,19 @@ class RefineResult:
     # instead of separately (D-051), and how many sources that covered.
     derived_units_merged: int = 0
     derived_sources_merged: int = 0
+    # Inherited (carrier) verdicts re-resolved against the evidence this pass
+    # produced (D-067). Free -- no model calls -- and reported rather than
+    # silent, because it moves the contaminated region.
+    carrier_pairs: int = 0
+    carriers_reresolved: int = 0
+    carriers_upgraded: int = 0
+    carriers_downgraded: int = 0
+    # How many event groups were ordered by the detector's own per-source
+    # confidence rather than by trace position (Phase 5).
+    confidence_ordered: int = 0
+    # Events whose signature moved on an UNCHANGED re-send, so a counterfactual
+    # flip there would have carried no information (Phase 2, `control_run`).
+    control_unstable_events: int = 0
 
     def summary(self) -> str:
         parts = [
@@ -795,6 +893,12 @@ class RefineResult:
             parts.append(
                 f"budget-attribution fallback fired {self.fallback_invocations}x"
             )
+        if self.carriers_reresolved:
+            parts.append(
+                f"carrier verdicts re-resolved: {self.carriers_reresolved} of "
+                f"{self.carrier_pairs} ({self.carriers_upgraded} upgraded, "
+                f"{self.carriers_downgraded} downgraded), 0 calls"
+            )
         return "; ".join(parts)
 
 
@@ -812,6 +916,7 @@ def refine_for_verdict(
     use_sprt: bool = True,
     sprt_config: Any = None,
     self_report_calibration: Any = None,
+    detector_confidence: dict[str, float] | None = None,
 ) -> RefineResult:
     """Examine only the pairs the detector's verdict makes relevant.
 
@@ -862,6 +967,27 @@ def refine_for_verdict(
     `self_report_calibration`  A measured per-channel precision
         (src/provenance/calibration.py). Channels whose positive self-reports
         are precise enough are accepted without spending a counterfactual.
+
+    `detector_confidence`  The per-source confidence the detector's `Verdict`
+        already carries and which nothing downstream has ever read -- only the
+        flat list of ids crossed into recovery (Phase 5). It orders the sources
+        *within* an event, so when the budget runs out mid-event it has spent
+        its calls on the ones worth spending them on.
+
+        **Ascending** confidence, and the direction is the argument. A
+        high-confidence flag is near-certainly malicious, so checking it mostly
+        confirms taint that was going to be recomputed anyway. A low-confidence
+        flag is the one that might be a false positive, and clearing it removes
+        its whole downstream region from the recovery set. So the least certain
+        flags are checked first, because that is where a call buys the most
+        preserved work.
+
+        What it deliberately does NOT reorder is which *event* is taken next.
+        That order is the frontier expansion, and it is forward for a reason:
+        an upstream verdict can remove downstream pairs from the region
+        entirely, so checking downstream first spends calls on pairs that were
+        about to become irrelevant. Confidence is a tiebreak inside an event,
+        not a replacement for the frontier.
     """
     from src.provenance.budget_attribution import attribute as budget_attribute
     from src.provenance.contamination import contaminate
@@ -962,12 +1088,30 @@ def refine_for_verdict(
                     trace = read_trace(trace_path)
                     continue
 
+            # --- Phase 5: detector confidence orders the group ---------
+            # Least certain flag first; a source the detector never named gets
+            # 1.0, so it sorts last and an unflagged derived source never
+            # displaces a doubtful flag. Trace order breaks ties, so the
+            # ordering stays deterministic when no confidence is supplied.
+            if detector_confidence:
+                position = {sid: i for i, sid in enumerate(group)}
+                group = sorted(
+                    group,
+                    key=lambda sid: (
+                        detector_confidence.get(sid, 1.0),
+                        position[sid],
+                    ),
+                )
+                result.confidence_ordered += 1
+
             context = {"run": run_code} if run_code else None
             decision = CounterfactualDecision(
                 client=client,
                 request=request,
                 calibration=calibration,
                 context=context,
+                repeats=repeats,
+                control_run=control_run,
             )
 
             # --- ATOMIC UNITS BEFORE ANY REMOVAL TEST (D-051) ---------------
@@ -990,6 +1134,7 @@ def refine_for_verdict(
             # The threshold counts units, not sources: units are what halving
             # splits, so three sources in one unit are one test, not three.
             batched = use_group_testing and len(units) >= MIN_GROUP_TEST_CANDIDATES
+            control_unstable = False
             if batched:
                 diagnostics = GroupTestDiagnostics()
                 influential_keys = set(
@@ -1026,6 +1171,7 @@ def refine_for_verdict(
                 budget.charge(decision.calls)
                 result.calls += decision.calls
                 result.tokens += decision.tokens
+                control_unstable = decision.control_stable is False
             elif len(by_key[unit_keys[0]]) > 1:
                 # Below the batching threshold, but the first unit is a merged
                 # one and still has to be removed whole -- otherwise the fix
@@ -1037,6 +1183,7 @@ def refine_for_verdict(
                 budget.charge(decision.calls)
                 result.calls += decision.calls
                 result.tokens += decision.tokens
+                control_unstable = decision.control_stable is False
                 error = decision.errors[0] if decision.errors else None
                 for sid in unit:
                     # Recorded against every member. The removal shows the unit
@@ -1072,6 +1219,7 @@ def refine_for_verdict(
                 budget.charge(outcome.calls)
                 result.calls += outcome.calls
                 result.tokens += outcome.tokens
+                control_unstable = outcome.control_stable is False
                 _record(
                     log, sid, target_event, request,
                     influenced=outcome.influenced,
@@ -1096,6 +1244,14 @@ def refine_for_verdict(
                     event_id_=target_event, agent_id=request.agent_id,
                 )
 
+            # Phase 2: whether this event's signature held still on an
+            # unchanged re-send. Read after the branches, because that is where
+            # the control call (if any) was actually made. `control_stable` is
+            # None when no control ran, which is neither stable nor unstable and
+            # must not be counted as either.
+            if control_unstable:
+                result.control_unstable_events += 1
+
             # --- 2a: stop as soon as the evidence is decisive ---------------
             if sprt is not None:
                 result.sprt_checks = sprt.checks
@@ -1117,6 +1273,20 @@ def refine_for_verdict(
                 result.sprt_decision = verdict
 
             trace = read_trace(trace_path)
+
+    # --- carrier resolution, after the evidence exists (D-067) --------------
+    # Carrier records were written mid-run, when almost nothing had been
+    # examined, so they inherited `assumed` -- correct at the time and stale
+    # now. Following those pointers against the verdicts this pass produced is
+    # free (no model calls) and it is the difference between a hand-off event
+    # staying contaminated on a question that has since been answered and it
+    # inheriting the answer. Reported here; the walk does the same resolution
+    # for itself in `CheckLedger.from_trace`.
+    resolution = carriers.resolve(read_trace(trace_path))
+    result.carrier_pairs = resolution.carrier_pairs
+    result.carriers_reresolved = resolution.resolved
+    result.carriers_upgraded = resolution.upgraded
+    result.carriers_downgraded = resolution.downgraded
 
     return result
 

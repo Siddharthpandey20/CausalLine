@@ -86,11 +86,14 @@ METHOD_NAMES = ("B0 full restart", "B1 agent taint", "B2 topology closure", "Cau
 # `record_carrier()` writes every one of its check records with this phrase in
 # the notes, and `record_structural()` writes none with it. That is the only
 # thing separating a code-path verdict from a carrier verdict that inherited an
-# *estimated* upstream influence set -- both are stored with
-# method="structural". Pinned by a test, because if the phrase ever changes,
-# ground truth silently starts reading the estimator's own answers back to
-# itself and every unsafe-preservation number here becomes meaningless.
-CARRIER_NOTE = "carries output of"
+# *estimated* upstream influence set. Pinned by a test, because if the phrase
+# ever changes, ground truth silently starts reading the estimator's own answers
+# back to itself and every unsafe-preservation number here becomes meaningless.
+#
+# Imported from the function that writes it rather than re-spelled here. This
+# module and `ClearancePolicy` were the two readers of the marker and only one
+# of them had it, which is the whole of docs/03 #17 (D-067).
+from src.provenance.attribution import CARRIER_NOTE  # noqa: E402
 
 
 # --- observed ground truth ----------------------------------------------------

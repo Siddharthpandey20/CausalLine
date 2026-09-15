@@ -253,12 +253,86 @@ class SelfReportAttributor:
 # --- structural, for events the model did not write --------------------------
 
 
+# The phrase every carrier record carries in its notes and no other record
+# does. It is the only handle that tells an inherited verdict apart from a
+# code-path one after the fact, so it lives here, next to the function that
+# writes it, and every reader imports it rather than spelling it again.
+CARRIER_NOTE = "carries output of"
+
+# The same fact in machine-readable form, appended to the same note. The prose
+# above is what a person reads; this is what `src/provenance/carriers.py` reads
+# when it re-resolves an inherited verdict against upstream evidence that did
+# not exist yet when the carrier was written.
+CARRIER_FROM = "carrier_from="
+
+
+class _AbsentUpstream:
+    """Sentinel: the source was not in the copied event's context at all.
+
+    Distinct from `None` (it was there and nobody looked), and the distinction
+    is load-bearing. An output cannot have been influenced by something that was
+    never in front of it, so this is a code-path fact and the carrier's
+    clearance really is structural. Treating it as "no record" instead would
+    refuse a sound clearance on most of the tool and hand-off events in a trace.
+    """
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return "ABSENT_UPSTREAM"
+
+
+ABSENT_UPSTREAM = _AbsentUpstream()
+
+
+def _inherited_clearance(
+    upstream_verdict: Callable[[str], Any] | None,
+    source_id: str,
+    copied_from: str,
+) -> tuple[str, float, str]:
+    """(method, confidence, why) for a carrier's `clean` record.
+
+    No lookup available at all keeps the pre-D-067 behaviour, so a caller that
+    has not been updated is not silently made less safe *or* less useful; every
+    caller in this repository passes one.
+    """
+    if upstream_verdict is None:
+        return (
+            "structural",
+            1.0,
+            f"no upstream lookup was supplied for {copied_from}",
+        )
+    record = upstream_verdict(source_id)
+    if record is ABSENT_UPSTREAM:
+        return (
+            "structural",
+            1.0,
+            f"this source was not in the context of {copied_from}, so the "
+            "output being copied cannot have been influenced by it",
+        )
+    if record is None:
+        return (
+            "assumed",
+            0.0,
+            f"no verdict was recorded for {source_id} on {copied_from}, so this "
+            "clearance rests on nothing and is not one",
+        )
+    method = getattr(record, "method", "assumed")
+    confidence = float(getattr(record, "confidence", 0.0))
+    return (
+        method,
+        confidence,
+        f"inherits the {method} verdict recorded for {source_id} on "
+        f"{copied_from} (confidence {confidence:.2f}); a derived clearance is "
+        "never stronger than its source",
+    )
+
+
 def record_carrier(
     sink: Sink,
     event_id: str,
     exposures: list[str],
     inherited: list[str],
     copied_from: str,
+    upstream_verdict: Callable[[str], Any] | None = None,
 ) -> None:
     """Attribution for an event that hands an earlier event's output onward.
 
@@ -272,9 +346,37 @@ def record_carrier(
     "structurally clean, used nothing" looks right -- and would mark a message
     whose text is a verbatim copy of contaminated output as clean. The copy
     relation is real influence; only the *reading* of fresh sources is absent.
+
+    A DERIVED CLEARANCE IS NEVER STRONGER THAN THE ONE IT DERIVES FROM (D-067)
+    --------------------------------------------------------------------------
+    The *copy* relation is structural. The **upstream verdict it copies** is
+    not: `inherited` is read off influence edges on `copied_from`, and on a
+    model-written event those edges came from the estimator. So writing
+    `clean / structural / 1.0` here took an estimated verdict and re-issued it
+    under the strongest label the clearance policy has -- and a policy that
+    refuses an estimated clean would still accept its laundered copy one event
+    later, with the system's highest trust attached.
+
+    `code_path_pairs()` in src/eval/real_llm.py already had to filter these
+    records out of ground truth for precisely this reason, by matching the note
+    below. `ClearancePolicy` did not, and the two disagreeing about what
+    `structural` meant is what docs/03 #17 is.
+
+    So a carrier **clearance** now inherits the method and confidence of the
+    upstream verdict for that same source, via `upstream_verdict`:
+
+        upstream clean, structural   -> clean, structural   (a code-path chain)
+        upstream clean, counterfactual -> clean, counterfactual, same confidence
+        upstream nothing recorded    -> assumed, 0.0, which is never a clearance
+
+    A carrier **taint** is left structural. The copy relation really is a code
+    fact, and taint is the conservative direction: nothing is preserved on the
+    strength of it.
     """
+    inherited_set = set(inherited)
+    tag = f"{CARRIER_FROM}{'|'.join(_upstream_ids(copied_from))}"
     for sid in exposures:
-        if sid in set(inherited):
+        if sid in inherited_set:
             sink.log_influence(
                 InfluenceEdge(sid, event_id, method="structural", confident=True)
             )
@@ -284,17 +386,30 @@ def record_carrier(
                 "tainted",
                 "structural",
                 confidence=1.0,
-                notes=f"carries output of {copied_from}, which this source influenced",
+                notes=(
+                    f"{CARRIER_NOTE} {copied_from}, which this source "
+                    f"influenced; {tag}"
+                ),
             )
         else:
+            method, confidence, why = _inherited_clearance(
+                upstream_verdict, sid, copied_from
+            )
             sink.log_check(
                 sid,
                 event_id,
                 "clean",
-                "structural",
-                confidence=1.0,
-                notes=f"carries output of {copied_from}, which this source did not influence",
+                method,
+                confidence=confidence,
+                notes=(
+                    f"{CARRIER_NOTE} {copied_from}, which this source did not "
+                    f"influence; {why}; {tag}"
+                ),
             )
+
+
+def _upstream_ids(copied_from: str) -> list[str]:
+    return [part.strip() for part in copied_from.split(",") if part.strip()]
 
 
 def record_structural(

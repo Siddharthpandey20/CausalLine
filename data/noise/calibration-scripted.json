@@ -1,0 +1,43 @@
+{
+  "model": "scripted",
+  "excluded": {
+    "code": [],
+    "decision": [],
+    "json_shape": [],
+    "prose": []
+  },
+  "floors": {
+    "json_shape": {
+      "keys": 0.0,
+      "counts": 0.0,
+      "carryover": 0.0
+    },
+    "prose": {
+      "terms": 0.0,
+      "formats": 0.0,
+      "output_format": 0.0,
+      "dependency": 0.0,
+      "carryover": 0.0
+    },
+    "decision": {
+      "library": 0.0,
+      "output_format": 0.0,
+      "strategy": 0.0,
+      "dependency": 0.0,
+      "carryover": 0.0
+    },
+    "code": {
+      "imports": 0.0,
+      "calls": 0.0,
+      "formats": 0.0,
+      "control": 0.0,
+      "carryover": 0.0
+    }
+  },
+  "trials": {
+    "json_shape": 20,
+    "prose": 960,
+    "decision": 140,
+    "code": 200
+  }
+}

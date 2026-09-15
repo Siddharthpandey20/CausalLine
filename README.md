@@ -363,9 +363,19 @@ Everything below runs offline against a scripted agent — no API key, no quota:
 
 ```bash
 python -m src.eval.experiment --detector oracle   # one matrix, all methods
-python -m src.eval.campaign                       # 96 cells x 30 reps (~20 min)
+python -m src.eval.campaign                       # 96 cells x 30 reps (~9 min)
 python -m src.eval.economics                      # cost model + required figures
 python -m src.eval.contract data/runs/ci.jsonl    # trace contract checker
+```
+
+The remediation pass (`docs/10-remediation.md`) adds four more, all offline:
+
+```bash
+python -m src.eval.action_census          # which recovery actions actually run
+python -m src.provenance.scripted_noise   # noise floor of the scripted client
+python -m src.eval.robustness             # repeats + control run: what they cost
+python -m src.eval.selfreport_value       # what the cheap stage actually buys
+python -m src.provenance.upstream TRACE S15   # where a flagged source came from
 ```
 
 Live experiments need `GEMINI_API_KEY` (copy `.env.example` to `.env`; it is

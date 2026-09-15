@@ -10,7 +10,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
+from src.provenance.checks import CheckLedger
 from src.provenance.contamination import Policy, contaminate
+from src.provenance.upstream import investigation_candidates
 from src.recovery.planner import RecoveryPlan, plan_recovery
 from src.recovery.replay import ReplayReport, replay
 from src.recovery.verify import (
@@ -18,6 +20,10 @@ from src.recovery.verify import (
     VerifyResult,
     invalidation_for_scope,
     next_scope,
+    original_task_success,
+    memory_writes,
+    selective_memory_rollback,
+    surviving_payload,
     verify,
 )
 from src.tracing.checkpoints import (
@@ -73,31 +79,56 @@ def _post_recovery_region(
 
     Events the splicing client never saw (tools, memory) are treated as
     spliced: they are deterministic and were not re-invoked at the model.
+
+    THE CLEARANCE THIS NO LONGER GRANTS ON TRUST (D-068)
+    ----------------------------------------------------
+    The clearance for a flagged source on a replayed event used to rest on the
+    fact that `redact_flagged()` had been called. That is verification believing
+    its own plan. It is now conditional on `surviving_payload()`: the recovered
+    prompt, output and tool arguments are read back and the clearance is
+    withheld if the flagged source's material is still in any of them. A
+    withheld clearance leaves the pair contaminated, verification fails, and the
+    run escalates -- which is what should happen when a recovery did not
+    actually remove the thing it was recovering from.
+
+    Returns the region and the re-check failures, so the failures can be named
+    in the verification result rather than showing up only as leftover taint.
     """
     flagged_set = set(flagged) & {s.id for s in recovered.sources}
     replayed = set(report.replayed)
     spliced = set(report.spliced)
     checked: set[tuple[str, str]] = set()
     influence: set[tuple[str, str]] = set()
+    recheck_failures: list[str] = []
 
     orig_ids = [e.id for e in original.events]
     rec_ids = [e.id for e in recovered.events]
     # Same pipeline, same order. A length mismatch means replay diverged
     # and verification should not invent pairings.
     if len(orig_ids) != len(rec_ids):
-        return contaminate(recovered, flagged_set)
+        return contaminate(recovered, flagged_set), recheck_failures
 
     remap = dict(zip(orig_ids, rec_ids))
-    orig_cleared = {
-        c.pair for c in original.checks if c.verdict == "clean"
-    }
+    # The original's clearances, read under the SAME policy the walk uses
+    # rather than off the raw verdict. A `clean` the policy refuses -- a
+    # self-report, or an inherited verdict resting on nothing (D-067) -- must
+    # not become a clearance here just because verification reads the field
+    # directly.
+    orig_cleared = CheckLedger.from_trace(original).cleared_pairs()
     orig_edges = {(e.source_id, e.target_event) for e in original.influence}
 
     for old_id, new_id in remap.items():
         if old_id in replayed:
             for sid in recovered.event(new_id).exposures:
-                if sid in flagged_set:
-                    checked.add((sid, new_id))
+                if sid not in flagged_set:
+                    continue
+                failures = surviving_payload(
+                    recovered, new_id, sid, report.issued_prompts.get(old_id)
+                )
+                if failures:
+                    recheck_failures.extend(failures)
+                    continue
+                checked.add((sid, new_id))
             for sid, target in orig_edges:
                 if target == old_id and sid not in flagged_set:
                     influence.add((sid, new_id))
@@ -119,11 +150,17 @@ def _post_recovery_region(
             influence.add((sid, new_id))
         if old_id not in spliced:
             for sid in recovered.event(new_id).exposures:
-                if sid in flagged_set:
-                    checked.add((sid, new_id))
+                if sid not in flagged_set:
+                    continue
+                failures = surviving_payload(recovered, new_id, sid)
+                if failures:
+                    recheck_failures.extend(failures)
+                    continue
+                checked.add((sid, new_id))
 
-    return contaminate(
-        recovered, flagged_set, influence=influence, checked=checked
+    return (
+        contaminate(recovered, flagged_set, influence=influence, checked=checked),
+        recheck_failures,
     )
 
 
@@ -149,10 +186,26 @@ class RecoveryResult:
     blast_radius_events: int
     blast_radius_agents: int
     notes: list[str] = field(default_factory=list)
+    # {key -> value to restore, or None to delete} for a live memory store.
+    # Only the writes this incident contaminated; clean writes are absent
+    # because they survive (D-071).
+    memory_rollback: dict[str, Any] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
         return self.verification.ok
+
+    @property
+    def pre_existing_task_failure(self) -> bool:
+        """Verification failed the task check on a run that was already failing it.
+
+        Not an excuse -- the verdict stands (D-069) -- but the one fact a method
+        comparison needs in order to be fair: B0, B1 and B2 do not verify, so
+        they are never charged for a failure that predates recovery, and a table
+        that does not say which rows are in this state is comparing two
+        different things.
+        """
+        return self.verification.pre_existing_task_failure
 
 
 def recover(
@@ -195,6 +248,15 @@ def recover(
             f"({gc.bytes_freed}B freed, {gc.bytes_retained}B retained)"
         )
 
+    # --- Phase 4: where did the flagged source itself come from? -----------
+    # Surfaced, never acted on. The detector decides what is malicious; a
+    # backward walk follows "was an input to", which is exposure rather than
+    # influence, so promoting its output to a seed would re-import exactly the
+    # conflation this method exists to remove. See src/provenance/upstream.py.
+    upstream = investigation_candidates(original, flagged_list)
+    if upstream.candidates:
+        notes.append(f"upstream attribution: {upstream.summary()}")
+
     plan = plan_recovery(original, flagged_list, checkpoints, policy=policy)
 
     # --- Phase 3a: the recovery horizon -------------------------------------
@@ -211,6 +273,11 @@ def recover(
     all_events = {e.id for e in original.events}
 
     analysis_tokens = original.analysis_tokens()
+    # Whether the run being recovered already did the task. Verification is
+    # judged against this rather than against absolute success -- see D-069 and
+    # docs/03 #15. True on every scripted run, so nothing in the scripted matrix
+    # moves.
+    started_successful = original_task_success(original)
     initial_memory = dict(tools.memory) if tools is not None else {}
     scope: Escalation = "selective"
     escalations = 0
@@ -251,6 +318,12 @@ def recover(
             target = target.with_name(f"{target.stem}-esc{escalations}{target.suffix}")
 
         if tools is not None:
+            # Wholesale, and deliberately so: the replay re-executes the whole
+            # workflow from its starting state, so a surviving write would show
+            # an early `memory_read` a value the original run never saw. The
+            # per-write plan a *deployment* would apply to the live store is
+            # computed after the replay instead -- see D-071 and
+            # `selective_memory_rollback`.
             tools.memory.clear()
             tools.memory.update(initial_memory)
         result, report = replay(
@@ -264,7 +337,14 @@ def recover(
             handoff_hook=handoff_hook,
         )
         recovered = read_trace(result.trace_path)
-        region = _post_recovery_region(original, recovered, report, flagged_list)
+        region, recheck_failures = _post_recovery_region(
+            original, recovered, report, flagged_list
+        )
+        if recheck_failures:
+            notes.append(
+                f"independent re-check withheld {len(recheck_failures)} "
+                f"clearance(s) at scope={scope}: {recheck_failures[0]}"
+            )
         # One implementation, shared. This block used to reimplement
         # `verify()` inline and, in doing so, dropped its missing-flagged-source
         # warning: a flagged source absent from the recovered trace cannot seed
@@ -280,6 +360,8 @@ def recover(
             current_memory=dict(tools.memory) if tools is not None else None,
             original=original,
             region=region,
+            recheck_failures=recheck_failures,
+            original_task_success=started_successful,
         )
 
         last_report = report
@@ -299,6 +381,27 @@ def recover(
             break
         scope = next_scope(scope)
         escalations += 1
+
+    # --- Phase 7: what a live memory store would actually have to undo -----
+    # Reported rather than applied. The replay's own fixture is reset wholesale
+    # above for a reason that is about replay semantics, not about cost; this is
+    # the answer to the different question a deployment asks, and it is the one
+    # that distinguishes "roll back the contaminated write" from "roll back
+    # everything since the checkpoint".
+    memory_plan = selective_memory_rollback(
+        original,
+        last_report.invalidation if last_report else plan.invalidation_set,
+        dict(tools.memory) if tools is not None else {},
+        initial_memory,
+    )
+    if memory_plan:
+        kept = {
+            key for _e, key, _v in memory_writes(original)
+        } - set(memory_plan)
+        notes.append(
+            f"selective memory rollback: {len(memory_plan)} key(s) to undo "
+            f"{sorted(memory_plan)}, {len(kept)} clean write(s) kept {sorted(kept)}"
+        )
 
     replay_tokens = last_report.replay_tokens if last_report else 0
     # What was actually recomputed: the set handed to the last replay attempt,
@@ -332,4 +435,5 @@ def recover(
         blast_radius_events=len(invalidation_final),
         blast_radius_agents=len(agents_hit - {"user"}),
         notes=notes,
+        memory_rollback=memory_plan,
     )

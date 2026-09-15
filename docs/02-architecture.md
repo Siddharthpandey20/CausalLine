@@ -3,7 +3,7 @@
 ## Pipeline (one flow, four subsystems)
 
 ```
-detector says "agent X compromised"
+detector says "sources S3, S7 are malicious" (+ a confidence for each)
         |
    [tracing]      trace store: events, graphs, checkpoints
         |
@@ -13,6 +13,32 @@ detector says "agent X compromised"
         |
    workflow continues
 ```
+
+**The detector's output is source-level, and this line used to say "agent X
+compromised".** That was never what the interface carried: `Verdict` in
+`src/eval/detectors.py` is a map from *source id* to confidence, and nothing
+in it can express "this agent is compromised". The two are not
+interchangeable — an agent-level verdict would name a whole agent's output as
+suspect, which is baseline B1, while a source-level verdict names an incoming
+unit of information and leaves the question of what it influenced to this
+system. Corrected 15-09-2026 (Phase 5); see `docs/10-remediation.md`.
+
+### Timing: this is post-hoc, batch recovery
+
+**Recovery begins after the workflow has finished, on a complete trace.** It is
+not an online monitor and there is no mid-execution path: nothing pauses a
+running workflow, quarantines an agent mid-turn, or re-plans while later agents
+are still working. `Verdict.detected_at` and `latency_events` record *when* the
+alarm would have fired, and they are used to make the batch problem harder (more
+work exists downstream of the injection), not to drive an interrupt.
+
+Why this is the right scope rather than a gap we ran out of time for: the claim
+this project is testing is **exposure is not influence**, and establishing
+non-influence needs counterfactual replay of an event that has already produced
+an output. Before the event completes there is nothing to re-run and nothing to
+compare, so the central measurement is not available online. An online variant
+would be a different method with a different evidence base, not this one with a
+lower latency. It is named in Future work.
 
 ## The testbed workflow (fixed for all experiments)
 

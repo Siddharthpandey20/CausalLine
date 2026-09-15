@@ -38,6 +38,10 @@ affected part from the nearest trusted checkpoint.
 - `docs/09-real-llm-evaluation.md` — the real-LLM mode: NVIDIA models, generated
   test suites, observed ground truth, and **exactly how far the external-validity
   limitation moves**; read §9 before quoting a real-LLM number
+- `docs/10-remediation.md` — the phase-gated remediation pass: the comparator
+  gap, the nested removability check, carrier clearances, and a fresh campaign
+  with every delta explained. **Supersedes `08` on the numbers it re-measures**,
+  and its §9 is the current claims-you-can / claims-you-cannot list
 
 ## Repo layout
 
@@ -45,6 +49,7 @@ affected part from the nearest trusted checkpoint.
 src/common/       shared models, config, LLM clients (Gemini, NVIDIA), prompts
 src/tracing/      event logging, call graph, event graph, checkpoints
 src/provenance/   source IDs, influence edges, counterfactual checking
+                  + removability, carrier resolution, upstream candidates
 src/recovery/     contaminated region, recovery planner, selective replay
 src/eval/         attack injection, baselines, metrics, economics, run harness
                   + real-LLM mode: llm_scenarios, real_llm, real_campaign
@@ -80,6 +85,11 @@ docs/             everything above
 - **recovery set** — the set of events to invalidate and recompute
 - **unsafe preservation** — we called something clean that was actually
   contaminated. This is the dangerous error and must always be reported.
+- **carrier** — an event whose output is a copy of an earlier event's, so its
+  verdicts are *inherited* rather than established. A carrier record is a
+  pointer to an upstream verdict, never a verdict of its own (D-067).
+- **removability** — whether redacting a source actually removes its information
+  from the prompt. Leave-one-out is only sound when it does (D-066).
 
 ## Two evaluation modes — do not mix their numbers
 

@@ -32,7 +32,18 @@ from dataclasses import dataclass, field
 from typing import Iterable
 
 from src.common.models import CheckRecord, CheckVerdict
+from src.provenance.attribution import CARRIER_NOTE
 from src.tracing.logger import Trace
+
+
+def is_carrier(record: CheckRecord) -> bool:
+    """Was this verdict inherited from an upstream event rather than established?
+
+    One definition, imported by everything that needs it -- the estimator's
+    ground-truth filter in src/eval/real_llm.py reads the same marker. Two
+    readers with two copies of this test is what let them disagree.
+    """
+    return CARRIER_NOTE in (record.notes or "")
 
 
 @dataclass(frozen=True)
@@ -48,11 +59,34 @@ class ClearancePolicy:
     accept_structural: bool = True
     accept_self_report: bool = False
     min_confidence: float = 0.5
+    # A **carrier** clearance is an inherited verdict: the event's text is a
+    # copy of an earlier output, so "this source did not influence me" is only
+    # as good as "this source did not influence the event I copied".
+    #
+    # Before D-067 those records were written as `clean / structural / 1.0`
+    # whatever they inherited, so an estimated clean -- including a wrong one --
+    # re-emerged one event later under the strongest label this policy has.
+    # `code_path_pairs()` in src/eval/real_llm.py had already had to filter
+    # them out of ground truth for exactly that reason; this policy had no
+    # corresponding rule, and the two disagreeing about what `structural` meant
+    # is docs/03 #17.
+    #
+    # D-067 makes the record honest at the point it is written: a carrier
+    # clearance now carries the method and confidence of the verdict it
+    # inherits, so the ordinary rules above judge it on its real merits and
+    # this switch defaults on.
+    #
+    # Turning it off refuses every carrier clearance. Two uses: the ablation
+    # that measures what inherited clearances are worth, and reading a trace
+    # written before D-067, where the label cannot be trusted.
+    accept_carrier: bool = True
 
     def accepts(self, record: CheckRecord) -> bool:
         if record.verdict != "clean":
             return False
         if record.confidence < self.min_confidence:
+            return False
+        if not self.accept_carrier and is_carrier(record):
             return False
         if record.method == "structural":
             return self.accept_structural
@@ -72,7 +106,11 @@ class ClearancePolicy:
             )
             if on
         ]
-        return f"clean accepted from {accepted or ['nothing']} at confidence >= {self.min_confidence}"
+        carrier = "" if self.accept_carrier else ", refusing inherited (carrier) ones"
+        return (
+            f"clean accepted from {accepted or ['nothing']} at confidence >= "
+            f"{self.min_confidence}{carrier}"
+        )
 
 
 # Refuse every clearance. Equivalent to having no check records at all, which
@@ -126,8 +164,32 @@ class CheckLedger:
             self._by_pair[record.pair] = record
 
     @classmethod
-    def from_trace(cls, trace: Trace, policy: ClearancePolicy | None = None) -> "CheckLedger":
-        return cls(trace.checks, policy=policy)
+    def from_trace(
+        cls,
+        trace: Trace,
+        policy: ClearancePolicy | None = None,
+        resolve_carriers: bool = True,
+    ) -> "CheckLedger":
+        """The trace's verdicts, with inherited ones followed to their source.
+
+        A carrier record is a pointer, not a verdict: it says "my answer for
+        this source is whatever the event I copied says". Those pointers are
+        written mid-run, before the counterfactual pass exists, so reading them
+        literally means reading a question that has since been answered as if it
+        were still open (D-067, src/provenance/carriers.py).
+
+        Resolution writes nothing -- the trace's one-record-per-pair invariant
+        is worth more than the convenience -- and `resolve_carriers=False` gives
+        the literal table back for the ablation that measures what following the
+        pointers is worth.
+        """
+        if not resolve_carriers:
+            return cls(trace.checks, policy=policy)
+        from src.provenance import carriers
+
+        ledger = cls((), policy=policy)
+        ledger._by_pair = dict(carriers.resolve(trace).records)
+        return ledger
 
     def verdict(self, event_id: str, source_id: str) -> CheckVerdict:
         record = self._by_pair.get((source_id, event_id))

@@ -31,6 +31,7 @@ from src.eval.influence_eval import score_estimator
 from src.eval.metrics import RecoveryScore, ground_truth_events, recovery_table
 from src.eval.scripted import ScriptedClient, ground_truth_influence
 from src.provenance.estimator import CheckBudget, HybridAttributor, refine_for_verdict
+from src.provenance.scripted_noise import SCRIPTED_CALIBRATION_PATH, SCRIPTED_MODEL
 from src.provenance.signatures import Calibration
 from src.recovery.causalline import recover
 from src.recovery.replay import replay
@@ -38,6 +39,34 @@ from src.tracing.checkpoints import CheckpointStore, checkpoint_path_for, overhe
 from src.tracing.logger import read_trace
 from src.tracing.pipeline import run_pipeline
 from src.tracing.tools import Tools
+
+
+def scripted_calibration() -> Calibration:
+    """The noise floor of the client this module actually runs on.
+
+    PHASE 2, AND IT IS A CORRECTION RATHER THAN AN ADDITION
+    -------------------------------------------------------
+    This used to be `Calibration.load()`, which reads
+    `data/noise/calibration.json` -- a floor measured on **gemini-3.6-flash**,
+    excluding the decision comparator's `strategy` and `dependency` facets
+    because they moved on 75% and 12.5% of eight live re-sends.
+
+    Every scripted run in this repository was scored under that file while
+    being produced by `ScriptedClient`. A floor belongs to the thing that
+    produced the answers (D-004, D-026) and `Calibration.load(model=...)`
+    exists to refuse exactly that transfer -- but the call passed no model, so
+    the guard never fired.
+
+    The direction matters: excluding a facet is the one place the method
+    knowingly trades safety for signal, so two facets were being ignored on
+    every scripted verdict on the strength of a measurement of a different
+    model. `ScriptedClient`'s own floor for both is 0% over 20 unchanged
+    re-sends (`python -m src.provenance.scripted_noise`), so they should have
+    been counting all along. Counting them makes verdicts lean towards
+    "influenced", which costs preserved work and never costs safety.
+    """
+    return Calibration.load(SCRIPTED_CALIBRATION_PATH, model=SCRIPTED_MODEL)
+
 
 SCENARIOS = ("A", "B", "C")
 # PHASE C: workflow length is a named configuration, not a constant. "short"
@@ -68,6 +97,8 @@ def _original_run(
     estimator_mode: str = "hybrid",
     workflow: str = "short",
     cost_model: str = "flat",
+    repeats: int = 1,
+    control_run: bool = False,
 ) -> tuple[Any, ScriptedClient, set[tuple[str, str]]]:
     attack = build(scenario, influencing)
     tools = _fresh_tools(attack, path, extended=(workflow == "long"))
@@ -77,11 +108,17 @@ def _original_run(
     # inline-everything ablation.
     inline_mode = "self_report" if estimator_mode == "hybrid" else estimator_mode
     attributor = None
-    if estimator_mode != "none":
+    # PHASE 6: `targeted_only` is `hybrid` with the cheap stage removed -- no
+    # inline self-report, same targeted counterfactual pass. It is the condition
+    # that says what self-report is actually buying, because the two differ in
+    # exactly one thing. The older `self_report` and `counterfactual` ablations
+    # differ in two (they also skip the targeted pass entirely), so neither of
+    # them could answer the question.
+    if estimator_mode not in ("none", "targeted_only"):
         attributor = HybridAttributor(
             client=client,
             mode=inline_mode,
-            calibration=Calibration.load(),
+            calibration=scripted_calibration(),
             model="scripted",
             seed=seed,
             audit_rate=0.0,
@@ -100,15 +137,24 @@ def _original_run(
         raise RuntimeError(
             f"{attack.name}: marker never reached the trace; run is void"
         )
-    if estimator_mode == "hybrid":
-        flagged = Oracle().flag(read_trace(path)).sources()
+    if estimator_mode in ("hybrid", "targeted_only"):
+        verdict = Oracle().flag(read_trace(path))
         refine_for_verdict(
             path,
-            flagged,
+            verdict.sources(),
             client,
-            calibration=Calibration.load(),
+            calibration=scripted_calibration(),
             budget=CheckBudget(),
             model="scripted",
+            # Phase 5: the per-source confidence the Verdict has always carried
+            # and which nothing downstream read. It orders the investigation; it
+            # never decides a verdict.
+            detector_confidence=dict(verdict.flagged),
+            # Phase 2. Both default off, which is how every reported result was
+            # produced; `src/eval/robustness.py` turns them on and measures what
+            # changes.
+            repeats=repeats,
+            control_run=control_run,
         )
     trace = read_trace(path)
     truth = ground_truth_influence(trace, client)
@@ -213,6 +259,8 @@ def run_cell(
     workdir: Path | None = None,
     seed: int = 20260906,
     workflow: str = "short",
+    repeats: int = 1,
+    control_run: bool = False,
     **detector_kwargs: Any,
 ) -> list[RecoveryScore]:
     """One (scenario, variant) against every method."""
@@ -225,7 +273,8 @@ def run_cell(
     orig_path = workdir / f"{stem}.jsonl"
 
     _outcome, client, true_inf = _original_run(
-        scenario, influencing, orig_path, seed, estimator_mode, workflow=workflow
+        scenario, influencing, orig_path, seed, estimator_mode, workflow=workflow,
+        repeats=repeats, control_run=control_run,
     )
     original = read_trace(orig_path)
     original.validate()
@@ -324,7 +373,16 @@ def run_cell(
             blast_events=recovered.blast_radius_events,
             blast_agents=recovered.blast_radius_agents,
             escalations=recovered.escalations,
-            notes=f"scope={recovered.scope}",
+            notes=(
+                f"scope={recovered.scope}"
+                + (
+                    "; task check failed, and the ORIGINAL run failed it too "
+                    "(docs/03 #15) -- the baselines do not verify and are not "
+                    "charged for this"
+                    if recovered.pre_existing_task_failure
+                    else ""
+                )
+            ),
             pair_unsafe_rate=pair_rate,
             pair_false_negatives=pair_fn,
             pair_scored=pair_n,

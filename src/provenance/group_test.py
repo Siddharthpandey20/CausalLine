@@ -50,10 +50,18 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from src.common.prompts import (
     SourceNotInPrompt,
+    parse_sources,
     redact_source,
     splice_block,
 )
-from src.provenance.signatures import Calibration, Comparator, compare, for_event
+from src.provenance import removability
+from src.provenance.signatures import (
+    Calibration,
+    Comparator,
+    compare,
+    for_event,
+    with_carryover,
+)
 
 # decision_fn(group) -> True when removing `group` changes the decision.
 DecisionFn = Callable[[Sequence[str]], bool]
@@ -331,6 +339,18 @@ class CounterfactualDecision:
     True -- "it mattered". That routes the group into the recursion instead of
     clearing it, which costs calls and never costs safety. Returning False on a
     redaction that removed nothing is the false clean D-029 is about.
+
+    Carries the same two additions single-source `counterfactual()` does, for
+    the same reason and so the two paths cannot disagree about what `clean`
+    means (D-064, D-066):
+
+      * the removal-aware `carryover` facet, computed against the concatenated
+        content of whatever group is being removed
+      * the nested removability check, which refuses to clear a group whose
+        material is still reachable in the redacted prompt
+
+    `removability_failures` counts the groups the second one caught, so the
+    effect is reportable rather than merely applied.
     """
 
     client: Any
@@ -338,9 +358,24 @@ class CounterfactualDecision:
     comparator: Comparator | None = None
     calibration: Calibration | None = None
     context: dict[str, Any] | None = None
+    # --- Phase 2: the robustness machinery, reachable from the default path --
+    # `repeats` and `control_run` existed on single-source `counterfactual()`
+    # and nowhere else, and group testing is on by default -- so on every
+    # reported run they were unreachable. Both are here now, with the same
+    # meaning and the same conservative aggregation.
+    #
+    # The control is per **event**, not per group: it asks whether this event's
+    # signature holds still when nothing is removed, which is a property of the
+    # request, not of which subset we happen to be testing. Running it once and
+    # caching it is the difference between one extra call per event and one per
+    # group.
+    repeats: int = 1
+    control_run: bool = False
     calls: int = 0
     tokens: int = 0
     errors: list[str] = field(default_factory=list)
+    removability_failures: int = 0
+    control_stable: bool | None = None
 
     def __post_init__(self) -> None:
         self.comparator = self.comparator or for_event(
@@ -349,6 +384,36 @@ class CounterfactualDecision:
         self.calibration = self.calibration or Calibration()
         self._excluded = self.calibration.exclude_for(self.comparator.name)
         self._before = self.comparator.signature(self.request.output, self.context)
+        self._contents = {
+            sid: text
+            for sid, _header, text in (
+                parse_sources(self.request.source_block)
+                if self.request.source_block
+                else []
+            )
+        }
+
+    def _removed_content(self, group: Sequence[str]) -> str:
+        return "\n".join(self._contents.get(sid, "") for sid in group)
+
+    def _control_is_stable(self) -> bool:
+        """Re-issue the request UNCHANGED and see whether the signature holds.
+
+        Cached: it is a fact about the event, and asking it once per group would
+        multiply the cost of the thing by the number of groups without learning
+        anything new.
+        """
+        if self.control_stable is not None:
+            return self.control_stable
+        response = self.client.generate(
+            self.request.prompt, system=self.request.system
+        )
+        self.calls += 1
+        self.tokens += getattr(response, "total_tokens", 0)
+        control = self.comparator.signature(response.text, self.context)
+        same, _moved = compare(self._before, control, exclude=self._excluded)
+        self.control_stable = same
+        return same
 
     def __call__(self, group: Sequence[str]) -> bool:
         if not self.request.prompt or not self.request.source_block:
@@ -368,12 +433,48 @@ class CounterfactualDecision:
             )
             return True
 
-        response = self.client.generate(prompt, system=self.request.system)
-        self.calls += 1
-        self.tokens += getattr(response, "total_tokens", 0)
-        after = self.comparator.signature(response.text, self.context)
-        same, _moved = compare(self._before, after, exclude=self._excluded)
-        return not same
+        removed = self._removed_content(group)
+        before = with_carryover(self._before, self.request.output, removed)
+        moved = False
+        for _ in range(max(1, self.repeats)):
+            response = self.client.generate(prompt, system=self.request.system)
+            self.calls += 1
+            self.tokens += getattr(response, "total_tokens", 0)
+            after = with_carryover(
+                self.comparator.signature(response.text, self.context),
+                response.text,
+                removed,
+            )
+            same, _moved = compare(before, after, exclude=self._excluded)
+            if not same:
+                moved = True
+                break
+        if moved:
+            return True
+
+        if self.control_run and not self._control_is_stable():
+            # The instrument moved with nothing removed, so an unchanged answer
+            # on this event carries no information. Conservative fallback.
+            self.errors.append(
+                f"{self.request.event_id}: control run (nothing removed) also "
+                "changed the signature, so holding still is not evidence here"
+            )
+            return True
+
+        # Signature held still. It is only evidence if the removal really
+        # removed something -- the premise leave-one-out rests on and which
+        # nothing enforced before (docs/03 #16).
+        report = removability.check_group(
+            self.request.prompt, self.request.source_block, list(group)
+        )
+        if not report.verified:
+            self.removability_failures += 1
+            self.errors.append(
+                f"{self.request.event_id}: {list(group)} not removable "
+                f"({report.note()}); unchanged answer is not evidence"
+            )
+            return True
+        return False
 
 
 def group_test_event(

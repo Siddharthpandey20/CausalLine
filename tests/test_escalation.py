@@ -36,44 +36,52 @@ from src.tracing.pipeline import run_pipeline
 from src.tracing.tools import Tools
 
 
-def _poisoned_run(tmp: Path, scenario: str = "A"):
-    """A run whose task genuinely fails, so verification cannot pass and the
-    ladder is forced all the way up. Scenario A influencing poisons the Coder,
-    so the generated script does not produce the expected ISO dates."""
-    attack = build(scenario, True)
-    path = tmp / f"{scenario}.jsonl"
-    tools = attack.apply(
-        Tools.from_fixtures(memory_path=path.with_suffix(".memory.json"))
-    )
-    run_pipeline(
-        path,
-        client=ScriptedClient(seed=20260906),
-        tools=tools,
-        handoff_hook=attack.handoff_hook,
-    )
-    planted = label_malicious(path, attack.marker)
-    if not planted:
-        raise RuntimeError("attack did not land")
-    return path, planted, attack
+# The source to flag in order to force the ladder to climb. S11 is the
+# Researcher's finding about format codes; removing it leaves the Coder with no
+# format literals, so the replayed script reaches for a third-party parser the
+# executor does not have and the task fails.
+#
+# WHY THE FIXTURE IS A CLEAN RUN AND NOT A POISONED ONE (D-069)
+# --------------------------------------------------------------
+# It used to be scenario A influencing with nothing flagged: the attack broke
+# the task, recovery was told there was nothing to fix, the task check failed
+# and the ladder climbed. That fixture stopped forcing anything when
+# verification stopped charging recovery for a task failure the original run
+# already had (docs/03 #15). Under the new rule that run verifies clean, and
+# correctly so -- the workflow is exactly as recovery found it.
+#
+# So the fixture now does what the rule actually forbids: it starts from a run
+# that **passed** the task and makes recovery break it. The original's success
+# is asserted below rather than assumed, because the whole point of the fixture
+# is the gap between where the run started and where recovery left it.
+FORCING_SOURCE = "S11"
+
+
+def _clean_run(tmp: Path):
+    """A run that does the task, so a later failure is recovery's doing."""
+    path = tmp / "clean.jsonl"
+    tools = Tools.from_fixtures(memory_path=path.with_suffix(".memory.json"))
+    result = run_pipeline(path, client=ScriptedClient(seed=20260906), tools=tools)
+    if not result.task_success:
+        raise RuntimeError(
+            "the fixture's original run must succeed at the task; this test "
+            "measures what recovery does to a workflow that was working"
+        )
+    return path
 
 
 def _recover_with(tmp: Path, max_escalations: int, flagged=None):
-    """Force failure by flagging nothing: with no seeds the plan invalidates
-    nothing, the poisoned code is replayed verbatim, the task check fails, and
-    the ladder has to climb."""
-    path, planted, attack = _poisoned_run(tmp)
+    """Force failure by flagging a source the workflow actually needs."""
+    path = _clean_run(tmp)
     original = read_trace(path)
     out = tmp / f"rec-{max_escalations}.jsonl"
     return recover(
         original,
-        planted if flagged is None else flagged,
+        [FORCING_SOURCE] if flagged is None else flagged,
         ScriptedClient(seed=20260907),
         out,
-        tools=attack.apply(
-            Tools.from_fixtures(memory_path=out.with_suffix(".memory.json"))
-        ),
+        tools=Tools.from_fixtures(memory_path=out.with_suffix(".memory.json")),
         checkpoints=CheckpointStore.load(checkpoint_path_for(path)),
-        handoff_hook=attack.handoff_hook,
         max_escalations=max_escalations,
     )
 
@@ -90,7 +98,7 @@ class TestEscalationLadder(unittest.TestCase):
     def test_counter_never_exceeds_the_budget(self) -> None:
         """The off-by-one. Before the fix a forced failure reported 3."""
         with tempfile.TemporaryDirectory() as raw:
-            result = _recover_with(Path(raw), max_escalations=2, flagged=[])
+            result = _recover_with(Path(raw), max_escalations=2)
         self.assertFalse(result.ok, "this fixture must fail verification")
         self.assertLessEqual(
             result.escalations, 2,
@@ -107,7 +115,7 @@ class TestEscalationLadder(unittest.TestCase):
         so `restart_all` -- the strongest recovery available -- never runs.
         """
         with tempfile.TemporaryDirectory() as raw:
-            result = _recover_with(Path(raw), max_escalations=2, flagged=[])
+            result = _recover_with(Path(raw), max_escalations=2)
         widened = [n for n in result.notes if "verify failed at scope=" in n]
         scopes = [n.split("scope=")[1].split(":")[0] for n in widened]
         self.assertIn(
@@ -117,7 +125,7 @@ class TestEscalationLadder(unittest.TestCase):
 
     def test_a_zero_budget_performs_no_widening(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
-            result = _recover_with(Path(raw), max_escalations=0, flagged=[])
+            result = _recover_with(Path(raw), max_escalations=0)
         self.assertEqual(result.escalations, 0)
         scopes = [
             n.split("scope=")[1].split(":")[0]
@@ -128,7 +136,7 @@ class TestEscalationLadder(unittest.TestCase):
 
     def test_a_budget_of_one_reaches_agent_restart_and_stops(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
-            result = _recover_with(Path(raw), max_escalations=1, flagged=[])
+            result = _recover_with(Path(raw), max_escalations=1)
         self.assertEqual(result.escalations, 1)
         scopes = [
             n.split("scope=")[1].split(":")[0]

@@ -288,7 +288,28 @@ the paper must carry "floor unmeasured" beside it, and the honest reading of a
 `clean` verdict from that comparator is weaker than from the code comparator,
 which has an executable behavioural facet.
 
-**Status:** OPEN. Raised 06-09-2026 by D-031.
+**Status:** PARTLY ANSWERED, 15-09-2026, and read the split carefully.
+
+The **hosted** floors for `prose`, `code`, `json_shape` and `tool_args` are
+still unmeasured and still need quota. Nothing below replaces them.
+
+What was measured is the floor of the client that actually produced every number
+in `docs/07` and `docs/08`: `ScriptedClient`. A floor belongs to the thing that
+produced the answers, so for those results the missing measurement was this one
+-- and it turned out `experiment.py` had been applying the **Gemini** file to
+scripted runs, excluding two decision facets on the strength of a measurement of
+a different model (D-070).
+
+`python -m src.provenance.scripted_noise`: 20 unchanged re-sends of each of 9
+pipeline calls, **0% floor on all 18 (comparator, facet) pairs**, `carryover`
+included. Nothing is excluded. Written to
+`data/noise/calibration-scripted.json` under `model: scripted` so it can never be
+confused with the hosted file.
+
+`tool_args` is absent from that table and the absence is not an oversight: tool
+calls are not model calls, are attributed structurally and never
+counterfactually, so the comparator has no verdict to be the floor of in this
+pipeline.
 
 ---
 
@@ -336,9 +357,24 @@ it needs a decision about what to do when they diverge: abort the replay, or
 fall back to a coarse agent restart the way the recovery horizon already does
 for a trace that has aged past its content store.
 
-**Status:** OPEN. Raised 10-09-2026 by the real-LLM evaluation (D-052).
-Not reachable from the scripted mode, so it is a new class of problem rather
-than a bug in existing code.
+**Status: ANSWERED, 15-09-2026.** Implemented as this section specified.
+`GeminiPipeline._call()` announces `(agent_id, kind)` before each model call and
+`SplicingClient` compares it against the event the queue is about to hand back;
+a mismatch raises `SpliceError` naming both, which turns the silent case into the
+loud one. `ReplayReport` carries both sequences and `assert_invariants` checks
+their lengths at the end of `replay()`.
+
+Two properties worth knowing. The hook is **optional** -- a client with no
+`announce` is spliced on position exactly as before -- so the replay engine does
+not become dependent on one pipeline. And the divergence question this section
+left open ("abort, or fall back to a coarse restart") is answered by aborting:
+`real_llm.run_generated()` already catches `SpliceError` per method and records
+it, so a method that could not replay produces no row rather than a wrong one,
+which is the behaviour this repository already chose for this class of failure.
+
+Pinned by `tests/test_recovery_hardening.py::TestSpliceIdentity`. Still not
+reachable from the scripted mode, so the test constructs the divergence rather
+than waiting for a model to produce one.
 
 ---
 
@@ -449,8 +485,149 @@ fresh campaign, and to record as such.
 the four methods are exempt from a check the fourth is failing for a reason
 unrelated to what any of them are being measured on.
 
-**Status:** OPEN. Needs a decision, not a patch: change the verification
-predicate, or exclude runs whose original `task_success` is false from the
-method comparison, or report both. Recommendation: change the predicate, then
-re-run — and say in the paper that it was changed after the first real-LLM
-campaign and why.
+**Status: DECIDED 15-09-2026, AND THE RECOMMENDATION ABOVE WAS REVERSED BY A
+MEASUREMENT.** See D-069.
+
+The predicate change was implemented and it is **not** a no-op on the scripted
+matrix, contrary to the claim above. The A-influencing attack breaks the task *by
+working*, so `original_task_success` is already false there -- and with the
+relaxed predicate the lying-self-reporter condition in
+`tests/test_validation.py` went from zero unsafe preservations to one.
+
+The mechanism is the finding. **The task check is an end-to-end detector of
+surviving contamination.** When the estimator misses an influence edge the walk
+under-covers, the selective plan leaves the contaminated event in place, and the
+contamination shows up in the output the task check reads -- so verification
+fails, the ladder climbs, and the unsafe preservation is removed by a route that
+never had to identify it. Relaxing the predicate removes the last line of defence
+exactly when the first one has already failed.
+
+So the second option was taken instead: the condition is **recorded**, not
+excused. `VerifyResult.original_task_success`,
+`RecoveryResult.pre_existing_task_failure`, and a note on the scored row, so a
+comparison can exclude or annotate those runs. Separately, D-065 makes the task
+check itself robust to unrelated formatting, which removes the most common way an
+original run fails for a reason nobody intended.
+
+---
+
+## 16. Leave-one-out assumes every route from a source into the prompt is removable
+
+Every counterfactual verdict in this project rests on one premise that nothing
+stated and nothing enforced:
+
+    deleting the block labelled [S] removes S's information from the request
+
+When it holds, an unchanged answer is evidence of non-influence. When a second,
+unremoved route carries the same material, an unchanged answer is evidence of
+nothing at all — and the verdict is `clean`. That is a **false clean produced by
+plumbing**, the dangerous direction of error (issue #4), and it is
+indistinguishable from a real result.
+
+It is not hypothetical. A measured real-model false clean had exactly this shape:
+the poisoned material was quoted inside a *second* source that stayed in the
+prompt, so removing the first changed the request without changing the
+information.
+
+**Our answer, and it costs nothing:** a nested removability check, run before any
+`clean` verdict is trusted. The question is about the prompt, not about the
+model, and the prompt is on disk — so the check is textual and deterministic
+rather than one extra model call per pair. `src/provenance/removability.py`
+redacts the source exactly as the counterfactual will, takes the distinctive
+spans of its content, and asks which of them still occur in the redacted prompt,
+naming the route when it finds one.
+
+**Is it general enforcement or a narrow patch?** General, within one stated
+limit. It runs on every counterfactual path — single source, merged atomic unit
+and group removal — so no clean verdict anywhere is now trusted without it, and
+that is what makes it enforcement of this issue rather than a fix for the one
+case that exposed it. The limit is that the routes it detects are **textual**: a
+second source that paraphrases rather than quotes still passes. That is the same
+narrowness the `carryover` facet has and the same narrowness the real-LLM
+canary-token ground truth has, and all three should be read together.
+
+**Status: ANSWERED, 15-09-2026** (D-066). Recorded as its own evidence type
+(`removability=verified` / `removability=residual:N`), so a trace can be read
+back and a verdict told apart from an unasked question. Regression tests in
+`tests/test_relay_confound.py`.
+
+---
+
+## 17. A false clean can be laundered into a structural clearance
+
+A **carrier** event produces no content of its own — a hand-off message, a tool
+call whose arguments came out of an earlier output. Its influence set is the
+upstream event's, restricted to what is in context, which is a fact about the
+code path.
+
+But `record_carrier()` wrote its clearances as `clean / structural / 1.0`: the
+strongest label the clearance policy has, on the strength of whatever the
+upstream event's influence edges happened to say **at the moment the carrier was
+logged**. On a model-written upstream event those edges come from the estimator,
+so an estimated clean re-emerged one event later wearing the system's highest
+trust — and `ClearancePolicy` accepts a structural clean unconditionally.
+
+`code_path_pairs()` in `src/eval/real_llm.py` had already had to filter these out
+of ground truth, by matching a phrase in the notes, for exactly this reason. The
+clearance policy had no corresponding rule. Two readers of one record,
+disagreeing about what `structural` means, is the issue.
+
+**It was worse than "an estimated clean".** The upstream edges are written by the
+inline self-report pass, which deliberately records **nothing** for a negative
+(see `src/provenance/attribution.py`). So the common case was silence laundered
+into a structural clearance.
+
+**Our answer:** a derived clearance inherits the method and confidence of the
+verdict it derives from, never the strongest available label; a carrier *taint*
+stays structural, because taint is the conservative direction and the copy
+relation really is a code fact; a source that was not in the upstream event's
+context at all is a separate and genuinely structural answer, not "no record";
+and the marker that identifies a carrier record has one definition, imported by
+both readers.
+
+Because carrier records are written mid-run and the evidence arrives afterwards,
+resolution happens **at read time** — `carriers.resolve()` treats a carrier
+record as a pointer and follows it to a fixed point over the finished trace.
+Appending an updated record was the obvious alternative and is not available:
+`Trace.validate()` refuses two check records for one pair, and that invariant is
+worth more than the convenience.
+
+**Status: ANSWERED, 15-09-2026** (D-067). It removed a real unsafe preservation
+in the scripted matrix: `e0016` on A-influencing/oracle was a memory write
+carrying contaminated output and was marked `clean / structural`. Work preserved
+on that cell falls 53% → 47%, which is one more event recomputed and it was
+contaminated.
+
+---
+
+## 18. A recovered trace stores a prompt that was never sent
+
+Found while building the independent post-recovery re-check (D-068), which
+reported flagged material surviving in the prompt of every *successful* recovery.
+
+The pipeline writes a prompt into the content store and **then** calls the
+client. Redaction happens inside `SplicingClient.generate()`. So for a replayed
+event the stored prompt is the one that would have been sent, not the one that
+was — the un-redacted copy.
+
+Nothing had depended on the difference until verification started reading prompts
+back. It matters for anything that will:
+
+- a post-hoc counterfactual run on a recovered trace would redact from the wrong
+  text and could report a redaction that had already happened as a change
+- a reader auditing what a recovered run actually saw would be misled
+
+**Current handling:** `ReplayReport.issued_prompts` records the text actually
+issued, and the re-check reads that rather than the store. That is enough for the
+consumer that exists.
+
+**Not fixed, and the reason is scope.** Making the store faithful means moving
+redaction out of the client and into the pipeline, or giving the pipeline a
+prompt-preparation hook it consults before writing content — and both change a
+shared file on a path every method goes through, for a defect with one known
+consumer that is already handled. Doing it in the same pass that changed
+verification would make two changes hard to tell apart in the campaign diff.
+
+**Status: OPEN, mitigated. Raised 15-09-2026.** Whoever takes it should also add
+an assertion that the stored prompt for a replayed event contains no flagged
+source, which is the cheap version of the same guarantee.

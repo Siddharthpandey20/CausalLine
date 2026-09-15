@@ -44,6 +44,7 @@ so there is one definition and the measured result still describes it.
 """
 
 import ast
+import hashlib
 import json
 import re
 from dataclasses import dataclass, field
@@ -133,6 +134,122 @@ class Signature:
 
     def __str__(self) -> str:
         return self.value or f"<empty:{self.comparator}>"
+
+
+# --- the removal-aware facet (D-064) -----------------------------------------
+#
+# Every comparator above reads the output *alone*: a fixed vocabulary, an AST, a
+# JSON shape. None of them can represent the one relation that is influence by
+# definition rather than by proxy -- **the answer repeats material that was only
+# available in the source we removed.**
+#
+# That gap produced a measured false clean. The redaction worked, the answer
+# genuinely changed, and every facet the comparator owns held still, because the
+# thing that moved was a span of text the vocabulary does not contain. The
+# verdict was `clean` and the output carried the payload.
+#
+# `carryover` closes it, and it is deliberately NOT a vocabulary. It is
+# leave-one-out on verbatim re-use: normalise both texts to word tokens, shingle
+# the removed source's content, and report which of those shingles occur in the
+# answer. Nothing about the shingles is chosen by us, so there is nothing to
+# tune -- which is the property D-026 demands of a comparator and the property a
+# hand-written "quotes the payload" rule would not have.
+#
+# Two things it is honest about:
+#
+#   * it is **one-directional evidence**. A source can influence an answer
+#     without a single word surviving, and this facet says nothing about that
+#     case. It removes a class of false cleans; it does not remove the class.
+#   * it is **self-cancelling on redundancy**. If the same span is also in a
+#     source that stayed, the facet holds still in both signatures and the
+#     verdict is unchanged. That is the correct reading -- the span did not
+#     depend on the removed source -- and it is why the facet cannot manufacture
+#     influence out of shared boilerplate.
+
+CARRYOVER_FACET = "carryover"
+
+# Length of the word shingle, in tokens. Eight words of running text is long
+# enough that two independently written sentences essentially never collide and
+# short enough that a quoted clause is caught. Fixed in advance, like every
+# other vocabulary in this module.
+SHINGLE = 8
+
+# A token distinctive enough to stand on its own: at least ten characters and
+# mixing letters with digits. Canary tokens, ids and hashes look like this;
+# English words and identifiers do not.
+_DISTINCTIVE = re.compile(r"[A-Za-z0-9_-]{10,}")
+
+_WORD = re.compile(r"[A-Za-z0-9_%/.:-]+")
+
+
+def _tokens(text: str) -> list[str]:
+    return _WORD.findall(text.lower())
+
+
+def _shingles(tokens: list[str], n: int = SHINGLE) -> list[str]:
+    if len(tokens) < n:
+        return [" ".join(tokens)] if tokens else []
+    return [" ".join(tokens[i : i + n]) for i in range(len(tokens) - n + 1)]
+
+
+def distinctive_spans(content: str, n: int = SHINGLE) -> list[str]:
+    """The spans of `content` whose presence elsewhere is worth reporting.
+
+    Word shingles, plus any single token distinctive enough to carry identity on
+    its own. Deduplicated and sorted so the result is a stable set rather than a
+    position-dependent list.
+    """
+    tokens = _tokens(content)
+    spans = set(_shingles(tokens, n))
+    spans.update(
+        match.group(0).lower()
+        for match in _DISTINCTIVE.finditer(content)
+        if any(c.isdigit() for c in match.group(0))
+        and any(c.isalpha() for c in match.group(0))
+    )
+    return sorted(s for s in spans if s)
+
+
+def spans_present_in(text: str, spans: list[str]) -> list[str]:
+    """Which of `spans` occur in `text`, compared on normalised word tokens."""
+    haystack = " ".join(_tokens(text))
+    return [span for span in spans if span and span in haystack]
+
+
+def carryover_facet(text: str, removed_content: str, n: int = SHINGLE) -> str:
+    """Facet value: what of `removed_content` survives verbatim into `text`.
+
+    The value is a count plus a bounded, sorted digest of the matched spans, so
+    two signatures differ exactly when the *set* of surviving spans differs --
+    not merely when the count does. A digest rather than the spans themselves
+    because a signature is written into every `check` record and a quoted
+    payload does not belong in a trace.
+    """
+    if not removed_content.strip():
+        return ""
+    hits = spans_present_in(text, distinctive_spans(removed_content, n))
+    if not hits:
+        return "0"
+    digest = sorted(
+        hashlib.sha256(span.encode("utf-8")).hexdigest()[:8] for span in hits
+    )
+    return f"{len(hits)}:" + ",".join(digest[:12])
+
+
+def with_carryover(
+    signature: Signature, text: str, removed_content: str, n: int = SHINGLE
+) -> Signature:
+    """`signature` plus the removal-aware facet, for one side of a comparison.
+
+    Called twice per counterfactual -- once on the original output and once on
+    the re-run -- against the same removed content, so the facet moves exactly
+    when the removed source's material stopped appearing in the answer.
+    """
+    facets = dict(signature.facets)
+    facets[CARRYOVER_FACET] = carryover_facet(text, removed_content, n)
+    return Signature(
+        comparator=signature.comparator, facets=facets, error=signature.error
+    )
 
 
 class Comparator(Protocol):

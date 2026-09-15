@@ -101,6 +101,28 @@ after-the-fact tuning the pre-registration rule forbids. The fix is a graded
 signal — how far a signature moved, facet by facet — and that is future work,
 not something half-done in this repository.
 
+**One slice of it was closed, 15-09-2026, and the slice is narrow (D-064).**
+The `carryover` facet added in the remediation pass represents one thing the
+vocabularies never could: *the answer repeats material that was only available
+in the removed source*. It is not a vocabulary — it shingles the removed
+source's own content and asks which shingles survive into the answer — so it has
+nothing to tune and does not reopen the pre-registration question.
+
+What it does **not** fix is this section's actual subject. An influence
+expressed in the model's own words, a directive obeyed without being quoted, a
+fact absorbed and paraphrased: all still invisible. The scenario-A example above
+is untouched by it. `carryover` removes the *verbatim* slice of the blind spot
+and nothing else, and its floor on the scripted client is 0% (D-070), which
+means it is also completely dormant on every scripted number in this repository.
+
+**It costs something to have, and the cost belongs here.** The real-LLM mode's
+ground truth is canary-token presence — the same shape of question. So on a
+real-LLM run the estimator and the ground truth now share a mechanism, and a
+pair-level agreement number computed with `carryover` active is not an
+independent measurement. Any future real-LLM agreement figure must either
+exclude the facet or say plainly that it is scoring an instrument against a
+relative.
+
 ### 2.2 Redundant sources are individually unnecessary
 
 Counterfactual influence is leave-one-out, so when two sources supply the same
@@ -176,6 +198,21 @@ knowingly traded for signal; D-037 measured what it costs. Keeping such a facet
 is worse, not merely different — a 75% floor turns the check into a coin flip
 that always says "influenced", which is the conservative fallback with extra
 steps.
+
+**Correction, 15-09-2026: that trade was being made on the wrong model's
+measurement (D-070).** `experiment.py` loaded `data/noise/calibration.json`,
+whose floors were measured on `gemini-3.6-flash`, and applied it to runs
+produced by `ScriptedClient`. `Calibration.load(model=...)` exists to refuse
+exactly that transfer; the call passed no model, so the guard never fired. Every
+scripted verdict in `docs/07` and `docs/08` was therefore scored with the
+decision comparator's `strategy` and `dependency` facets excluded for no reason
+that applied to it.
+
+`ScriptedClient`'s own floor, measured over 20 unchanged re-sends of each of 9
+pipeline calls, is **0% on all 18 (comparator, facet) pairs**. Nothing is
+excluded now, so in the scripted mode this section currently describes a trade
+the method is not making. It still describes the hosted mode, where the floors
+are real and two facets genuinely do have to go.
 
 ---
 
@@ -356,6 +393,33 @@ The transformer-based `TransformerInjectionDetector` is optional and requires
 downloading model weights; it raises rather than returning an empty verdict
 when unavailable, because an empty verdict is indistinguishable from the
 `Blind` control.
+
+### 6.1 What the socket actually carries, and what it does not
+
+Corrected 15-09-2026, because `docs/02` used to overstate it.
+
+A `Verdict` is a map from **source id** to confidence, plus a detection point.
+It cannot express "agent X is compromised", and the difference is not
+cosmetic — an agent-level verdict names a whole agent's output as suspect, which
+*is* baseline B1. Everything this method does downstream begins from a
+source-level flag.
+
+Two fields on that verdict were computed and then discarded, and only one of
+them is now read:
+
+- **confidence** is read, and orders the investigation within an event: least
+  certain flag first, because clearing a doubtful flag removes a whole
+  downstream region while confirming a certain one mostly re-derives taint that
+  was going to be recomputed anyway (D-074).
+- **detection timing** is still not read, and `docs/02` now says why rather than
+  leaving it implicit. This system is **post-hoc and batch**: it runs on a
+  finished trace, and `detected_at` exists to make the batch problem harder (more
+  work downstream of the injection) rather than to drive an interrupt. There is
+  no online, mid-execution detect-and-recover path and there is no half-built
+  one. The reason is about evidence, not effort: counterfactual replay needs an
+  output that already exists, so the central measurement is unavailable before
+  the event completes. An online variant is a different method, and it is named
+  in Future work.
 
 ---
 
