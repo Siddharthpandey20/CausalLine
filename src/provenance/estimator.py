@@ -878,6 +878,10 @@ class RefineResult:
     # Events whose signature moved on an UNCHANGED re-send, so a counterfactual
     # flip there would have carried no information (Phase 2, `control_run`).
     control_unstable_events: int = 0
+    # D-082: what the deferred self-report pass did, when it is enabled. Zero
+    # under the inline default, which is how every stored number was produced.
+    self_report_calls: int = 0
+    self_report_positives: int = 0
 
     def summary(self) -> str:
         parts = [
@@ -926,6 +930,7 @@ def refine_for_verdict(
     sprt_config: Any = None,
     self_report_calibration: Any = None,
     detector_confidence: dict[str, float] | None = None,
+    self_report_first: bool = False,
 ) -> RefineResult:
     """Examine only the pairs the detector's verdict makes relevant.
 
@@ -1014,6 +1019,10 @@ def refine_for_verdict(
     budget = budget or CheckBudget()
     result = RefineResult()
     flagged = set(malicious)
+    # D-082: self-report deferred to here instead of firing on every event of
+    # every run. Asked once per event, the first time that event is reached,
+    # and only for events the detector's region actually brings up.
+    asked: dict[str, Any] = {}
 
     sprt = SPRTState(config=sprt_config or SPRTConfig()) if use_sprt else None
 
@@ -1112,6 +1121,58 @@ def refine_for_verdict(
                     ),
                 )
                 result.confidence_ordered += 1
+
+            # --- D-082: the lazy self-report, if it is enabled -------------
+            # Same claims, same asymmetry, same records as the inline pass --
+            # a positive is accepted and costs replay tokens, a negative earns
+            # nothing and still has to be paid for with a counterfactual. Only
+            # *when* it is asked has changed, and it is asked about the event
+            # the frontier has actually reached.
+            if self_report_first and target_event not in asked:
+                report = selfreport.ask(
+                    client,
+                    target_event,
+                    request.kind,
+                    request.output,
+                    request.catalogue(),
+                )
+                asked[target_event] = report
+                log.log_usage(
+                    "self_report", model=model,
+                    prompt_tokens=report.prompt_tokens,
+                    output_tokens=report.output_tokens,
+                    total_tokens=report.total_tokens,
+                    event_id_=target_event, agent_id=request.agent_id,
+                )
+                result.self_report_calls += 1
+                settled: list[str] = []
+                for sid in group:
+                    claim = report.claims.get(sid)
+                    if claim is None or not claim.used:
+                        continue
+                    log.log_influence(
+                        InfluenceEdge(
+                            sid, target_event, method="self_report",
+                            confident=claim.confidence >= 0.7,
+                        )
+                    )
+                    log.log_check(
+                        sid, target_event, "tainted", "self_report",
+                        confidence=claim.confidence,
+                        notes="agent reported using this source; accepted "
+                              "without evidence because a wrong positive costs "
+                              "work, not safety (asked on demand, D-082)",
+                    )
+                    result.examined += 1
+                    result.tainted += 1
+                    result.self_report_positives += 1
+                    result.order.append((sid, target_event))
+                    settled.append(sid)
+                if settled:
+                    group = [sid for sid in group if sid not in settled]
+                    if not group:
+                        trace = read_trace(trace_path)
+                        continue
 
             context = {"run": run_code} if run_code else None
             decision = CounterfactualDecision(

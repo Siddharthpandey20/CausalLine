@@ -3056,3 +3056,134 @@ was only ever reachable by a model that writes a datetime.
 
 Pinned by `tests/test_recovery_hardening.py::TestIsoDateAcceptsADatetime`,
 including that a wrong, missing, extra or reordered date still fails.
+
+## D-081 — DeepSeek is an availability problem, not a configuration one
+
+**16-09-2026. Phase 2 of the remediation brief, which asked for bounded effort
+and a plain answer either way. The answer is: not fixable here.**
+
+**What was measured, in order, on one afternoon:**
+
+| when | what was asked | result |
+|---|---|---|
+| smoke test | 4-token "reply ok" | **36.5s, succeeded** |
+| campaign preflight, ~10 min later | 4-token "reply ok", 45s deadline, 1 attempt | **read timeout** |
+| campaign execution, same run | a real pipeline call | gave up after 5 attempts, test **VOID** at 484s |
+| direct probe, ~3h later | three 4-token "reply ok" calls | **no answer in 5 min; the process ran >20 min and produced no output at all** |
+
+Nemotron answered every one of those in under a second from the same process,
+on the same key, over the same connection. So this is the endpoint, not our
+client, not the key, and not the network.
+
+**One configuration observation worth recording, which is not the cause.** The
+pool's preflight deadline is 45s and DeepSeek's *successful* latency was measured
+at 36.5s — it passes with nine seconds to spare on a good call. So even when the
+endpoint works it is marginal against a probe sized for a model that answers in
+under a second. Raising the deadline would buy nothing: the failing calls are not
+finishing in 90s either, which is the model's own `timeout_s`. A probe cannot be
+made to predict an endpoint whose per-request latency ranges over two orders of
+magnitude.
+
+**Decision: no change.** D-058 already characterises this endpoint as flaky
+per-request rather than per-day or per-key, and today's measurements are a fourth
+independent reproduction of exactly that. The machinery built around it is doing
+its job — the preflight bounded the damage to 45s instead of five stalled
+retries, the failed test cooled the model, and `fallback_from` recorded that the
+scenario DeepSeek was asked for was written by Nemotron instead. Nothing here is
+mis-configured; the endpoint does not serve.
+
+**What it costs, stated where it matters rather than here.** Both real-LLM
+campaigns are single-model. `docs/09` §9.1 is unchanged and remains the binding
+statement: the cross-model question is **not answered by this work**, and
+splitting these results by model would compare "the model that answered" against
+"the model that answered less often".
+
+**If a second model is wanted, the answer is a different model**, not more
+debugging of this one. That is a procurement decision rather than an engineering
+one, and it is the single highest-value thing an outside reviewer would ask for.
+
+## D-082 — Self-report can be deferred to detection time, and it is not free
+
+**16-09-2026. Phase 3 of the remediation brief. The proposal's safety claim is
+confirmed; its implied "no downside" is refuted, with numbers.**
+
+**The proposal.** Self-report fires on every model event of every run, before
+anyone knows whether an attack happened. On a clean run every one of those calls
+answers a question nobody asked. Defer them: fire only for agents exposed to a
+flagged source, and only after a detector has spoken. The safety argument is
+that the contamination walk already treats an unexamined pair as contaminated
+(D-024), so nothing is *clean* before it is checked whether the check is eager
+or lazy.
+
+**The audit the brief asked for first — what reads check records mid-run.**
+Listed in full, including what turned out fine:
+
+| reader | when | affected by deferral |
+|---|---|---|
+| `pipeline._verdict_on()` → `record_carrier` | **mid-run** | **yes** — a carrier's inheritance is read from the upstream event's records *at the moment the carrier is logged*. A lazy run has none there, so the carrier inherits `None`, which is never a clearance. |
+| `pipeline._influenced_by()` | mid-run | yes — self-report positives write influence edges, which a carrier inherits. Absent under deferral. |
+| `CheckLedger.from_trace` → `carriers.resolve()` | read time | **no.** D-067 made carrier records pointers resolved when read, so a verdict established later still reaches them. This is what keeps the deferral safe. |
+| `checkpoints.confirmed_clean` / `gc_checkpoints` | post-hoc | no — reads the ledger, which resolves at read time. |
+| `calibration.measure()` | post-hoc | **yes, and it is a real consequence**: per-channel self-report precision would be measured only on flagged regions of attacked runs, a biased subset. Anyone re-running D-072's calibration under `lazy` must say so. |
+| `metrics`, `influence_eval`, `real_llm`, `token_validation`, `contract` | post-hoc | no. |
+
+**Both mid-run readers fail in the safe direction** — an inheritance that does
+not exist is not a clearance — which is why the proposal's safety claim survives
+contact with the code. It is also why the deferral is not free.
+
+**Decision: implement it as a switch, default off, and report the trade.**
+`refine_for_verdict(self_report_first=True)` asks once per event, the first time
+the frontier reaches that event, and only about the group it is examining.
+Positives are recorded exactly as the inline pass recorded them — accepted
+without verification, because a wrong positive costs work and not safety.
+Negatives earn nothing and still have to be paid for with a counterfactual.
+`estimator_mode="lazy"` in `experiment.py` selects it.
+
+**Measured (`python -m src.eval.lazy_selfreport`, oracle detector):**
+
+*Clean run — no attack, nothing flagged, the deferred pass never fires:*
+
+| | self-report calls | self-report tokens |
+|---|---|---|
+| inline | 6 | 600 |
+| lazy | **0** | **0** |
+
+600 tokens saved per clean run, which on this workflow is **100% of the run's
+own pipeline cost** — the inline pass was doubling the price of an unattacked
+run.
+
+*Attacked matrix, six CausalLine cells:*
+
+| | inline | lazy | delta |
+|---|---|---|---|
+| analysis tokens | 4500 | 2500 | **−2000** |
+| recovery tokens | 5300 | 3500 | **−1800** |
+| work preserved | 79.0% | **75.4%** | **−3.6 pts** |
+| unsafe preservations | 0 | 0 | 0 |
+| pair false negatives | 0 | 0 | 0 |
+| escalations | 0 | 0 | 0 |
+
+**Safety is unchanged on every axis that measures it.** The cost is work
+preserved, and the mechanism is the one the audit predicted: on scenario A the
+contaminated region is identical, but the record mix is not — inline leaves 25
+structural and 12 `assumed` records, lazy leaves 18 and 19. A carrier whose
+upstream had no verdict when it was written inherits nothing, the walk treats
+nothing as contaminated, and three and a half points of work are recomputed that
+the inline run could show were fine.
+
+**So the honest summary, which is not the proposal's summary:** deferring
+self-report is safe, saves the entire inline cost on clean runs, and costs 3.6
+points of work preserved on attacked ones. Which way that trades depends on the
+attack rate, and this project already has the machinery to say so —
+`docs/06` §4's economics is exactly that calculation. At a low attack rate the
+deferral wins easily; on a benchmark where every run is attacked, it loses.
+
+**Default stays inline** so that every stored number remains the number it was,
+and because the campaign matrix is entirely attacked runs, which is the regime
+the deferral is worst in. The switch exists so the trade is measurable rather
+than argued, which is the same standard Phase 2's `repeats`/`control_run` were
+held to.
+
+**One recommendation for a deployment, stated separately from the benchmark:**
+run lazy. A production system sees mostly clean runs, and 100% of the analysis
+cost on those runs is the saving.

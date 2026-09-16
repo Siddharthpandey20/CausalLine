@@ -114,7 +114,11 @@ def _original_run(
     # exactly one thing. The older `self_report` and `counterfactual` ablations
     # differ in two (they also skip the targeted pass entirely), so neither of
     # them could answer the question.
-    if estimator_mode not in ("none", "targeted_only"):
+    # PHASE 3 (D-082): `lazy` runs the pipeline with no inline attribution at
+    # all -- no self-report call on any event -- and asks self-report later, in
+    # `refine_for_verdict`, about the events the detector's region actually
+    # reaches. A clean run therefore pays nothing for a question nobody needed.
+    if estimator_mode not in ("none", "targeted_only", "lazy"):
         attributor = HybridAttributor(
             client=client,
             mode=inline_mode,
@@ -137,7 +141,7 @@ def _original_run(
         raise RuntimeError(
             f"{attack.name}: marker never reached the trace; run is void"
         )
-    if estimator_mode in ("hybrid", "targeted_only"):
+    if estimator_mode in ("hybrid", "targeted_only", "lazy"):
         verdict = Oracle().flag(read_trace(path))
         refine_for_verdict(
             path,
@@ -150,6 +154,9 @@ def _original_run(
             # and which nothing downstream read. It orders the investigation; it
             # never decides a verdict.
             detector_confidence=dict(verdict.flagged),
+            # PHASE 3: the deferred half of `lazy`. Same claims, same records,
+            # asked on demand instead of on every event of every run (D-082).
+            self_report_first=(estimator_mode == "lazy"),
             # Phase 2. Both default off, which is how every reported result was
             # produced; `src/eval/robustness.py` turns them on and measures what
             # changes.
