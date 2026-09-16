@@ -1,0 +1,220 @@
+campaign: 3 scenarios x 2 variants x 4 detectors x 30 repetitions = 720 cells, 3600 pipeline runs
+detectors: ['oracle', 'heuristic', 'pessimistic', 'blind']
+offline: scripted agent, no API calls, no quota.
+
+  10/720 cells (10s elapsed, ~742s left)
+  20/720 cells (22s elapsed, ~777s left)
+  30/720 cells (33s elapsed, ~760s left)
+  40/720 cells (45s elapsed, ~758s left)
+  50/720 cells (56s elapsed, ~746s left)
+  60/720 cells (67s elapsed, ~737s left)
+  70/720 cells (78s elapsed, ~721s left)
+  80/720 cells (88s elapsed, ~705s left)
+  90/720 cells (99s elapsed, ~692s left)
+  100/720 cells (109s elapsed, ~678s left)
+  110/720 cells (120s elapsed, ~665s left)
+  120/720 cells (130s elapsed, ~652s left)
+  130/720 cells (141s elapsed, ~640s left)
+  140/720 cells (151s elapsed, ~627s left)
+  150/720 cells (162s elapsed, ~616s left)
+  160/720 cells (173s elapsed, ~604s left)
+  170/720 cells (183s elapsed, ~592s left)
+  180/720 cells (194s elapsed, ~582s left)
+  190/720 cells (205s elapsed, ~572s left)
+  200/720 cells (217s elapsed, ~563s left)
+  210/720 cells (229s elapsed, ~557s left)
+  220/720 cells (236s elapsed, ~536s left)
+  230/720 cells (247s elapsed, ~525s left)
+  240/720 cells (257s elapsed, ~515s left)
+  250/720 cells (272s elapsed, ~511s left)
+  260/720 cells (287s elapsed, ~507s left)
+  270/720 cells (301s elapsed, ~502s left)
+  280/720 cells (312s elapsed, ~490s left)
+  290/720 cells (322s elapsed, ~478s left)
+  300/720 cells (332s elapsed, ~465s left)
+  310/720 cells (342s elapsed, ~453s left)
+  320/720 cells (353s elapsed, ~441s left)
+  330/720 cells (363s elapsed, ~429s left)
+  340/720 cells (373s elapsed, ~417s left)
+  350/720 cells (384s elapsed, ~406s left)
+  360/720 cells (394s elapsed, ~394s left)
+  370/720 cells (411s elapsed, ~389s left)
+  380/720 cells (428s elapsed, ~383s left)
+  390/720 cells (444s elapsed, ~376s left)
+  400/720 cells (461s elapsed, ~369s left)
+  410/720 cells (479s elapsed, ~362s left)
+  420/720 cells (496s elapsed, ~355s left)
+  430/720 cells (507s elapsed, ~342s left)
+  440/720 cells (518s elapsed, ~330s left)
+  450/720 cells (528s elapsed, ~317s left)
+  460/720 cells (538s elapsed, ~304s left)
+  470/720 cells (547s elapsed, ~291s left)
+  480/720 cells (557s elapsed, ~279s left)
+  490/720 cells (574s elapsed, ~269s left)
+  500/720 cells (589s elapsed, ~259s left)
+  510/720 cells (605s elapsed, ~249s left)
+  520/720 cells (622s elapsed, ~239s left)
+  530/720 cells (638s elapsed, ~229s left)
+  540/720 cells (654s elapsed, ~218s left)
+  550/720 cells (668s elapsed, ~207s left)
+  560/720 cells (683s elapsed, ~195s left)
+  570/720 cells (698s elapsed, ~184s left)
+  580/720 cells (708s elapsed, ~171s left)
+  590/720 cells (718s elapsed, ~158s left)
+  600/720 cells (729s elapsed, ~146s left)
+  610/720 cells (742s elapsed, ~134s left)
+  620/720 cells (756s elapsed, ~122s left)
+  630/720 cells (770s elapsed, ~110s left)
+  640/720 cells (780s elapsed, ~97s left)
+  650/720 cells (789s elapsed, ~85s left)
+  660/720 cells (800s elapsed, ~73s left)
+  670/720 cells (814s elapsed, ~61s left)
+  680/720 cells (827s elapsed, ~49s left)
+  690/720 cells (838s elapsed, ~36s left)
+  700/720 cells (846s elapsed, ~24s left)
+  710/720 cells (856s elapsed, ~12s left)
+  720/720 cells (868s elapsed, ~0s left)
+
+det         scen  variant       method                      work preserved     recovery tokens  unsafe%  pairUNSF%    ok%
+-------------------------------------------------------------------------------------------------------------------------
+blind       A     exposed_only  B0 full restart              0.0% +/- 0.0%                 600      0%         0%   100%
+blind       A     exposed_only  B1 agent taint             100.0% +/- 0.0%                   0      0%         0%   100%
+blind       A     exposed_only  B2 topology closure        100.0% +/- 0.0%                   0      0%         0%   100%
+blind       A     exposed_only  CausalLine                 100.0% +/- 0.0%      903.3 +/- 11.9      0%         0%   100%
+blind       A     influencing   B0 full restart              0.0% +/- 0.0%                 600      0%         2%     0%
+blind       A     influencing   B1 agent taint             100.0% +/- 0.0%                   0    100%         2%     0%
+blind       A     influencing   B2 topology closure        100.0% +/- 0.0%                   0    100%         2%     0%
+blind       A     influencing   CausalLine                   0.0% +/- 0.0%       1480 +/- 28.4      0%         2%     0%
+blind       B     exposed_only  B0 full restart              0.0% +/- 0.0%                 600      0%         0%   100%
+blind       B     exposed_only  B1 agent taint             100.0% +/- 0.0%                   0      0%         0%   100%
+blind       B     exposed_only  B2 topology closure        100.0% +/- 0.0%                   0      0%         0%   100%
+blind       B     exposed_only  CausalLine                 100.0% +/- 0.0%      773.3 +/- 16.8      0%         0%   100%
+blind       B     influencing   B0 full restart              0.0% +/- 0.0%                 600      0%         0%     0%
+blind       B     influencing   B1 agent taint             100.0% +/- 0.0%                   0    100%         0%     0%
+blind       B     influencing   B2 topology closure        100.0% +/- 0.0%                   0    100%         0%     0%
+blind       B     influencing   CausalLine                   0.0% +/- 0.0%       1237 +/- 18.3      0%         0%     0%
+blind       C     exposed_only  B0 full restart              0.0% +/- 0.0%                 600      0%         0%   100%
+blind       C     exposed_only  B1 agent taint             100.0% +/- 0.0%                   0      0%         0%   100%
+blind       C     exposed_only  B2 topology closure        100.0% +/- 0.0%                   0      0%         0%   100%
+blind       C     exposed_only  CausalLine                 100.0% +/- 0.0%      776.7 +/- 18.8      0%         0%   100%
+blind       C     influencing   B0 full restart              0.0% +/- 0.0%                 600      0%         0%     0%
+blind       C     influencing   B1 agent taint             100.0% +/- 0.0%                   0    100%         0%     0%
+blind       C     influencing   B2 topology closure        100.0% +/- 0.0%                   0    100%         0%     0%
+blind       C     influencing   CausalLine                   0.0% +/- 0.0%       1263 +/- 20.8      0%         0%     0%
+heuristic   A     exposed_only  B0 full restart              0.0% +/- 0.0%                 600      0%         0%   100%
+heuristic   A     exposed_only  B1 agent taint             100.0% +/- 0.0%                   0      0%         0%   100%
+heuristic   A     exposed_only  B2 topology closure        100.0% +/- 0.0%                   0      0%         0%   100%
+heuristic   A     exposed_only  CausalLine                 100.0% +/- 0.0%      903.3 +/- 11.9      0%         0%   100%
+heuristic   A     influencing   B0 full restart              0.0% +/- 0.0%                 600      0%         2%   100%
+heuristic   A     influencing   B1 agent taint              21.1% +/- 0.0%                 500      0%         2%   100%
+heuristic   A     influencing   B2 topology closure         15.8% +/- 0.0%                 500      0%         2%   100%
+heuristic   A     influencing   CausalLine                  42.8% +/- 4.1%       1300 +/- 29.4      0%         2%   100%
+heuristic   B     exposed_only  B0 full restart              0.0% +/- 0.0%                 600      0%         0%   100%
+heuristic   B     exposed_only  B1 agent taint             100.0% +/- 0.0%                   0      0%         0%   100%
+heuristic   B     exposed_only  B2 topology closure        100.0% +/- 0.0%                   0      0%         0%   100%
+heuristic   B     exposed_only  CausalLine                 100.0% +/- 0.0%      773.3 +/- 16.8      0%         0%   100%
+heuristic   B     influencing   B0 full restart              0.0% +/- 0.0%                 600      0%         0%     0%
+heuristic   B     influencing   B1 agent taint             100.0% +/- 0.0%                   0    100%         0%     0%
+heuristic   B     influencing   B2 topology closure        100.0% +/- 0.0%                   0    100%         0%     0%
+heuristic   B     influencing   CausalLine                   0.0% +/- 0.0%       1237 +/- 18.3      0%         0%     0%
+heuristic   C     exposed_only  B0 full restart              0.0% +/- 0.0%                 600      0%         0%   100%
+heuristic   C     exposed_only  B1 agent taint             100.0% +/- 0.0%                   0      0%         0%   100%
+heuristic   C     exposed_only  B2 topology closure        100.0% +/- 0.0%                   0      0%         0%   100%
+heuristic   C     exposed_only  CausalLine                 100.0% +/- 0.0%      776.7 +/- 18.8      0%         0%   100%
+heuristic   C     influencing   B0 full restart              0.0% +/- 0.0%                 600      0%         0%   100%
+heuristic   C     influencing   B1 agent taint              52.6% +/- 0.0%                 200      0%         0%   100%
+heuristic   C     influencing   B2 topology closure         15.8% +/- 0.0%                 500      0%         0%   100%
+heuristic   C     influencing   CausalLine                  63.2% +/- 0.0%      863.3 +/- 20.8      0%         0%   100%
+oracle      A     exposed_only  B0 full restart              0.0% +/- 0.0%                 600      0%         0%   100%
+oracle      A     exposed_only  B1 agent taint              21.1% +/- 0.0%                 500      0%         0%   100%
+oracle      A     exposed_only  B2 topology closure         15.8% +/- 0.0%                 500      0%         0%   100%
+oracle      A     exposed_only  CausalLine                  95.6% +/- 4.9%      936.7 +/- 37.3      0%         0%   100%
+oracle      A     influencing   B0 full restart              0.0% +/- 0.0%                 600      0%         2%   100%
+oracle      A     influencing   B1 agent taint              21.1% +/- 0.0%                 500      0%         2%   100%
+oracle      A     influencing   B2 topology closure         15.8% +/- 0.0%                 500      0%         2%   100%
+oracle      A     influencing   CausalLine                  42.8% +/- 4.1%       1300 +/- 29.4      0%         2%   100%
+oracle      B     exposed_only  B0 full restart              0.0% +/- 0.0%                 600      0%         0%   100%
+oracle      B     exposed_only  B1 agent taint              57.9% +/- 0.0%                 200      0%         0%   100%
+oracle      B     exposed_only  B2 topology closure         57.9% +/- 0.0%                 200      0%         0%   100%
+oracle      B     exposed_only  CausalLine                  95.6% +/- 3.1%                 800      0%         0%   100%
+oracle      B     influencing   B0 full restart              0.0% +/- 0.0%                 600      0%         0%   100%
+oracle      B     influencing   B1 agent taint              57.9% +/- 0.0%                 200      0%         0%   100%
+oracle      B     influencing   B2 topology closure         57.9% +/- 0.0%                 200      0%         0%   100%
+oracle      B     influencing   CausalLine                  63.2% +/- 0.0%      836.7 +/- 18.3      0%         0%   100%
+oracle      C     exposed_only  B0 full restart              0.0% +/- 0.0%                 600      0%         0%   100%
+oracle      C     exposed_only  B1 agent taint              52.6% +/- 0.0%                 200      0%         0%   100%
+oracle      C     exposed_only  B2 topology closure         15.8% +/- 0.0%                 500      0%         0%   100%
+oracle      C     exposed_only  CausalLine                  96.5% +/- 3.2%                 800      0%         0%   100%
+oracle      C     influencing   B0 full restart              0.0% +/- 0.0%                 600      0%         0%   100%
+oracle      C     influencing   B1 agent taint              52.6% +/- 0.0%                 200      0%         0%   100%
+oracle      C     influencing   B2 topology closure         15.8% +/- 0.0%                 500      0%         0%   100%
+oracle      C     influencing   CausalLine                  63.2% +/- 0.0%      863.3 +/- 20.8      0%         0%   100%
+pessimistic A     exposed_only  B0 full restart              0.0% +/- 0.0%                 600      0%         0%     0%
+pessimistic A     exposed_only  B1 agent taint              21.1% +/- 0.0%                 500      0%         0%     0%
+pessimistic A     exposed_only  B2 topology closure         15.8% +/- 0.0%                 500      0%         0%     0%
+pessimistic A     exposed_only  CausalLine                   0.0% +/- 0.0%       1503 +/- 11.9      0%         0%     0%
+pessimistic A     influencing   B0 full restart              0.0% +/- 0.0%                 600      0%         2%     0%
+pessimistic A     influencing   B1 agent taint              21.1% +/- 0.0%                 500      0%         2%     0%
+pessimistic A     influencing   B2 topology closure         15.8% +/- 0.0%                 500      0%         2%     0%
+pessimistic A     influencing   CausalLine                   0.0% +/- 0.0%       1480 +/- 28.4      0%         2%     0%
+pessimistic B     exposed_only  B0 full restart              0.0% +/- 0.0%                 600      0%         0%   100%
+pessimistic B     exposed_only  B1 agent taint              57.9% +/- 0.0%                 200      0%         0%   100%
+pessimistic B     exposed_only  B2 topology closure         57.9% +/- 0.0%                 200      0%         0%   100%
+pessimistic B     exposed_only  CausalLine                  63.2% +/- 0.0%      973.3 +/- 16.8      0%         0%   100%
+pessimistic B     influencing   B0 full restart              0.0% +/- 0.0%                 600      0%         0%   100%
+pessimistic B     influencing   B1 agent taint              57.9% +/- 0.0%                 200      0%         0%   100%
+pessimistic B     influencing   B2 topology closure         57.9% +/- 0.0%                 200      0%         0%   100%
+pessimistic B     influencing   CausalLine                  63.2% +/- 0.0%      836.7 +/- 18.3      0%         0%   100%
+pessimistic C     exposed_only  B0 full restart              0.0% +/- 0.0%                 600      0%         0%     0%
+pessimistic C     exposed_only  B1 agent taint              10.5% +/- 0.0%                 500      0%         0%     0%
+pessimistic C     exposed_only  B2 topology closure          5.3% +/- 0.0%                 600      0%         0%     0%
+pessimistic C     exposed_only  CausalLine                   0.0% +/- 0.0%       1377 +/- 18.8      0%         0%     0%
+pessimistic C     influencing   B0 full restart              0.0% +/- 0.0%                 600      0%         0%     0%
+pessimistic C     influencing   B1 agent taint              10.5% +/- 0.0%                 500      0%         0%     0%
+pessimistic C     influencing   B2 topology closure          5.3% +/- 0.0%                 600      0%         0%     0%
+pessimistic C     influencing   CausalLine                   0.0% +/- 0.0%       1263 +/- 20.8      0%         0%     0%
+
+CausalLine vs B1 (agent taint), work preserved, mean +/- 95% CI
+det         scen  variant                 CausalLine                  B1      gain  unsafe%  pairUNSF%
+------------------------------------------------------------------------------------------------------
+blind       A     influencing          0.0% +/- 0.0%     100.0% +/- 0.0%  -100.0%       0%        2%
+blind       A     exposed_only       100.0% +/- 0.0%     100.0% +/- 0.0%     0.0%       0%        0%
+blind       B     influencing          0.0% +/- 0.0%     100.0% +/- 0.0%  -100.0%       0%        0%
+blind       B     exposed_only       100.0% +/- 0.0%     100.0% +/- 0.0%     0.0%       0%        0%
+blind       C     influencing          0.0% +/- 0.0%     100.0% +/- 0.0%  -100.0%       0%        0%
+blind       C     exposed_only       100.0% +/- 0.0%     100.0% +/- 0.0%     0.0%       0%        0%
+heuristic   A     influencing         42.8% +/- 4.1%      21.1% +/- 0.0%    21.8%       0%        2%
+heuristic   A     exposed_only       100.0% +/- 0.0%     100.0% +/- 0.0%     0.0%       0%        0%
+heuristic   B     influencing          0.0% +/- 0.0%     100.0% +/- 0.0%  -100.0%       0%        0%
+heuristic   B     exposed_only       100.0% +/- 0.0%     100.0% +/- 0.0%     0.0%       0%        0%
+heuristic   C     influencing         63.2% +/- 0.0%      52.6% +/- 0.0%    10.5%       0%        0%
+heuristic   C     exposed_only       100.0% +/- 0.0%     100.0% +/- 0.0%     0.0%       0%        0%
+oracle      A     influencing         42.8% +/- 4.1%      21.1% +/- 0.0%    21.8%       0%        2%
+oracle      A     exposed_only        95.6% +/- 4.9%      21.1% +/- 0.0%    74.6%       0%        0%
+oracle      B     influencing         63.2% +/- 0.0%      57.9% +/- 0.0%     5.3%       0%        0%
+oracle      B     exposed_only        95.6% +/- 3.1%      57.9% +/- 0.0%    37.7%       0%        0%
+oracle      C     influencing         63.2% +/- 0.0%      52.6% +/- 0.0%    10.5%       0%        0%
+oracle      C     exposed_only        96.5% +/- 3.2%      52.6% +/- 0.0%    43.9%       0%        0%
+pessimistic A     influencing          0.0% +/- 0.0%      21.1% +/- 0.0%   -21.1%       0%        2%
+pessimistic A     exposed_only         0.0% +/- 0.0%      21.1% +/- 0.0%   -21.1%       0%        0%
+pessimistic B     influencing         63.2% +/- 0.0%      57.9% +/- 0.0%     5.3%       0%        0%
+pessimistic B     exposed_only        63.2% +/- 0.0%      57.9% +/- 0.0%     5.3%       0%        0%
+pessimistic C     influencing          0.0% +/- 0.0%      10.5% +/- 0.0%   -10.5%       0%        0%
+pessimistic C     exposed_only         0.0% +/- 0.0%      10.5% +/- 0.0%   -10.5%       0%        0%
+
+96 cells over 30 repetitions in 868s
+written to data\results\campaign.json
+
+Intervals cover variation in which self-report claims were wrong --
+the scripted agent's error rates are knobs and the seed moves them.
+They do NOT cover live-model variance; D-026 measured that apart.
+
+8 cell(s) recorded an unsafe preservation:
+  heuristic   B-influencing   B1 agent taint        100% of runs
+  heuristic   B-influencing   B2 topology closure   100% of runs
+  blind       A-influencing   B1 agent taint        100% of runs
+  blind       A-influencing   B2 topology closure   100% of runs
+  blind       B-influencing   B1 agent taint        100% of runs
+  blind       B-influencing   B2 topology closure   100% of runs
+  blind       C-influencing   B1 agent taint        100% of runs
+  blind       C-influencing   B2 topology closure   100% of runs

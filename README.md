@@ -247,7 +247,7 @@ oracle detector, 30 repetitions, 95% CIs, `data/results/campaign.json`:
 | scenario | CausalLine | B1 | gain |
 |---|---|---|---|
 | A influencing | 42.8% ± 4.1% | 21.1% | **+21.8** |
-| A exposed-only | 96.0% ± 4.8% | 21.1% | **+74.9** |
+| A exposed-only | 95.6% ± 4.9% | 21.1% | **+74.6** |
 | B influencing | 63.2% ± 0.0% | 57.9% | **+5.3** |
 | B exposed-only | 95.6% ± 3.1% | 57.9% | **+37.7** |
 | C influencing | 63.2% ± 0.0% | 52.6% | **+10.5** |
