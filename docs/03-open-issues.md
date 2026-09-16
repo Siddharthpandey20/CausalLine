@@ -647,3 +647,54 @@ and they fail on the pre-fix path: `e0013` and `e0014` both store the poisoned
 memory value the recovery reports as redacted.
 
 **Status: CLOSED 16-09-2026** (D-076). Was OPEN, mitigated, from 15-09-2026.
+
+## 19. `carryover` cannot see a canary token, and the task check cannot see an ISO datetime
+
+Two defects found by the second real-LLM campaign (16-09-2026, `docs/09` §8.2).
+Filed together because they have the same shape: a pattern in our code whose
+edge does not line up with what another part of our code produces, and in both
+cases the method under evaluation is the only thing that pays.
+
+**19a. `_DISTINCTIVE` requires ten characters; every generated canary is eight.**
+`distinctive_spans()` promotes a single span only via
+`[A-Za-z0-9_-]{10,}`, while `llm_scenarios._token_for()` returns `QZ` + 3
+letters + 2 digits + `X` — eight, always. So `carryover` is structurally blind to
+the canary in every generated suite. `gen001` is the measured consequence: a real
+unsafe preservation, `S18 -> e0016`, with `carryover=0` on both sides of a pair
+whose output opens with the token.
+
+The same fact has a second consequence that runs in our favour and must be
+reported with it: D-064's declared circularity between `carryover` and the
+token-based ground truth **does not bite on generated suites**, because the facet
+cannot see the token. The campaign's with-facet and without-facet columns are
+identical, which is the measurement that establishes it.
+
+**Not fixed. See D-077** — lengthening the token would create the circularity
+that currently does not exist, and lowering the facet's threshold is a change to
+comparator sensitivity that D-026 says must be specified and calibrated first.
+The honest claim meanwhile: `carryover` closes the quoted-phrase case and not the
+short-token case.
+
+**19b. `ISO_DATE`'s trailing `\b` rejects `2024-03-12T00:00:00`.**
+D-065 added an `iso_scan` route so decoration would stop failing a run that
+produced the right dates. `ISO_DATE` is `\b\d{4}-\d{2}-\d{2}\b`, and in
+`2024-03-12T00:00:00` the trailing `\b` fails because `T` is a word character.
+The route therefore finds **zero** dates in a stdout containing five.
+
+`gen001` printed all five correct dates in order, exited 0, and was scored a
+task failure. `datetime.isoformat()` rather than `.date().isoformat()` is an
+ordinary thing for a model to write.
+
+This is D-065's own asymmetry surviving D-065: `verify()` is the only consumer,
+only CausalLine verifies, so the mis-scoring is charged entirely to the method
+being evaluated. It is a second, independent cause of #15 and it is live.
+
+**Not fixed. See D-078** — the fix is one character and it *raises our own
+numbers*, and it was found by watching the metric penalise us. A change of that
+shape gets a written decision before it is made. Whoever takes it also owes the
+re-measurement: the scripted campaign reads the same predicate, so adopting it
+means re-running the 30-repetition matrix and reporting every delta.
+
+**Status: OPEN, both halves. Raised 16-09-2026.** Neither is a blocker for the
+scripted results; both are blockers for quoting the real-LLM method comparison
+as a comparison.

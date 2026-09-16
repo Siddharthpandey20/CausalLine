@@ -467,13 +467,40 @@ Full narrative: `docs/10-remediation.md`. Decisions: `docs/05` D-062..D-076.
 
 ---
 
-## What is still owed, and it is one thing
+## The one thing that was still owed — now run, 16-09-2026
 
-**A real-LLM campaign under this code, scored with `carryover` excluded.** Every
-fix above is confirmed against a deterministic reproduction of the failure, not
-against a real model. That is the right instrument for mechanisms that are
-properties of a prompt and a comparator — but it is not the same claim, and
-`docs/09` §9 already forbids the stronger one. It needs quota and an
-`NVIDIA_API_KEY_*`; neither exists on this machine. **Until it is run, no
-real-LLM number from this pass may be quoted**, and the diagnostic prints that
-sentence every time it is run so it cannot be forgotten.
+**A real-LLM campaign under this code, scored with `carryover` excluded.** One
+key became available and it was run: 6 scenarios, 80 calls, 1319s,
+`data/results/real-llm-campaign-2.txt`, written up in `docs/09` §8.2. Scoring
+both ways is now built in and costs nothing — `verdict_without_carryover()`
+recomputes the pre-D-064 verdict from the stored signatures plus a free re-run of
+the removability check, and a test pins it against a live re-issue of the same
+counterfactuals.
+
+**What it says, and it is three things, only one of them comfortable.**
+
+1. **The circularity D-064 declared does not bite on generated suites.** The
+   with-facet and without-facet columns are identical — 3/4 examined agreement,
+   1 unsafe, same pair. So these are non-circular numbers. The reason is
+   `docs/03` #19a and it is not to our credit: `carryover` cannot see an
+   eight-character canary at all.
+2. **`gen006`, the test behind the original 2/2 unsafe preservation, is 0/2** —
+   and **not because of either fix.** Its two pairs were caught by a positive
+   self-report and by an ordinary signature move; `carryover` read 0 on both
+   sides of both. The original failure was one draw from a non-deterministic
+   process, and a different draw was easier. The deterministic diagnostic remains
+   the only place either mechanism is shown to be necessary.
+3. **A new unsafe preservation appeared that neither fix covers** — `gen001`,
+   `S18 -> e0016`, where the carried material is a short token rather than a
+   quoted phrase. D-077, `docs/03` #19a.
+
+**Still owed after this, and now more precisely stated than before:**
+
+- **Cross-model evidence.** DeepSeek failed its preflight and voided its one
+  test; MiniMax is retired. Both campaigns are single-model. `docs/09` §9.1
+  stands untouched.
+- **Repetition.** n=1 per design point, against a non-deterministic model.
+  Finding 2 above is what that costs: the same cell gave opposite answers on two
+  runs. No real-LLM rate in this repository should be quoted as a rate.
+- **`docs/03` #19**, both halves, each deliberately left open with a written
+  reason rather than patched in the same pass that found it.

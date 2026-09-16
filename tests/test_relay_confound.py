@@ -429,5 +429,89 @@ class TestTheDiagnosticStillPasses(unittest.TestCase):
                 )
 
 
+class TestOfflineCarryoverExclusionMatchesALiveRerun(unittest.TestCase):
+    """D-064 consequence 1, computed from the trace instead of from quota.
+
+    A real-LLM pair number has to be reported with `carryover` excluded, and the
+    obvious way to get it -- re-issue every counterfactual with the facet turned
+    off -- costs a second campaign. `real_llm.verdict_without_carryover()` reads
+    it off the stored signatures instead, plus a re-run of the removability
+    check, which is free because the prompt is on disk.
+
+    "Free" is only worth having if it agrees with the expensive version, so this
+    checks it against one: the diagnostic re-issues the counterfactual with an
+    excluding calibration, and the two must reach the same verdict on the same
+    pairs. It is the whole justification for quoting the cheap number.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        from src.eval.relay_diagnosis import (
+            CANARY,
+            TOKEN_CARRY,
+            TOKEN_MARKER,
+            TOKEN_PAYLOAD,
+            _run_one,
+        )
+
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.probe = _run_one(
+            Path(cls._tmp.name), "t", TOKEN_MARKER, TOKEN_PAYLOAD,
+            TOKEN_CARRY, CANARY,
+        )
+        cls.token = CANARY
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._tmp.cleanup()
+
+    def test_the_two_ways_of_excluding_the_facet_agree(self) -> None:
+        from src.eval.real_llm import score_pairs_without_carryover
+
+        offline = score_pairs_without_carryover(self.probe.trace, ["S14"], self.token)
+        # The diagnostic's live re-issue, same two pairs:
+        #   e0013 -- removability verified, so excluding the facet clears it
+        #   e0014 -- removability residual, so it stays tainted whatever moves
+        self.assertEqual(self.probe.blind_verdict, "clean")
+        self.assertEqual(self.probe.code_blind_verdict, "tainted")
+        self.assertEqual(
+            offline.unsafe_pairs, ["S14->e0013"],
+            "the offline exclusion disagrees with a live re-run of the same "
+            "counterfactuals; the cheap column cannot be quoted until it does",
+        )
+
+    def test_removability_is_re_consulted_and_not_read_off_the_note(self) -> None:
+        """The bug this nearly shipped with.
+
+        A *passing* removability check writes no note, so "verified" and "never
+        asked" are the same string on a record. Reading the note would have left
+        every pair tainted and reported a falsely clean zero. And skipping
+        removability altogether would clear `e0014`, whose verdict has nothing
+        to do with any facet -- reporting one unsafe pair too many.
+        """
+        from src.provenance import removability
+        from src.eval.real_llm import verdict_without_carryover
+
+        record = self.probe.trace.check_record("e0014", "S14")
+        self.assertEqual(
+            removability.verdict_of(record), removability.UNCHECKED,
+            "a passing check leaves no note, which is what makes the note "
+            "unusable as the signal here",
+        )
+        self.assertEqual(
+            verdict_without_carryover(self.probe.trace, record), "tainted",
+            "e0014 must stay tainted without the facet -- it is unremovable, "
+            "and that is independent of every comparator",
+        )
+        self.assertEqual(
+            verdict_without_carryover(
+                self.probe.trace, self.probe.trace.check_record("e0013", "S14")
+            ),
+            "clean",
+            "e0013 is removable, so without the facet there is nothing left "
+            "to catch it -- which is the honest non-circular answer",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

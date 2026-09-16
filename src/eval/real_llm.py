@@ -67,9 +67,10 @@ from src.eval.experiment import run_baseline_recovery, score_row
 from src.eval.llm_scenarios import GeneratedScenario, validate
 from src.eval.metrics import RecoveryScore
 from src.eval.token_validation import PairOutcome
+from src.provenance import removability
 from src.provenance.contamination import contaminate
 from src.provenance.estimator import CheckBudget, HybridAttributor, refine_for_verdict
-from src.provenance.signatures import Calibration
+from src.provenance.signatures import CARRYOVER_FACET, Calibration
 from src.recovery.causalline import recover
 from src.recovery.replay import SpliceError
 from src.tracing.checkpoints import CheckpointStore, checkpoint_path_for, overhead
@@ -427,6 +428,128 @@ def score_pairs(pairs: list[PairOutcome]) -> PairScore:
 # --- one real-LLM test --------------------------------------------------------
 
 
+# --- D-064's binding consequence 1, computed offline ---------------------------
+
+
+def _facets_of(signature: str | None) -> dict[str, str] | None:
+    """`a=1|b=2` -> {"a": "1", "b": "2"}. None when there is nothing to parse.
+
+    The stored `signature_before` / `signature_after` are `Signature.value`,
+    which is the sorted facet list joined on `|`. Parsing them back is what
+    makes the re-scoring below free: the facet values are already in the trace,
+    so asking "what would this verdict have been without `carryover`" costs no
+    model call.
+    """
+    if not signature:
+        return None
+    facets: dict[str, str] = {}
+    for part in signature.split("|"):
+        if "=" not in part:
+            return None
+        key, value = part.split("=", 1)
+        facets[key] = value
+    return facets
+
+
+def verdict_without_carryover(trace: Trace, record: Any) -> str:
+    """What this counterfactual would have concluded before D-064.
+
+    Returns "tainted", "clean", or "unknown" when the record cannot answer.
+
+    THE POINT OF THIS FUNCTION
+    --------------------------
+    D-064 declares that `carryover` and the real-LLM canary ground truth ask a
+    question of the same shape, so pair-level agreement scored with the facet
+    active is partly true by construction. Its first binding consequence is that
+    any real-LLM pair number must also be reported with the facet excluded.
+    This computes that column from what the trace already holds rather than by
+    re-issuing anything, so the honest number costs nothing to obtain.
+
+    IT MIRRORS `counterfactual()`, IN ORDER, AND BOTH STEPS MATTER
+    --------------------------------------------------------------
+    1. Did any facet *other than* `carryover` move? If so, tainted — the facet
+       was never what decided it.
+    2. If not, ask the removability check again. `counterfactual()` refuses a
+       clean verdict on an unremovable source (D-066), and with `carryover`
+       excluded the signature holds still, so that branch is reached where the
+       live run never got to it. Skipping this step is what makes the naive
+       version of this function wrong: it reports `clean` for a pair the
+       pre-D-064 code would have called tainted for a reason unrelated to any
+       facet, and the resulting "unsafe" count is too high.
+
+    The removability note on the record cannot be used for step 2, because a
+    *passing* check writes no note — the note exists only on the failure path,
+    so "no note" and "verified" are indistinguishable there. Re-running the
+    check from the stored prompt is both free and unambiguous.
+
+    "unknown" when the stored signatures cannot be parsed: a group-tested
+    positive stores `signature_after=""` because the group's after-signature
+    belongs to no single member, and an event with no stored prompt stores a
+    signature with no facets at all. Reporting those as unknown rather than
+    guessing is the point.
+    """
+    if getattr(record, "method", "") != "counterfactual":
+        return getattr(record, "verdict", "unknown")
+
+    before = _facets_of(getattr(record, "signature_before", None))
+    after = _facets_of(getattr(record, "signature_after", None))
+    if before is None or after is None:
+        return "unknown"
+    before = {k: v for k, v in before.items() if k != CARRYOVER_FACET}
+    after = {k: v for k, v in after.items() if k != CARRYOVER_FACET}
+    if before != after:
+        return "tainted"
+
+    source_id, event_id = record.pair
+    prompt = trace.prompt_text(event_id)
+    block = trace.source_block_text(event_id)
+    if not prompt or not block:
+        # Nothing to re-issue and nothing to check. `counterfactual()` calls
+        # that influenced, and so does this.
+        return "tainted"
+    try:
+        check = removability.check(prompt, block, source_id)
+    except Exception:  # noqa: BLE001 -- an unanswerable check is not a pass
+        return "tainted"
+    return "clean" if check.verified else "tainted"
+
+
+def score_pairs_without_carryover(
+    trace: Trace, planted: list[str], token: str
+) -> PairScore:
+    """`score_pairs`, with every counterfactual verdict recomputed sans facet.
+
+    The non-circular column. Pairs the estimator never examined stay
+    `unchecked`, and a pair whose pre-facet verdict cannot be recovered is left
+    at what it actually was -- inventing one would be worse than reporting a
+    narrower number.
+    """
+    score = PairScore()
+    for pair in pair_outcomes(trace, planted, token):
+        score.scored += 1
+        verdict = pair.verdict
+        if verdict != "unchecked":
+            record = trace.check_record(pair.event_id, pair.source_id)
+            recomputed = (
+                verdict_without_carryover(trace, record) if record else "unknown"
+            )
+            if recomputed in ("clean", "tainted"):
+                verdict = "influenced" if recomputed == "tainted" else "clean"
+        agrees = (
+            verdict == "influenced" if pair.token_present else verdict == "clean"
+        )
+        if agrees:
+            score.operative_agreements += 1
+        if verdict != "unchecked":
+            score.examined += 1
+            if agrees:
+                score.examined_agreements += 1
+        if pair.token_present and verdict == "clean":
+            score.unsafe += 1
+            score.unsafe_pairs.append(f"{pair.source_id}->{pair.event_id}")
+    return score
+
+
 @dataclass
 class RealRunResult:
     """One generated scenario, executed and scored.
@@ -444,6 +567,12 @@ class RealRunResult:
     rows: list[RecoveryScore] = field(default_factory=list)
     truth: TruthReport | None = None
     pairs: PairScore | None = None
+    # The same pairs rescored with `carryover` excluded (D-064's binding
+    # consequence 1). Computed offline from the stored signatures, so it costs
+    # no model call, and it is the column a reader should take seriously: with
+    # the facet active the estimator and the token-based ground truth share a
+    # mechanism.
+    pairs_no_carryover: PairScore | None = None
     annotation_check: dict[str, Any] = field(default_factory=dict)
     task_success: bool = False
     trace_path: str = ""
@@ -483,6 +612,10 @@ class RealRunResult:
             "rows": [asdict(r) for r in self.rows],
             "truth": self.truth.to_dict() if self.truth else None,
             "pairs": self.pairs.to_dict() if self.pairs else None,
+            "pairs_no_carryover": (
+                self.pairs_no_carryover.to_dict()
+                if self.pairs_no_carryover else None
+            ),
             "annotation_check": self.annotation_check,
             "task_success": self.task_success,
             "trace_path": self.trace_path,
@@ -712,6 +845,9 @@ def run_generated(
     truth_events, truth = ground_truth(trace, planted, scenario.token)
     result.truth = truth
     result.pairs = score_pairs(pair_outcomes(trace, planted, scenario.token))
+    result.pairs_no_carryover = score_pairs_without_carryover(
+        trace, planted, scenario.token
+    )
     result.annotation_check = check_annotation(scenario, trace, truth)
     if result.pairs.unsafe:
         result.notes.append(
@@ -979,6 +1115,38 @@ def pair_summary(results: list[RealRunResult]) -> str:
     for r in landed:
         if r.pairs.unsafe:
             lines.append(f"    {r.test_id}: {r.pairs.unsafe_pairs}")
+
+    # D-064: with `carryover` active the estimator and this ground truth share
+    # a mechanism, so the number above is partly true by construction. The
+    # column below removes the facet and is the one that can be quoted.
+    blind = [r for r in landed if r.pairs_no_carryover]
+    if blind:
+        b_scored = sum(r.pairs_no_carryover.scored for r in blind)
+        b_ex = sum(r.pairs_no_carryover.examined for r in blind)
+        b_exa = sum(r.pairs_no_carryover.examined_agreements for r in blind)
+        b_unsafe = sum(r.pairs_no_carryover.unsafe for r in blind)
+        lines.append("")
+        lines.append(
+            "  the same pairs with `carryover` EXCLUDED -- the non-circular "
+            "column (D-064):"
+        )
+        lines.append(
+            f"    examined agreement  {b_exa}/{b_ex}"
+            + (f" ({b_exa / b_ex:.0%})" if b_ex else " (n/a)")
+        )
+        lines.append(
+            f"    UNSAFE              {b_unsafe}"
+            + (f" ({b_unsafe / b_scored:.0%})" if b_scored else "")
+        )
+        for r in blind:
+            if r.pairs_no_carryover.unsafe:
+                lines.append(
+                    f"      {r.test_id}: {r.pairs_no_carryover.unsafe_pairs}"
+                )
+        lines.append(
+            "    Read this one. With the facet active the instrument and the "
+            "yardstick ask the same question."
+        )
     return "\n".join(lines)
 
 

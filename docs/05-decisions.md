@@ -2837,3 +2837,95 @@ recovery reports as redacted — and passes now. D-068's re-check can go on read
 
 Measured effect on the campaign: none. The corrected text is only ever written
 for a replayed event, and no metric read it.
+
+## D-077 — The canary token is too short for `carryover` to see, and that is the honest state to leave it in
+
+**16-09-2026. Found by the second real-LLM campaign, and it cuts both ways.**
+
+`gen001` produced an unsafe preservation: `S18 -> e0016`, the Coder's decision
+event, whose output opens with the canary `QZAFB61X`. Removing S18 moved no
+facet, `removability` verified the removal was real, and the pair was cleared.
+`carryover` read **0 on both sides** — it never saw the token at all.
+
+**The mechanism, and it is a contract mismatch between two of our own parts.**
+`distinctive_spans()` promotes a single span to a match only through
+`_DISTINCTIVE = [A-Za-z0-9_-]{10,}` — **at least ten characters**.
+`llm_scenarios._token_for()` builds every canary as `QZ` + 3 letters + 2 digits
++ `X`: **exactly eight, always**. So no generated canary token can ever reach the
+distinctive-token path, and an eight-word shingle cannot match a bare token
+either. `carryover` is structurally blind to the canary in every real-LLM run
+this project can generate.
+
+**Consequence 1, against us.** D-064's facet does not close the e0013 shape when
+the carried material is a *short token* rather than a quoted phrase. `gen001` is
+that case and it is a real, measured unsafe preservation under the current code.
+
+**Consequence 2, for us, and it is the more interesting one.** D-064 declared
+that `carryover` and the real-LLM canary ground truth ask a question of the same
+shape, and made it binding that any real-LLM pair number be reported with the
+facet excluded. **On generated suites that circularity does not actually bite**,
+because the facet cannot see the token. Measured rather than argued: the
+with-facet and without-facet columns of this campaign are *identical* — 3/4
+examined agreement, 1 unsafe, the same pair. The estimator's verdicts here owe
+nothing to the facet.
+
+**Decision: leave the token at eight characters, and report the gap.**
+
+Lengthening it to ten is a one-line change and it is the wrong one to make now.
+It would let `carryover` match the canary, which would *create* the circularity
+that currently does not exist and make every future real-LLM pair number weaker
+evidence than the numbers above. The current state is the scientifically cleaner
+one: an instrument that cannot see the yardstick.
+
+What should change instead, and it is a separate decision with its own
+measurement: whether `carryover` should match short spans at all. That is a
+change to a comparator's sensitivity, D-026 governs it, and it must be specified
+and calibrated before it is adopted — not chosen because we have just watched it
+miss something. The null floor of a ten-character threshold is 0%; the floor of a
+six-character one is unmeasured and could plausibly be non-zero, since short
+alphanumeric runs occur in ordinary code (`%d/%m/%Y`, `S14`, `e0016`).
+
+Until then the honest statement for the paper is: **`carryover` closes the
+quoted-phrase case and does not close the short-token case, and the campaign
+above contains one instance of each.**
+
+## D-078 — Task success still rejects a correct answer, for a different reason than D-065 fixed
+
+**16-09-2026. A residual of D-065, found by re-running the real-LLM mode.**
+
+D-065 replaced exact line equality with a two-route check so that decoration
+would stop failing a run that produced every correct date. The second campaign
+shows the route it added does not cover the commonest way a model renders a
+date.
+
+**`gen001` printed all five dates, in order, correctly**, and was scored a task
+failure:
+
+```
+stdout   2024-03-12T00:00:00 ... 1999-12-31T00:00:00   (rc=0, no stderr)
+scored   (False, "mismatch")
+```
+
+`ISO_DATE` is `\b\d{4}-\d{2}-\d{2}\b`. In `2024-03-12T00:00:00` the trailing
+`\b` fails, because `T` is a word character and `12T` is not a boundary. So the
+`iso_scan` route finds **zero** dates in a stdout containing five, and the run is
+a failure. `datetime.isoformat()` — as opposed to `.date().isoformat()` — is a
+completely ordinary thing for a model to write.
+
+**Why this matters more than a regex nit.** It is the same asymmetry D-065 was
+written to remove, surviving the fix: `verify()` is the only consumer, only
+CausalLine verifies, so the cost of the mis-scoring falls entirely on the method
+under evaluation. In this campaign it is the difference between "one of five
+recoveries had a working workflow to certify" and "none did".
+
+**Not fixed in this pass, deliberately, and the reason is the direction.**
+The fix is one character. It also *raises our own numbers*, and it was found by
+watching the metric penalise us. This project's rule is that a change of that
+shape needs a written decision before it is made, not after — so it is recorded
+here and in `docs/03` #19 as the next thing to decide, together with the
+re-measurement it obliges: the scripted campaign reads the same predicate, so
+adopting it means re-running the 30-repetition matrix and reporting the delta.
+
+**What must not be said in the meantime:** that the real-LLM method comparison is
+a comparison. `docs/03` #15 is still open and this is a second, independent
+reason for it.
