@@ -3682,3 +3682,75 @@ runs for the first time in this project**, against a projection of 0.92.
 with the numbers.** In particular: the chain result is not overturned, this
 testbed was *designed* to have the property being tested, n = 3 per cell, and
 the task is deliberately easier than the chain's.
+
+## D-092 — Gate 1: a cheap economic gate before the investigation, and the two mechanisms it beat
+
+**17-09-2026. Adds `src/recovery/gate1.py`, `src/eval/gate1_experiment.py`,
+`src/eval/gate1_cases.py`, `tests/test_gate1.py`. Wires one decision into
+`run_generated`. `docs/gate1/` is the full report.**
+
+**The hole.** The production path's only condition on spending the entire
+analysis budget was `if refine and flagged:`. Gate 2 -- the planner's
+replay-vs-restart cap -- fires only *after* `A` is spent, so a workflow that was
+always going to be restarted still paid for a full investigation first.
+
+**The rule is derived, not chosen.** With Gate 2 underneath, continuing costs
+`A + min(R,N)` and restarting costs `N`, so investigating wins exactly when
+`A/N + f < 1`. Both terms are estimated free from the trace: `f` by
+`structural_prior` (the cost-weighted B2 closure, which had **zero callers**
+since it was written), `A` by region pairs priced at the mean event cost.
+
+**Three candidates were falsified before this one was implemented.**
+
+- **P (`risk/attack_model.run_probability`) is unusable as a gate.** It
+  saturates: 0.988-0.998 measured across cases whose true footprint ran 0.00 to
+  0.83, so gates at P<0.5, P<0.9 and P<0.99 are numerically identical to
+  always-restart. The cause is structural -- P counts exposure *attempts* and is
+  monotone in exposure count, so it answers "was this run attacked" and not "how
+  much of it is contaminated".
+- **Early-verdict rate does not estimate `f`.** Mean tainted rate 0.880 against
+  mean `f_true` 0.345, correlation **0.234**. `_unchecked_in_region` only offers
+  pairs whose source is *already believed contaminated*, so a high rate is
+  near-guaranteed by construction, while `f = R/N` is a cost-weighted fraction
+  of the whole trace. Every adaptive-budget gate collapsed to always-restart
+  while spending 278-765 tokens to get there.
+- **The SPRT's i.i.d. assumption does not hold here**, for the same reason: the
+  observations are adaptive, ordered, and drawn from a non-stationary population
+  that is not the quantity under test. It still beats chance (86.6% held-out)
+  but costs 781 tokens per decision, totals 1.13x restart -- worse than simply
+  restarting -- and its errors cost 1957 tokens each against 296 for the gate
+  chosen, because an abort pays for analysis *and then* restarts.
+
+**The margin is a measured bias, not a knob.** With `total < 1.0` the gate made
+10 false restarts and **zero** false recoveries -- a one-sided pull. Both
+estimators are upper bounds by construction, and the compound bias was positive
+on **65 of 65** development cases (median +0.223). `DECISION_MARGIN = 0.174` is
+the q25 of that distribution, derived from the estimator's known error rather
+than from an accuracy sweep.
+
+**A methodological error, found and corrected.** The first held-out set was
+discarded: Gate 1 had already been wired in, so it suppressed the very
+investigations whose cost defines the oracle, and 67 cases came back with `A=0`.
+`run_generated` now takes `gate1_enabled=False`, which the case collector forces,
+so the gate can never define its own ground truth.
+
+**It then failed on the real model, and the failure is the useful part.**
+The frozen gate scored **25.0%** on 24 real GPU runs -- 18 false recoveries.
+`A_SCALE` is a property of the **client and prompt structure**, not of the
+algorithm: 0.431 scripted, 0.547 real-lazy, **1.781 real-eager** -- a factor of
+four between two modes of the same model. `calibrate()` now measures it from
+runs the deployment has already made. Leave-one-design-point-out on the real
+data: **25.0% -> 75.0%, zero false restarts**, realized cost 0.90x restart and
+1.04x the oracle, saving **43.3%** against current behaviour.
+
+**Safety is unchanged and cannot be harmed by this gate.** Declining to
+investigate is not a clearance: every pair stays `unchecked`, which the
+contamination walk treats as contaminated. A wrong RESTART costs preserved work
+and never safety -- the same asymmetry running out of budget already has.
+
+**What is NOT claimed.** No gate tested -- this one included -- beats
+always-restart within 15% of the economic break-even point. The advantage comes
+entirely from cases where the answer is not close, and is defensible only
+because regret *is* `|margin| x N` by construction, so errors at the boundary are
+cheap: 10 errors across 115 cases cost 2955 tokens in total and none occurred
+above `|margin| = 0.40`.

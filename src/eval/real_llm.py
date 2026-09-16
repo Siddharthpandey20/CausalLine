@@ -70,6 +70,7 @@ from src.eval.token_validation import PairOutcome
 from src.provenance import removability
 from src.provenance.contamination import contaminate
 from src.provenance.estimator import CheckBudget, HybridAttributor, refine_for_verdict
+from src.recovery.gate1 import decide as gate1_decide
 from src.provenance.signatures import CARRYOVER_FACET, Calibration
 from src.recovery.causalline import recover
 from src.recovery.replay import SpliceError
@@ -588,6 +589,9 @@ class RealRunResult:
     # self-reports it asked, whether the SPRT aborted, or on what hypotheses --
     # which is exactly what the lazy-vs-eager comparison needs to be checkable.
     lazy_self_report: bool = False
+    # D-092: what Gate 1 decided and on what numbers. Recorded so a run that
+    # skipped its investigation is never mistaken for one that found nothing.
+    gate1: dict[str, Any] = field(default_factory=dict)
     self_report_calls: int = 0
     self_report_positives: int = 0
     sprt_decision: str = ""
@@ -643,6 +647,7 @@ class RealRunResult:
             # silently absent from the results file -- which is how the first
             # fan-out campaign came to carry `sprt_f_star: 0` for every run.
             "lazy_self_report": self.lazy_self_report,
+            "gate1": dict(self.gate1),
             "self_report_calls": self.self_report_calls,
             "self_report_positives": self.self_report_positives,
             "sprt_decision": self.sprt_decision,
@@ -728,6 +733,7 @@ def run_generated(
     refine: bool = True,
     replay_client_factory: Any = None,
     lazy_self_report: bool = False,
+    gate1_enabled: bool = True,
     **detector_kwargs: Any,
 ) -> RealRunResult:
     """One generated scenario, end to end, on a real model.
@@ -863,7 +869,26 @@ def run_generated(
     flagged = verdict.sources()
 
     result.lazy_self_report = lazy_self_report
-    if refine and flagged:
+
+    # GATE 1 (D-092): before a single analysis token is spent, is investigating
+    # likely to pay for itself? GATE 2 -- the planner's replay-vs-restart cap --
+    # is untouched and still runs afterwards; the two ask different questions
+    # and A belongs in exactly one of them.
+    #
+    # Declining to investigate is not a clearance: every pair stays `unchecked`,
+    # which the contamination walk treats as contaminated, so the planner will
+    # restart. A wrong RESTART here costs preserved work and never safety.
+    # `gate1_enabled=False` runs the FULL investigation regardless, which is
+    # what the Gate-1 experiment needs: the oracle is "what did the complete
+    # process cost", and a gate that suppressed the investigation would be
+    # defining the ground truth it is judged against.
+    gate1 = gate1_decide(trace, flagged) if (flagged and gate1_enabled) else None
+    if gate1 is not None:
+        result.gate1 = gate1.to_dict()
+        result.notes.append(gate1.line())
+    investigate = gate1 is None or gate1.investigate
+
+    if refine and flagged and investigate:
         try:
             refined = refine_for_verdict(
                 orig_path,
