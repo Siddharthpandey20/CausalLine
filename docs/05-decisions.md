@@ -3187,3 +3187,105 @@ held to.
 **One recommendation for a deployment, stated separately from the benchmark:**
 run lazy. A production system sees mostly clean runs, and 100% of the analysis
 cost on those runs is the saving.
+
+## D-083 — The judge tier is declined; the diff tier is earned but not adopted yet
+
+**16-09-2026. Phase 4 of the remediation brief, which asked for the two
+collisions to be resolved with evidence before any implementation time went
+into the proposed three-stage comparator cascade.**
+
+### 4a. The judge tier: no, and D-026 is not amended
+
+D-026 did not forbid an LLM judge outright. It named it as "the obvious
+candidate" for prose and attached a condition: *it is itself an instrument with
+a noise floor that would then need measuring*. The brief asks for either a
+reasoned amendment saying what has changed, or no judge.
+
+**Nothing has changed that makes it acceptable, and two things have changed that
+make it less so.**
+
+1. **The condition is still unmet and is not cheap.** Every other comparator in
+   this project now has a measured floor on the client that produces the answers
+   (D-070, D-079). A judge would need the same, on a hosted model, over enough
+   unchanged re-sends to be a rate — which is quota this project does not have,
+   on an endpoint whose second model will not answer at all (D-081).
+2. **The project has since decided twice that a comparator must have nothing to
+   tune.** D-064 admitted `carryover` specifically because it is not a
+   vocabulary, and D-079 changed a discriminator rather than retune a threshold
+   for the same reason. **A judge is the most tunable instrument available** —
+   its prompt is a free parameter, invisible in the trace, and adjustable until
+   the result comes out right. That is exactly the failure mode D-026's
+   pre-registration rule exists to prevent, and it is a stronger objection now
+   than when D-026 was written.
+3. **The cost model already fails.** `docs/06` §4: A/N is 1.33 and the analysis
+   does not pay for itself. A judge adds a model call per examined pair, on top
+   of the counterfactual, on the same budget.
+
+**Decision: do not build the judge tier.** D-026 stands unamended, and this
+entry is the record of the question being asked properly and answered no.
+
+### 4b. The diff tier: it works, and the evidence is better than expected
+
+`python -m src.eval.diff_probe` — a prototype of the diff mechanism alone, not
+the cascade, measured against the implemented one on the same inputs.
+
+**Does it catch `gen001`?** Yes: `diff_carried()` reports `qzafb61x`, the exact
+token the real run carried into the Coder's decision and the real estimator
+cleared.
+
+**So does `carryover`, since D-079.** That changes the argument rather than
+settling it: the proposal's claim was that a diff-based approach might catch
+what a length-thresholded span check could not, and it was right — but the
+coverage gap is now closed by other means, so coverage no longer decides.
+
+**What does decide is the floor, and this is the finding.** Both mechanisms on
+700 unchanged re-sends of the real stored prompts, one client throughout (the
+D-070 methodology):
+
+| | fires on unchanged re-sends | floor |
+|---|---|---|
+| diff-based (prototype) | 0 / 700 | **0.0%** |
+| `carryover` (implemented) | 25 / 700 | **3.6%** |
+
+**The diff check is strictly better on this testbed** — same coverage on
+`gen001`, and stable where `carryover` is not. The reason is structural rather
+than lucky: `carryover` contrasts the answer against *the request*, so the
+scripted client's per-call `[ref <hex>]` churn enters as a unique span that
+appears and disappears; the diff contrasts the answer against *the re-run's
+answer*, and churn that did not come from the removed source cancels on both
+sides. It also costs nothing extra — the re-run's answer is already produced by
+the counterfactual.
+
+It is worth naming what it is **not**: this is not the text comparison D-026
+removed at a 100% floor. "Did the text change" and "did text *from the removed
+source* leave the answer" are different questions, and the second one has now
+been measured at 0% where the first was measured at 100%.
+
+### 4c. The decision: neither tier ships in this pass
+
+**No judge, no cascade, and the diff tier recorded as the recommended next
+change with the measurement it owes.**
+
+Adopting the diff check today would mean replacing the mechanism in every
+counterfactual verdict on the strength of a 0% floor measured on one scripted
+client whose churn is a single nonce — the day it was prototyped, immediately
+after watching the incumbent miss something. That is the shape of change this
+project has repeatedly decided to make *after* a written decision and a
+re-measurement, not before: D-064 on the facet, D-078 and D-080 on the task
+check, D-082 on the deferral.
+
+**What adoption owes, and it is short:**
+
+1. a floor on a hosted model, not only on `ScriptedClient` — the 3.6% that
+   condemns `carryover` here is a property of our harness's churn, and the
+   diff's 0% may be too;
+2. a full campaign re-run, because it changes every counterfactual verdict;
+3. a decision on what happens to `carryover` — replaced, or kept alongside as a
+   second facet, in which case the prose exclusion D-079 measured still applies
+   to it.
+
+**What is kept from the proposal, and it is the substantive half:** the
+observation that the contrast should be the model's own two answers rather than
+the request. That is a real design insight, it is now backed by a measured
+floor, and it is written down here so that adopting it later is a decision with
+evidence attached rather than a preference.

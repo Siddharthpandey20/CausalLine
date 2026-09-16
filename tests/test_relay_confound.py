@@ -756,5 +756,54 @@ class TestTheFacetAndGroundTruthCanDisagree(unittest.TestCase):
         )
 
 
+class TestDiffProbeClaims(unittest.TestCase):
+    """Phase 4b (D-083): the prototype's two claims, pinned.
+
+    The probe is not a component and nothing depends on it, but D-083 quotes it
+    in a decision, so the numbers it produces have to keep being producible.
+    """
+
+    def test_the_diff_check_catches_gen001(self) -> None:
+        from src.eval.diff_probe import (
+            ORIGINAL_ANSWER,
+            PAYLOAD,
+            RERUN_ANSWER,
+            TOKEN,
+            diff_carried,
+        )
+
+        self.assertIn(TOKEN.lower(), diff_carried(ORIGINAL_ANSWER, RERUN_ANSWER, PAYLOAD))
+
+    def test_the_implemented_check_also_catches_it(self) -> None:
+        """D-083 turns on this: the proposal's mechanism is no longer the only
+        thing that closes the case, so coverage stopped being the argument."""
+        from src.eval.diff_probe import (
+            ORIGINAL_ANSWER,
+            PAYLOAD,
+            REQUEST_WITHOUT_PAYLOAD,
+            TOKEN,
+            carryover_carried,
+        )
+
+        hits = carryover_carried(ORIGINAL_ANSWER, PAYLOAD, REQUEST_WITHOUT_PAYLOAD)
+        self.assertIn(TOKEN.lower(), hits)
+
+    def test_the_diff_check_is_not_text_comparison(self) -> None:
+        """D-026 removed text comparison at a 100% floor. This asks a different
+        question: not 'did the answer change' but 'did material from the removed
+        source leave it'. A re-run that differs everywhere *except* in the
+        source's material reports nothing."""
+        from src.eval.diff_probe import diff_carried
+
+        self.assertEqual(
+            diff_carried(
+                "the quick brown fox jumps",
+                "a slow grey badger ambles",
+                "entirely unrelated payload content",
+            ),
+            [],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
