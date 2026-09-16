@@ -19,18 +19,28 @@ CausalLine pays analysis `A`, then replays the contaminated fraction `f` of it.
 CausalLine wins  <=>  A + f·N  <  N  <=>  A/N + f  <  1
 ```
 
-**Measured on the local GPU campaign (n = 11 landed runs):**
+**Measured on the completed local GPU campaign (60 runs, n = 17 landed):**
 
-| | |
-|---|---|
-| A (analysis tokens per run) | 6 369 |
-| N (full-restart tokens) | 5 390 |
-| **A/N** | **1.18** |
-| f (contaminated fraction) | 0.40 |
-| **A/N + f** | **1.58** — needs to be < 1.00 |
+| | identified | delivered |
+|---|---|---|
+| A (analysis tokens per run) | 6 489 | 6 489 |
+| N (full-restart tokens) | 5 520 | 5 520 |
+| **A/N** | **1.18** | **1.18** |
+| f (fraction that must be recomputed) | 0.39 | **1.00** |
+| **A/N + f** | **1.57** | **2.18** |
 
-The analysis alone costs more than the restart it is trying to avoid. That is
-`docs/03` #7's collapse condition, and it is now measured on three models.
+Both columns need to be under 1.00 and neither is.
+
+**The two columns, and why the second is the real one.** `f` identified is the
+contaminated fraction CausalLine works out it must recompute — 39% of the
+workflow. `f` delivered is what it actually recomputed: **all of it**, because
+`verify()` refused to certify the selective replay on 17 of 17 landed runs and
+the planner escalated to a full restart (D-086). On this frontier CausalLine
+did not pay `A + f·N`; it paid `A + (selective replay) + N`.
+
+The analysis alone costs more than the restart it is trying to avoid, before
+any of that. That is `docs/03` #7's collapse condition, and it is now measured
+on three models.
 
 ---
 
@@ -77,11 +87,18 @@ unchanged on every axis and **100% of the cost removed from clean runs**.
 Removing self-report from the analysed path here:
 
 ```
-A 6 369 -> 2 829    A/N 1.18 -> 0.52    A/N + f = 0.92     (win condition met)
+A 6 489 -> 2 949    A/N 1.18 -> 0.53    A/N + f = 0.92     (at f identified = 0.39)
 ```
 
-**This one lever alone crosses the line**, at f = 0.40. It is built, tested,
-and off by default because it costs 3.6 points of work preserved (D-082).
+**This one lever alone crosses the line — but only against `f` identified.**
+Against `f` delivered it does not: `0.53 + 1.00 = 1.53`. Lazy self-report makes
+the *analysis* affordable; it does nothing about a planner that escalates to a
+full restart because verification cannot certify the replay. **Both problems
+have to be fixed for the cost result to turn positive, and D-086 is the one
+this project has not started on.**
+
+It is built, tested, and off by default because it costs 3.6 points of
+identified work preserved (D-082).
 
 ### Lever 2 — prompt caching
 
@@ -184,10 +201,14 @@ re-measurement that obliges. It is the highest-value unwired thing left.
 
 **Do not claim CausalLine is cheaper. It is not, and three models agree.**
 
-The claim the measurements support is narrower and still worth making:
-CausalLine **discards less clean work than any baseline, unanimously
-(11W–0L–0T, p = 0.001), at equal safety.** It buys preserved work, not saved
-tokens.
+The claim the measurements support is narrower than it looked, and narrower
+than the earlier draft of this file said: CausalLine **identifies a smaller
+contaminated region than any baseline, unanimously (17W–0L–0T, p = 0.00002), at
+equal safety.** That is a claim about identification. On the local frontier it
+**delivered** none of that preservation, because verification refused to certify
+the replay every time and the planner escalated (D-086). It buys a better
+answer to "what is contaminated", not saved tokens and — so far, nowhere in this
+project — not demonstrated preserved work.
 
 That becomes a *cost* result only when the preserved work is worth more than the
 tokens — irreversible side effects, human review, or computation that cannot be

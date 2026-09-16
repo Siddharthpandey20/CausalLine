@@ -188,6 +188,16 @@ def measure_run(
             "recovery_tokens": row.get("recovery_tokens"),
             "recovery_success": row.get("recovery_success"),
             "escalations": row.get("escalations", 0),
+            # WHAT THE SYSTEM ACTUALLY DELIVERED, which is not the same number.
+            # `work_preserved` above is the *identification*: one minus the
+            # contaminated region as a fraction of the trace. It is what the
+            # method would preserve if its plan were executed as computed.
+            # The planner may then escalate -- `verify()` refusing to certify a
+            # replay sends CausalLine to `restart_all` -- and an escalated run
+            # preserves nothing while having already paid for the selective
+            # replay. Reporting only the first number under the label "work
+            # preserved" reads as a delivery claim and is not one.
+            "work_preserved_delivered": row.get("work_preserved"),
         }
     return metrics
 
@@ -242,10 +252,25 @@ def safety_verdict(runs: list[RunMetrics]) -> str:
         m: sum(r.method[m]["unsafe_preservations"] for r in landed) for m in METHODS
     }
     if all(v == 0 for v in totals.values()):
+        # What actually distinguished the methods depends on whether the planner
+        # executed the plan it identified. If CausalLine escalated on most
+        # landed runs, its DELIVERED preservation is a loss, and naming "work
+        # preservation" as the distinguishing result would be the same
+        # over-claim this function exists to prevent, moved one column across.
+        escalated = sum(1 for r in landed if r.method["CausalLine"]["escalations"])
+        if escalated > len(landed) / 2:
+            tail = (
+                "  The distinguishing result was IDENTIFICATION PRECISION only.\n"
+                f"  CausalLine escalated to a full restart on {escalated} of "
+                f"{len(landed)} landed run(s), so its\n"
+                "  DELIVERED work preservation is NOT a win -- see 3b(ii)."
+            )
+        else:
+            tail = "  The distinguishing result was PRECISION / WORK PRESERVATION."
         return (
             "SAFETY WAS TIED in this experiment -- every method had zero unsafe\n"
             "  preservations, so none of them is shown safer than another here.\n"
-            "  The distinguishing result was PRECISION / WORK PRESERVATION."
+            + tail
         )
     return "SAFETY: unsafe preservations by method -- " + ", ".join(
         f"{m}={v}" for m, v in totals.items()
@@ -253,7 +278,13 @@ def safety_verdict(runs: list[RunMetrics]) -> str:
 
 
 
-def paired_vs(runs: list[RunMetrics], challenger: str, baseline: str) -> str:
+def paired_vs(
+    runs: list[RunMetrics],
+    challenger: str,
+    baseline: str,
+    key: str = "work_preserved",
+    label: str = "work preserved (identified)",
+) -> str:
     """Per-run paired comparison, which is the test this design actually calls for.
 
     Unpaired means with overlapping intervals are the weakest reading of these
@@ -273,8 +304,10 @@ def paired_vs(runs: list[RunMetrics], challenger: str, baseline: str) -> str:
     wins = losses = ties = 0
     deltas: list[float] = []
     for run in landed:
-        a = run.method[challenger]["work_preserved"]
-        b = run.method[baseline]["work_preserved"]
+        a = run.method[challenger].get(key)
+        b = run.method[baseline].get(key)
+        if a is None or b is None:
+            continue
         deltas.append(a - b)
         if a > b:
             wins += 1
@@ -297,8 +330,9 @@ def paired_vs(runs: list[RunMetrics], challenger: str, baseline: str) -> str:
     )
     return (
         f"  {challenger} vs {baseline}: {wins}W-{losses}L-{ties}T over "
-        f"{len(landed)} paired run(s), mean delta {mean_delta:+.1%} work "
-        f"preserved" + chr(10) + f"      sign test p={p:.3f} ({verdict})"
+        f"{wins + losses + ties} paired run(s), mean delta "
+        f"{mean_delta:+.1%} {label}" + chr(10)
+        + f"      sign test p={p:.5f} ({verdict})"
     )
 
 
@@ -350,7 +384,8 @@ def render(runs: list[RunMetrics]) -> str:
               "   (landed runs only; precision is what separates the methods)"]
     if landed:
         lines.append(f"  {'method':<12}{'precision':>18}{'recall':>16}"
-                     f"{'work preserved':>20}{'blast':>9}{'unsafe':>8}")
+                     f"{'preserved(ident)':>20}{'deliv':>8}{'esc':>7}"
+                     f"{'blast':>8}{'unsafe':>8}")
         for m in METHODS:
             precisions = [r.method[m]["precision"] for r in landed
                           if r.method[m]["precision"] is not None]
@@ -363,18 +398,40 @@ def render(runs: list[RunMetrics]) -> str:
             rm, rh = _mean_ci(recalls)
             wm, wh = _mean_ci(preserved)
             bm, _bh = _mean_ci(blast)
+            delivered = [r.method[m]["work_preserved_delivered"] for r in landed
+                         if r.method[m]["work_preserved_delivered"] is not None]
+            escalated = sum(1 for r in landed if r.method[m]["escalations"])
+            dm = statistics.mean(delivered) if delivered else float("nan")
             lines.append(
                 f"  {m:<12}{_fmt(pm, ph):>18}{_fmt(rm, rh):>16}"
-                f"{_fmt(wm, wh, pct=True):>20}{bm:>9.1f}{unsafe:>8}"
+                f"{_fmt(wm, wh, pct=True):>20}{dm:>7.1%}"
+                f"{escalated:>4}/{len(landed):<2}{bm:>8.1f}{unsafe:>8}"
             )
+        lines += [
+            "",
+            "  preserved(ident) = 1 - |contaminated region| / |events|: what the",
+            "    method IDENTIFIES as safe to keep. deliv = what the executed plan",
+            "    actually preserved. esc = runs where the planner escalated to a",
+            "    full restart, which preserves nothing AFTER paying for the",
+            "    selective replay. When esc is high the two columns diverge and",
+            "    only `deliv` is a claim about what the system delivers.",
+        ]
         if len(landed) < 3:
             lines.append("  (n < 3: means are printed without intervals, because an "
                          "interval over two points is decoration)")
 
     # --- paired comparison ------------------------------------------------
-    lines += ["", "3b. PAIRED COMPARISON (same runs, so pair them)"]
+    lines += ["", "3b. PAIRED COMPARISON (same runs, so pair them)",
+              "  (i) on what CausalLine IDENTIFIES as preservable:"]
     for baseline in ("B0", "B1", "B2"):
         lines.append(paired_vs(runs, "CausalLine", baseline))
+    lines += ["", "  (ii) on what the executed plan actually DELIVERED -- read this "
+              "one as the",
+              "       claim about the system, because it includes escalation:"]
+    for baseline in ("B0", "B1", "B2"):
+        lines.append(paired_vs(runs, "CausalLine", baseline,
+                               key="work_preserved_delivered",
+                               label="work preserved (delivered)"))
 
     # --- safety -----------------------------------------------------------
     lines += ["", "4. SAFETY", "  " + safety_verdict(runs)]

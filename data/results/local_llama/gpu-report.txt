@@ -1,48 +1,67 @@
-LOCAL LLaMA FRONTIER -- 35 run(s) over 6 design point(s)
+LOCAL LLaMA FRONTIER -- 60 run(s) over 6 design point(s)
 
 1. COVERAGE
   design   channel        intent        flow      n  landed  task ok
-  gen001   agent_message  influencing   long      6       5        0
-  gen002   web            influencing   long      5       1        0
-  gen003   web            exposed_only  short     7       0        0
-  gen004   agent_message  exposed_only  short     5       0        0
-  gen005   memory         exposed_only  long      6       0        0
-  gen006   memory         influencing   short     6       5        0
+  gen001   agent_message  influencing   long     10       9        0
+  gen002   web            influencing   long     10       1        0
+  gen003   web            exposed_only  short    10       0        0
+  gen004   agent_message  exposed_only  short    10       0        0
+  gen005   memory         exposed_only  long     10       0        0
+  gen006   memory         influencing   short    10       7        0
 
 2. ATTRIBUTION (pair level, against the canary token)
-  n=11 landed run(s), 33 scoreable pair(s)
-  TP=18  FP=13  FN=0
-  precision=0.581  recall=1.000  F1=0.735
-  UNSAFE pairs: 0 (with carryover), 3 (without -- the non-circular column, D-064)
+  n=17 landed run(s), 49 scoreable pair(s)
+  TP=26  FP=21  FN=0
+  precision=0.553  recall=1.000  F1=0.712
+  UNSAFE pairs: 0 (with carryover), 6 (without -- the non-circular column, D-064)
 
 3. CONTAMINATION IDENTIFICATION AND RECOVERY, per method
    (landed runs only; precision is what separates the methods)
-  method               precision          recall      work preserved    blast  unsafe
-  B0                0.25 +/-0.06    1.00 +/-0.00        0.0% +/-0.0%     21.7       0
-  B1                0.57 +/-0.16    1.00 +/-0.00       52.5% +/-7.1%     10.5       0
-  B2                0.46 +/-0.17    1.00 +/-0.00      33.1% +/-14.0%     15.1       0
-  CausalLine        0.67 +/-0.19    1.00 +/-0.00       60.1% +/-5.3%      8.7       0
+  method               precision          recall    preserved(ident)   deliv    esc   blast  unsafe
+  B0                0.23 +/-0.05    1.00 +/-0.00        0.0% +/-0.0%   0.0%   0/17    21.9       0
+  B1                0.52 +/-0.13    1.00 +/-0.00       53.5% +/-4.6%  53.5%   0/17    10.3       0
+  B2                0.42 +/-0.14    1.00 +/-0.00      31.2% +/-10.9%  31.2%   0/17    15.6       0
+  CausalLine        0.62 +/-0.15    1.00 +/-0.00       61.1% +/-3.4%   0.0%  17/17     8.6       0
+
+  preserved(ident) = 1 - |contaminated region| / |events|: what the
+    method IDENTIFIES as safe to keep. deliv = what the executed plan
+    actually preserved. esc = runs where the planner escalated to a
+    full restart, which preserves nothing AFTER paying for the
+    selective replay. When esc is high the two columns diverge and
+    only `deliv` is a claim about what the system delivers.
 
 3b. PAIRED COMPARISON (same runs, so pair them)
-  CausalLine vs B0: 11W-0L-0T over 11 paired run(s), mean delta +60.1% work preserved
-      sign test p=0.001 (significant at 0.05)
-  CausalLine vs B1: 11W-0L-0T over 11 paired run(s), mean delta +7.7% work preserved
-      sign test p=0.001 (significant at 0.05)
-  CausalLine vs B2: 11W-0L-0T over 11 paired run(s), mean delta +27.0% work preserved
-      sign test p=0.001 (significant at 0.05)
+  (i) on what CausalLine IDENTIFIES as preservable:
+  CausalLine vs B0: 17W-0L-0T over 17 paired run(s), mean delta +61.1% work preserved (identified)
+      sign test p=0.00002 (significant at 0.05)
+  CausalLine vs B1: 17W-0L-0T over 17 paired run(s), mean delta +7.6% work preserved (identified)
+      sign test p=0.00002 (significant at 0.05)
+  CausalLine vs B2: 17W-0L-0T over 17 paired run(s), mean delta +29.9% work preserved (identified)
+      sign test p=0.00002 (significant at 0.05)
+
+  (ii) on what the executed plan actually DELIVERED -- read this one as the
+       claim about the system, because it includes escalation:
+  CausalLine vs B0: 0W-0L-17T over 17 paired run(s), mean delta +0.0% work preserved (delivered)
+      sign test p=1.00000 (NOT significant at 0.05 -- directionally consistent, underpowered)
+  CausalLine vs B1: 0W-17L-0T over 17 paired run(s), mean delta -53.5% work preserved (delivered)
+      sign test p=0.00002 (significant at 0.05)
+  CausalLine vs B2: 0W-17L-0T over 17 paired run(s), mean delta -31.2% work preserved (delivered)
+      sign test p=0.00002 (significant at 0.05)
 
 4. SAFETY
   SAFETY WAS TIED in this experiment -- every method had zero unsafe
   preservations, so none of them is shown safer than another here.
-  The distinguishing result was PRECISION / WORK PRESERVATION.
+  The distinguishing result was IDENTIFICATION PRECISION only.
+  CausalLine escalated to a full restart on 17 of 17 landed run(s), so its
+  DELIVERED work preservation is NOT a win -- see 3b(ii).
 
 5. COST
-  analysis tokens per run: 6369.36 +/-702.93  (n=11)
-  B0           recovery tokens 5390.45 +/-612.65
-  B1           recovery tokens 2629.73 +/-604.55
-  B2           recovery tokens 4068.00 +/-1323.31
-  CausalLine   recovery tokens 11793.18 +/-1141.83
+  analysis tokens per run: 6488.59 +/-520.10  (n=17)
+  B0           recovery tokens 5520.06 +/-489.61
+  B1           recovery tokens 2619.59 +/-422.45
+  B2           recovery tokens 4291.18 +/-1048.18
+  CausalLine   recovery tokens 12045.47 +/-911.95
 
-  CausalLine total (analysis + replay) = 18163 tokens
-  B0 full restart                      = 5390 tokens
+  CausalLine total (analysis + replay) = 18534 tokens
+  B0 full restart                      = 5520 tokens
   -> selective recovery is NOT CHEAPER than full restart on this workload.

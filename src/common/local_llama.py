@@ -291,7 +291,21 @@ class LocalLlamaClient:
             with urllib.request.urlopen(
                 request, timeout=self.settings.timeout_s
             ) as response:
-                return json.loads(response.read())
+                body = response.read()
+            try:
+                return json.loads(body)
+            except (json.JSONDecodeError, ValueError) as exc:
+                # Ollama answers HTTP 200 with an empty or truncated body when
+                # it drops a connection mid-load. Raised bare, that is a
+                # JSONDecodeError which `generate()`'s retry loop does not
+                # catch, so it escapes `run_generated` and discards the whole
+                # run -- four of the sixty GPU-campaign runs died this way,
+                # after minutes of real inference, at [19][20][21] and [31].
+                # It is a transient transport fault, so it is spelled as one.
+                raise LLMError(
+                    f"unparseable body from {self.settings.endpoint} "
+                    f"({len(body)} byte(s)): {body[:120]!r}"
+                ) from exc
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode(errors="replace")[:300]
             if exc.code == 404:

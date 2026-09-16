@@ -132,6 +132,33 @@ class TestTransportBehaviour(unittest.TestCase):
         self.assertEqual(response.total_tokens, 333)
         self.assertEqual(client.total_tokens, 333)
 
+    def test_an_empty_body_is_a_transient_error_not_a_lost_run(self) -> None:
+        """Ollama answers HTTP 200 with an empty body when it drops a
+        connection mid-load. Raised bare that is a `JSONDecodeError`, which the
+        retry loop does not catch and which therefore escapes `run_generated`
+        and discards the entire run. Four of the sixty GPU-campaign runs were
+        lost exactly this way, after minutes of real inference. It has to
+        surface as `LLMError` so the existing retry handles it."""
+        import io
+        import json as _json
+        from contextlib import contextmanager
+
+        from src.common.llm import LLMError
+
+        @contextmanager
+        def empty_response(*_args, **_kwargs):
+            yield io.BytesIO(b"")
+
+        client = LocalLlamaClient(settings=LocalLlamaSettings(max_attempts=2))
+        with mock.patch("urllib.request.urlopen", empty_response), mock.patch(
+            "time.sleep"
+        ):
+            with self.assertRaises(LLMError) as caught:
+                client.generate("anything")
+        self.assertNotIsInstance(caught.exception, _json.JSONDecodeError)
+        self.assertIn("0 byte", str(caught.exception))
+        self.assertEqual(client.stats.retries, 1, "an empty body was not retried")
+
     def test_a_degenerate_json_answer_is_retried_and_still_charged(self) -> None:
         """D-056's rule, applied locally: a rejected attempt's tokens were
         still spent, so hiding them would make the analysis look cheaper than

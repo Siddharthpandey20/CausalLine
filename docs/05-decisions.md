@@ -3390,3 +3390,85 @@ afford, reports `n` beside every number, and claims nothing needing a larger
 `n`. A single-model, single-repetition local result does not close `docs/09`
 §9.1 either — it adds a *second* model at n=1, which is a different and smaller
 claim than cross-model validity.
+
+## D-085 — An unparseable HTTP body is a transient fault, not a lost run
+
+**16-09-2026. `src/common/local_llama.py`, `tests/test_local_llama.py`.**
+
+Four of the sixty GPU-campaign runs died with
+`JSONDecodeError: Expecting value: line 1 column 1 (char 0)` — three of them
+consecutively, at `[19][20][21]`, and one at `[31]`.
+
+**Cause, proven rather than guessed.** `_post` ended with
+`return json.loads(response.read())`, unguarded. Ollama answers **HTTP 200 with
+an empty body** when it drops a connection around a model reload. The bare
+`JSONDecodeError` that produces is not an `LLMError`, so `generate()`'s retry
+loop — which catches `LLMError` — never saw it. It propagated out of
+`run_generated` and the campaign's per-run `except Exception` discarded the
+**entire run**, minutes of real inference included, printing only the exception
+type. The regression test reproduces the campaign's exact error string from an
+empty body, which is what makes this a cause and not a story.
+
+**Fix: spell it as what it is.** The body parse is wrapped and re-raised as
+`LLMError` with the byte count and a prefix of the body, so the existing retry
+handles it and a genuine malformation still fails loudly with its content
+visible. One line of guarding turned four lost runs into four retried calls.
+
+**The four runs were re-run, not written off.** Same `_one()` code path, same
+seeds, appended to the existing results file; nothing already measured was
+overwritten. The campaign reports 60 of 60.
+
+**This is the third instance of the same shape** — after `total_tokens` and
+`rate_limited` / `key_rotations` in D-084 — where a local-backend contract gap
+destroyed work *after* it was done. The pattern worth naming: on an expensive,
+slow backend, any failure that can only surface at the end of a run costs the
+whole run, so the cheap defensive guard is worth more than it looks.
+
+## D-086 — "Work preserved" is two numbers, and the report must print both
+
+**16-09-2026. `src/eval/local_report.py`.**
+
+**The problem, found in our own favour.** The local report's `work_preserved`
+was computed as `1 - |contaminated region| / |events|` — a property of the
+contaminated region the method *identifies*. It was printed under the heading
+"work preserved" and fed the paired sign test, which returned CausalLine
+**17W–0L–0T against all three baselines, p = 0.00002**.
+
+That number is real, and it is not what the system delivered. The stored
+per-run rows carry the planner's *executed* outcome, and on **17 of 17 landed
+runs** it was `0.0%`: `verify()` refused to certify the selective replay
+(`task-level check failed`, with the trace's own note that the original run
+failed the same check), so the planner escalated to `agent_restart` and then to
+a full restart. Paired on the delivered number, CausalLine is **0W–17L against
+B1 and B2** and ties B0.
+
+So the report was answering "how good is the identification?" while its column
+heading, and any reader, would take it for "how much work did you save?". The
+two diverge exactly when escalation is common, which is precisely the case this
+project has to be honest about.
+
+**Decision: report both, always, and name which is the system claim.**
+
+- `preserved(ident)` — `1 - |region| / |events|`, what the method identifies.
+- `deliv` — what the executed plan actually preserved, read from the run row.
+- `esc` — how many landed runs escalated, because that is the whole gap.
+
+The paired test now takes the key explicitly and runs **twice**, with the
+delivered comparison labelled as the one to read as a claim about the system.
+`safety_verdict()` additionally checks the escalation rate before it is willing
+to name work preservation as the distinguishing result: with escalation on a
+majority of landed runs it says *identification precision only*, and points at
+the delivered table. A tie may not be reported as a win (the brief's rule 4),
+and neither may a loss one column over.
+
+**Why the loss is not, by itself, a refutation of the method.** The escalation
+is `docs/03` #15: the 3B model fails the task on 56 of 60 runs *before any
+attack*, so no replay of it can ever be certified. CausalLine is the only one
+of the four methods that checks, and the only one charged for the answer; B1's
+53.5% is unverified preservation. Both readings are in
+`docs/local_llm_frontier/02` §3.3 and neither is allowed to stand alone.
+
+**Why it is still a genuine negative.** No frontier in this project has yet
+observed CausalLine execute a selective recovery that verification certified.
+Until one does, the work-preservation claim is about *identification*, and every
+table has to say so.
