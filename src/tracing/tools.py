@@ -48,6 +48,9 @@ class Tools:
     # `web_pages` and for the same reason -- src/eval/ hands in a poisoned
     # version and nothing in this module changes (D-014).
     fanout_docs: list[dict[str, Any]] = field(default_factory=list)
+    # A briefing exposed to EVERY analyst. Used to build the wide-exposure /
+    # low-influence cases the Gate-1 falsification suite needs.
+    fanout_shared: str = ""
 
     @classmethod
     def from_fixtures(
@@ -78,6 +81,15 @@ class Tools:
         )
 
     # --- fan-out documents ---------------------------------------------------
+
+    def fanout_shared_note(self) -> str:
+        """A briefing every analyst reads, or "" for none.
+
+        Injected by the scenario like `fanout_docs`; empty by default so every
+        existing fan-out run is byte-identical.
+        """
+        return self.fanout_shared
+
 
     def fanout_documents(self, workers: int) -> list[dict[str, Any]]:
         """One document per analyst. Falls back to the clean generated corpus

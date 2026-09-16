@@ -85,6 +85,18 @@ class FanoutPipeline(GeminiPipeline):
         finding_sources: list[str] = []
         analyst_events: list[str] = []
 
+        # A SHARED BRIEFING, exposed to every analyst.
+        #
+        # This exists to attack the structural bound, not to help it. The bound
+        # is the call-graph closure of wherever a flagged source entered, so a
+        # source every analyst reads makes that closure the WHOLE trace --
+        # f_structural ~ 1.0 -- whatever its actual influence turns out to be.
+        # It is the "wide exposure, little influence" shape that
+        # `docs/gate1/02-experiments.md` §8 records as an untested gap.
+        #
+        # None by default, so every existing fan-out run is unchanged.
+        shared_text = self.tools.fanout_shared_note()
+
         for index, document in enumerate(documents, start=1):
             agent = f"analyst{index}"
             # Each analyst sees ITS OWN document and nothing else. This is the
@@ -123,6 +135,28 @@ class FanoutPipeline(GeminiPipeline):
             )
             self._sources[source.id] = source
             self.expose(agent, source.id)
+
+            if shared_text:
+                # EACH analyst fetches the bulletin for itself, so it is a
+                # separate source with its own entry event per agent.
+                #
+                # Logging it once and sharing the id does NOT produce wide
+                # structural reach, and finding that out is part of the result:
+                # `b2_topology_closure` locates a flagged source by its
+                # `origin_event`, so one entry point yields one compromised
+                # agent however many contexts the source sits in. Measured, the
+                # single-source version gave f_structural 0.13-0.20 -- no wider
+                # than an ordinary one-analyst poisoning. Per-agent retrieval is
+                # both the shape a real deployment has and the one that actually
+                # tests the bound.
+                shared_source = self.log.log_source(
+                    kind="web",
+                    content=shared_text,
+                    origin_event=fetch_response.id,
+                    metadata={"doc": "shared-briefing", "channel": "web"},
+                )
+                self._sources[shared_source.id] = shared_source
+                self.expose(agent, shared_source.id)
 
             # An INJECTED source, when the scenario planted one for this
             # analyst. It is a second source rather than an edit to the report,
