@@ -3289,3 +3289,104 @@ observation that the contrast should be the model's own two answers rather than
 the request. That is a real design insight, it is now backed by a measured
 floor, and it is written down here so that adopting it later is a decision with
 evidence attached rather than a preference.
+
+## D-084 — A second real-model frontier, on a local LLaMA, sharing the pipeline and nothing else
+
+**16-09-2026. Adds `src/common/local_llama.py`, `src/eval/local_bench.py`,
+`src/eval/local_campaign.py`. Changes no existing module.**
+
+**Why a second frontier at all.** `docs/09` §9.1 has said since the first
+campaign that the cross-model question is *not answered by this work*: one
+hosted model answered, a second was retired and a third would not serve
+(D-058, D-081). A local model is the only second model this project can
+actually get, so it is the only way to move that limitation.
+
+**Decision: a third client behind the same `generate()` contract, and no second
+pipeline.** `real_llm.run_generated()` does the work — the same tracing,
+provenance, attribution, contamination walk, planner, replay, verification,
+baselines and `RecoveryScore`. The local runner hands it a different client and
+writes to `data/results/local_llama/`. `src/common/nvidia.py` and
+`src/eval/real_campaign.py` are not imported by any new module, which
+`tests/test_local_llama.py::TestTheNvidiaFrontierIsUntouched` asserts by
+parsing their imports rather than by promising it.
+
+**It runs the *same suite* as the hosted campaign** — `suite-20260910.jsonl`,
+the exact six design points. A comparison needs the scenarios held constant;
+generating a fresh local suite would change the model and the tests at once and
+answer nothing. It also spends no tokens on generation, which matters at 9.5
+tok/s.
+
+### What the machine turned out to be, and why it shaped everything
+
+| | |
+|---|---|
+| GPU | RTX 3050 Laptop, 6144 MiB |
+| placement | **100% CPU** — `GPULayers:[]` in Ollama's own load record |
+| parallelism | **`Parallel:1`** in the same record |
+| llama3 (8B Q4) | 4.06 tok/s |
+| llama3.2:3b | 9.50 tok/s |
+
+Neither model reaches the GPU, and the 2.5 GB one fits 6 GiB with room to
+spare — so this is not a capacity problem a smaller model solves, it is a CUDA
+path that is not being used on this install. Recorded as an environment
+property rather than chased, because the brief asked for bounded effort on
+exactly this kind of thing (and D-081 is the precedent).
+
+**`llama3.2:3b` is the campaign model** because the 8B measured at roughly 4.5
+minutes *per model call* on the real pipeline prompts — about two hours per
+test and twelve for the suite. That is not a campaign anyone can iterate on.
+The 3B is 2.4× faster. Both sweeps are kept.
+
+**The concurrency answer is 1, and the rule that produced it had to be
+corrected.** The first rule was "the highest level with no failures and
+throughput within 90% of peak", which answered **4**: nothing failed at 4 and
+throughput was close to peak. But throughput is *flat* across 1, 2 and 4 while
+p50 goes 16.7s → 32.8s → 67.5s. A level that completes every call while running
+each one four times slower has not failed, and it is not safe to run a campaign
+on either. The rule is now **the smallest concurrency that reaches peak
+throughput**, because above saturation extra concurrency is pure queueing. Both
+models answer C_safe = C_saturated = 1, and `Parallel:1` is the mechanism.
+
+### Three client-contract gaps, and where they failed
+
+"Drop-in for `GeminiClient`" turned out to mean more than `generate()`. Two
+attributes the *shared* code reads off whatever client it is handed were
+missing, and both failed **after the work**:
+
+- `client.total_tokens`, read by `run_pipeline` on the last line of a run;
+- `stats.rate_limited` / `stats.key_rotations`, read by
+  `real_llm._attach_api_stats` at the reporting step.
+
+Three local tests were lost to those — twelve real inference calls each,
+discarded at the final line and reported as `VOID` with **no cause printed**,
+which is what made them expensive to diagnose rather than merely annoying.
+
+Two consequences, both kept:
+
+1. **The fields live on the local client, not behind a defensive harness.**
+   `_attach_api_stats` is shared with the NVIDIA frontier and the brief forbids
+   changing it. `rate_limited` and `key_rotations` are structurally zero here —
+   no quota, no keys — so zero is the measurement, not a placeholder.
+2. **`tests/test_local_llama.py` asserts the whole contract offline**, as an
+   explicit list, so a missing attribute names itself in under a second instead
+   of surfacing as an `AttributeError` three frames down after five minutes of
+   inference. The local runner also prints `result.failure` now: a void row
+   without its reason is a row nobody can act on.
+
+### On determinism (the brief's Phase 6)
+
+Temperature 0 and a fixed seed make greedy decoding reproducible *for a fixed
+model and runtime version*. That is not byte-identical replay and nothing here
+claims it. The existing decision / code / JSON-shape / tool-args signatures are
+what separate a real change from wording churn, exactly as on the hosted
+frontier — which is the whole reason D-026 removed text comparison.
+
+### What this frontier cannot deliver, stated before it is run
+
+**The brief asks for ≥30 repetitions per design point where practical. It is not
+practical.** At 9.5 tok/s, serialised, 30 repetitions of six design points is on
+the order of a week of wall clock on this machine. The campaign runs what it can
+afford, reports `n` beside every number, and claims nothing needing a larger
+`n`. A single-model, single-repetition local result does not close `docs/09`
+§9.1 either — it adds a *second* model at n=1, which is a different and smaller
+claim than cross-model validity.

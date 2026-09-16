@@ -1,0 +1,92 @@
+{
+  "model": "llama3.2:3b",
+  "prompt_tokens_requested": 160,
+  "levels": [
+    {
+      "concurrency": 1,
+      "repeat": 1,
+      "calls": 2,
+      "successes": 2,
+      "failures": 0,
+      "timeouts": 0,
+      "wall_clock_s": 33.69585704803467,
+      "output_tokens": 320,
+      "gpu_util_pct": 0.0,
+      "gpu_mem_used_mb": 0.0,
+      "ram_used_mb": null,
+      "errors": [],
+      "p50_s": 16.65,
+      "p95_s": 17.04,
+      "throughput_tok_s": 9.5,
+      "completed_per_min": 3.56
+    },
+    {
+      "concurrency": 2,
+      "repeat": 1,
+      "calls": 4,
+      "successes": 4,
+      "failures": 0,
+      "timeouts": 0,
+      "wall_clock_s": 66.6814079284668,
+      "output_tokens": 640,
+      "gpu_util_pct": 0.0,
+      "gpu_mem_used_mb": 0.0,
+      "ram_used_mb": null,
+      "errors": [],
+      "p50_s": 32.83,
+      "p95_s": 33.84,
+      "throughput_tok_s": 9.6,
+      "completed_per_min": 3.6
+    },
+    {
+      "concurrency": 4,
+      "repeat": 1,
+      "calls": 8,
+      "successes": 8,
+      "failures": 0,
+      "timeouts": 0,
+      "wall_clock_s": 134.6429328918457,
+      "output_tokens": 1280,
+      "gpu_util_pct": 0.0,
+      "gpu_mem_used_mb": 0.0,
+      "ram_used_mb": null,
+      "errors": [],
+      "p50_s": 67.54,
+      "p95_s": 67.8,
+      "throughput_tok_s": 9.51,
+      "completed_per_min": 3.56
+    }
+  ],
+  "verdict": {
+    "per_level": {
+      "1": {
+        "failures": 0,
+        "timeouts": 0,
+        "throughput_tok_s": 9.5,
+        "p50_s": 16.65,
+        "p95_s": 17.04,
+        "completed_per_min": 3.56
+      },
+      "2": {
+        "failures": 0,
+        "timeouts": 0,
+        "throughput_tok_s": 9.6,
+        "p50_s": 32.83,
+        "p95_s": 33.84,
+        "completed_per_min": 3.6
+      },
+      "4": {
+        "failures": 0,
+        "timeouts": 0,
+        "throughput_tok_s": 9.51,
+        "p50_s": 67.54,
+        "p95_s": 67.8,
+        "completed_per_min": 3.56
+      }
+    },
+    "C_safe": 1,
+    "C_saturated": 1,
+    "C_failure": null,
+    "best_throughput_tok_s": 9.6
+  }
+}
