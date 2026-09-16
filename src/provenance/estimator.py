@@ -256,8 +256,15 @@ def counterfactual(
         request.prompt, request.source_block, source_id, removed_content
     )
 
+    # `redacted` is what the model sees after the removal, and it is what the
+    # carryover facet measures uniqueness against (D-079): a span the answer
+    # could still have got from the request is not evidence about the source
+    # that left it.
     before = with_carryover(
-        comparator.signature(request.output, context), request.output, removed_content
+        comparator.signature(request.output, context),
+        request.output,
+        removed_content,
+        redacted,
     )
     result = CounterfactualResult(
         source_id, request.event_id, influenced=False,
@@ -274,6 +281,7 @@ def counterfactual(
             comparator.signature(response.text, context),
             response.text,
             removed_content,
+            redacted,
         )
         result.after = after
         result.repeats += 1
@@ -310,6 +318,7 @@ def counterfactual(
             comparator.signature(response.text, context),
             response.text,
             removed_content,
+            redacted,
         )
         same, _moved = compare(before, control, exclude=excluded)
         result.control_stable = same

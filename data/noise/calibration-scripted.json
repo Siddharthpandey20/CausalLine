@@ -4,7 +4,9 @@
     "code": [],
     "decision": [],
     "json_shape": [],
-    "prose": []
+    "prose": [
+      "carryover"
+    ]
   },
   "floors": {
     "json_shape": {
@@ -17,7 +19,7 @@
       "formats": 0.0,
       "output_format": 0.0,
       "dependency": 0.0,
-      "carryover": 0.0
+      "carryover": 0.021875
     },
     "decision": {
       "library": 0.0,

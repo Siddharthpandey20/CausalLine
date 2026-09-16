@@ -216,7 +216,59 @@ def spans_present_in(text: str, spans: list[str]) -> list[str]:
     return [span for span in spans if span and span in haystack]
 
 
-def carryover_facet(text: str, removed_content: str, n: int = SHINGLE) -> str:
+def carried_spans(content: str, elsewhere: str, n: int = SHINGLE) -> list[str]:
+    """Spans of `content` that occur nowhere else in the request (D-079).
+
+    WHY THIS IS NOT `distinctive_spans`, AND WHY THAT MATTERS
+    ---------------------------------------------------------
+    `distinctive_spans` decides what is worth reporting by the *shape* of a
+    span: at least ten characters, letters mixed with digits. That is a rule
+    about what an identifier looks like, and it had two costs.
+
+    The first was a measured false clean. `llm_scenarios._token_for()` builds
+    every canary as eight characters, so no generated canary ever cleared the
+    ten-character bar; `gen001` carried its token into an answer and the facet
+    read zero on both sides (`docs/03` #19a).
+
+    The second is subtler and is the reason the fix is not "change 10 to 8".
+    The shape rule and the ground-truth generator would then be two spellings
+    of the same idea -- "a short alphanumeric identifier" -- and the estimator
+    would agree with the yardstick because both were built to look for the same
+    thing. Closing the coverage gap that way reopens the circularity D-064
+    declared.
+
+    So the discriminator is changed rather than retuned. A span counts here if
+    it is **unique to the removed source within this request**: present in the
+    content being removed, absent from everything the model can still see. That
+    is a question about *this prompt*, answered by set difference, with no
+    pattern and no threshold in it -- structurally unlike an exact-substring
+    test for a constant we chose, which is what the ground truth does.
+
+    Three properties fall out rather than being arranged:
+
+      * **it is the causally relevant question.** A span the answer could have
+        got from a source that stayed is not evidence about the one that left.
+      * **it needs no length or shape rule.** Ordinary words are filtered by
+        occurring elsewhere in the request, not by a list or a bar, so a short
+        token and a long clause are treated the same way.
+      * **redundancy still cancels it.** A payload duplicated into a surviving
+        source is no longer unique, the facet holds still, and the verdict is
+        unchanged -- the same self-cancelling behaviour D-064 claimed, now
+        enforced by the definition instead of by the shape of the spans.
+
+    `elsewhere` is the redacted request: the prompt as re-issued, with the
+    source gone. Empty `elsewhere` makes every span unique, so callers that
+    have no request must pass the content they do have rather than nothing.
+    """
+    tokens = _tokens(content)
+    candidates = set(_shingles(tokens, n)) | set(tokens)
+    rest = " ".join(_tokens(elsewhere))
+    return sorted(span for span in candidates if span and span not in rest)
+
+
+def carryover_facet(
+    text: str, removed_content: str, elsewhere: str, n: int = SHINGLE
+) -> str:
     """Facet value: what of `removed_content` survives verbatim into `text`.
 
     The value is a count plus a bounded, sorted digest of the matched spans, so
@@ -224,10 +276,13 @@ def carryover_facet(text: str, removed_content: str, n: int = SHINGLE) -> str:
     not merely when the count does. A digest rather than the spans themselves
     because a signature is written into every `check` record and a quoted
     payload does not belong in a trace.
+
+    `elsewhere` is the rest of the request; see `carried_spans` for why the
+    span set is computed against it rather than by shape.
     """
     if not removed_content.strip():
         return ""
-    hits = spans_present_in(text, distinctive_spans(removed_content, n))
+    hits = spans_present_in(text, carried_spans(removed_content, elsewhere, n))
     if not hits:
         return "0"
     digest = sorted(
@@ -237,7 +292,11 @@ def carryover_facet(text: str, removed_content: str, n: int = SHINGLE) -> str:
 
 
 def with_carryover(
-    signature: Signature, text: str, removed_content: str, n: int = SHINGLE
+    signature: Signature,
+    text: str,
+    removed_content: str,
+    elsewhere: str,
+    n: int = SHINGLE,
 ) -> Signature:
     """`signature` plus the removal-aware facet, for one side of a comparison.
 
@@ -246,7 +305,9 @@ def with_carryover(
     when the removed source's material stopped appearing in the answer.
     """
     facets = dict(signature.facets)
-    facets[CARRYOVER_FACET] = carryover_facet(text, removed_content, n)
+    facets[CARRYOVER_FACET] = carryover_facet(
+        text, removed_content, elsewhere, n
+    )
     return Signature(
         comparator=signature.comparator, facets=facets, error=signature.error
     )

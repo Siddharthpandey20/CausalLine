@@ -434,7 +434,10 @@ class CounterfactualDecision:
             return True
 
         removed = self._removed_content(group)
-        before = with_carryover(self._before, self.request.output, removed)
+        # D-079: uniqueness is measured against the request as re-issued.
+        before = with_carryover(
+            self._before, self.request.output, removed, prompt
+        )
         moved = False
         for _ in range(max(1, self.repeats)):
             response = self.client.generate(prompt, system=self.request.system)
@@ -444,6 +447,7 @@ class CounterfactualDecision:
                 self.comparator.signature(response.text, self.context),
                 response.text,
                 removed,
+                prompt,
             )
             same, _moved = compare(before, after, exclude=self._excluded)
             if not same:
@@ -566,6 +570,15 @@ def measure_on_scenario(
     from src.tracing.pipeline import run_pipeline
     from src.tracing.tools import Tools
 
+    # D-070's defect, one layer out: this harness drove every decision with an
+    # empty `Calibration()`, so the facets the scripted client was *measured*
+    # to be unstable on were counted anyway. It only started to matter when
+    # D-079 gave `carryover` a span set sensitive enough for the client's
+    # per-call `[ref ...]` churn to move it on prose.
+    from src.eval.experiment import scripted_calibration
+
+    calibration = scripted_calibration()
+
     out_dir = Path(workdir)
     out_dir.mkdir(parents=True, exist_ok=True)
     variant = "influencing" if influencing else "exposed_only"
@@ -589,15 +602,21 @@ def measure_on_scenario(
             continue
         candidates = list(request.exposures)
 
-        loo_decision = CounterfactualDecision(client=client, request=request)
+        loo_decision = CounterfactualDecision(
+            client=client, request=request, calibration=calibration
+        )
         loo_diag = GroupTestDiagnostics()
         loo_found = leave_one_out(candidates, loo_decision, loo_diag)
 
-        gt_decision = CounterfactualDecision(client=client, request=request)
+        gt_decision = CounterfactualDecision(
+            client=client, request=request, calibration=calibration
+        )
         gt_diag = GroupTestDiagnostics()
         gt_found = group_test(candidates, gt_decision, gt_diag)
 
-        infer_decision = CounterfactualDecision(client=client, request=request)
+        infer_decision = CounterfactualDecision(
+            client=client, request=request, calibration=calibration
+        )
         infer_diag = GroupTestDiagnostics()
         group_test(candidates, infer_decision, infer_diag, infer_sibling=True)
 

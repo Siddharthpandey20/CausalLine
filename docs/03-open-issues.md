@@ -698,3 +698,5 @@ means re-running the 30-repetition matrix and reporting every delta.
 **Status: OPEN, both halves. Raised 16-09-2026.** Neither is a blocker for the
 scripted results; both are blockers for quoting the real-LLM method comparison
 as a comparison.
+
+**Status: CLOSED 16-09-2026.** 19a by D-079, 19b by D-080. Both with before/after numbers and a stated direction.

@@ -183,23 +183,21 @@ def measure(
         # inconsistently between identical requests, which would make the facet
         # unusable as evidence -- so it is calibrated like every other one.
         for content in contents:
-            base = with_carryover(Signature(comparator.name), output, content).facets[
-                CARRYOVER_FACET
-            ]
-            seen = {
-                with_carryover(Signature(comparator.name), text, content).facets[
-                    CARRYOVER_FACET
-                ]
-                for text in repeats
-            }
-            differs = sum(1 for v in seen if v != base) and sum(
-                1
-                for text in repeats
-                if with_carryover(Signature(comparator.name), text, content).facets[
-                    CARRYOVER_FACET
-                ]
-                != base
-            )
+            # D-079: the facet's span set is what is unique to this source
+            # within the request, so the floor has to be measured against the
+            # same `elsewhere` the estimator uses -- the request with this
+            # source's text taken out. Measuring it against nothing would
+            # calibrate a different function from the one that runs.
+            elsewhere = prompt.replace(content, " ") if content in prompt else prompt
+
+            def _facet(text: str, _c: str = content, _e: str = elsewhere) -> str:
+                return with_carryover(
+                    Signature(comparator.name), text, _c, _e
+                ).facets[CARRYOVER_FACET]
+
+            base = _facet(output)
+            seen = {_facet(text) for text in repeats}
+            differs = sum(1 for text in repeats if _facet(text) != base)
             out.record(
                 comparator.name, CARRYOVER_FACET, differs, trials, len(seen | {base})
             )

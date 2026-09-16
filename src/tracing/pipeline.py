@@ -1172,7 +1172,14 @@ class GeminiPipeline:
 
 # The shape the task asks for: "prints each one as an ISO date (YYYY-MM-DD),
 # one per line". Fixed here, next to the task statement it comes from.
-ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
+# D-080 (`docs/03` #19b). The trailing `` used to be `\d{4}-\d{2}-\d{2}`,
+# which does not match inside `2024-03-12T00:00:00`: `T` is a word character, so
+# `12T` is not a boundary and a stdout full of correct dates matched *nothing*.
+# `datetime.isoformat()` rather than `.date().isoformat()` is an ordinary thing
+# for a model to write, and `gen001` wrote it -- five right dates, in order,
+# rc=0, scored a failure. A negative lookahead for a digit keeps the guard that
+# matters (no matching a longer run of digits) without rejecting a time suffix.
+ISO_DATE = re.compile(r"(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)")
 
 
 def task_outcome(expected: list[str], stdout: str) -> tuple[bool, str]:

@@ -487,5 +487,52 @@ class TestStoredPromptIsTheSentPrompt(unittest.TestCase):
         client.generate(self.original.prompt_text(first) or "x")
         self.assertIsNone(client.last_issued_prompt())
 
+class TestIsoDateAcceptsADatetime(unittest.TestCase):
+    r"""docs/03 #19b (D-080): D-065's `iso_scan` route could not see a datetime.
+
+    `ISO_DATE` was `\b\d{4}-\d{2}-\d{2}\b`. Inside `2024-03-12T00:00:00`
+    the trailing `\b` fails, because `T` is a word character and `12T` is not a
+    boundary — so the route D-065 added to stop decoration failing a correct run
+    found **zero** dates in a stdout containing five.
+
+    `gen001` in the second real-LLM campaign is that run: five correct dates, in
+    order, exit 0, scored a failure. Same asymmetry D-065 was written to remove,
+    surviving D-065 — `verify()` is the only consumer and only CausalLine
+    verifies, so only CausalLine was charged for it.
+    """
+
+    EXPECTED = ["2024-03-12", "2021-03-05", "2019-07-04", "2000-01-01", "1999-12-31"]
+
+    def test_the_gen001_output_now_passes(self) -> None:
+        stdout = "".join(f"{d}T00:00:00" + chr(10) for d in self.EXPECTED)
+        self.assertEqual(task_outcome(self.EXPECTED, stdout), (True, "iso_scan"))
+
+    def test_plain_dates_are_still_decided_by_the_unchanged_rule(self) -> None:
+        stdout = "".join(f"{d}" + chr(10) for d in self.EXPECTED)
+        self.assertEqual(task_outcome(self.EXPECTED, stdout), (True, "exact_lines"))
+
+    def test_it_still_refuses_everything_it_must(self) -> None:
+        """Only decoration is forgiven. The values are still exact."""
+        wrong = list(self.EXPECTED)
+        wrong[0] = "2024-03-13"
+        cases = {
+            "a wrong date": wrong,
+            "a missing date": self.EXPECTED[:4],
+            "an extra date": self.EXPECTED + ["2001-01-01"],
+            "a different order": list(reversed(self.EXPECTED)),
+        }
+        for name, dates in cases.items():
+            with self.subTest(case=name):
+                stdout = "".join(f"{d}T00:00:00" + chr(10) for d in dates)
+                ok, _how = task_outcome(self.EXPECTED, stdout)
+                self.assertFalse(ok, f"{name} must not pass")
+
+    def test_a_longer_digit_run_is_not_a_date(self) -> None:
+        """What the word boundaries were protecting, kept by the lookarounds."""
+        self.assertEqual(
+            task_outcome(self.EXPECTED, "12024-03-121" + chr(10)), (False, "mismatch")
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
