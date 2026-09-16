@@ -333,6 +333,15 @@ def main(argv: list[str] | None = None) -> int:
         print("the endpoint did not answer; nothing below would mean anything")
         return 1
 
+    # Placement is part of the measurement, not context for it: a CPU sweep and
+    # a GPU sweep of the same model are different experiments.
+    from src.common.local_llama import LocalLlamaSettings, placement
+
+    on_gpu, placement_detail = placement(LocalLlamaSettings(model=args.model))
+    where = "GPU" if on_gpu else "*** CPU ***"
+    print(f"  placement: {where} -- {placement_detail}")
+    print()
+
     results: list[LevelResult] = []
     for concurrency in levels:
         for repeat in range(1, args.repeats + 1):
@@ -375,6 +384,8 @@ def main(argv: list[str] | None = None) -> int:
         json.dumps(
             {
                 "model": args.model,
+                "placement": placement_detail,
+                "on_gpu": on_gpu,
                 "prompt_tokens_requested": BENCH_TOKENS,
                 "levels": [r.to_dict() for r in results],
                 "verdict": verdict,

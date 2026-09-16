@@ -342,6 +342,86 @@ def available(settings: LocalLlamaSettings | None = None) -> tuple[bool, str]:
     return False, f"{settings.model} not pulled; have {sorted(names)}"
 
 
+
+def placement(settings: LocalLlamaSettings | None = None) -> tuple[bool, str]:
+    """Is the model actually on the GPU? (on_gpu, human-readable detail)
+
+    WHY THIS IS A PREFLIGHT AND NOT A FOOTNOTE
+    -------------------------------------------
+    The first local campaign ran entirely on CPU and nobody noticed until the
+    throughput was explained after the fact. Ollama had *not* failed and had not
+    said anything at request time -- its startup log carried one line,
+    `failure during GPU discovery ... failed to finish discovery before
+    timeout`, and it then served every request from `library=cpu` at roughly a
+    fifth of the speed the machine can do.
+
+    That is the expensive kind of silent fallback: nothing errors, the numbers
+    are real, and the campaign simply takes five times longer than it needed
+    to. So placement is now checked *before* a campaign spends anything, and
+    the caller is told loudly enough to act on it.
+
+    The check asks the running server (`/api/ps`) rather than `nvidia-smi`,
+    because the question is "where is this model loaded", not "does a GPU
+    exist" -- the machine this was written on answers yes to the second and no
+    to the first.
+
+    Returns `(False, ...)` when the model is not loaded at all, because an
+    unloaded model cannot be confirmed to be on the GPU. Load it with one
+    cheap call first; `warn_if_cpu()` does exactly that.
+    """
+    settings = settings or LocalLlamaSettings()
+    try:
+        with urllib.request.urlopen(
+            f"{settings.endpoint}/api/ps", timeout=10
+        ) as response:
+            running = json.loads(response.read()).get("models", [])
+    except Exception as exc:  # noqa: BLE001
+        return False, f"could not ask the server where the model is: {exc}"
+
+    for entry in running:
+        name = entry.get("name") or entry.get("model") or ""
+        if not (name == settings.model or name.startswith(settings.model + ":")):
+            continue
+        total = int(entry.get("size") or 0)
+        on_gpu = int(entry.get("size_vram") or 0)
+        if total <= 0:
+            return False, f"{name}: loaded, but the server reported no size"
+        share = on_gpu / total
+        detail = (
+            f"{name}: {share:.0%} on GPU "
+            f"({on_gpu / 1e9:.1f} GB of {total / 1e9:.1f} GB in VRAM)"
+        )
+        return share > 0.5, detail
+    return False, f"{settings.model} is not currently loaded"
+
+
+def warn_if_cpu(settings: LocalLlamaSettings | None = None) -> bool:
+    """Load the model, check placement, and say so. Returns True if on GPU.
+
+    Called by `local_bench` and `local_campaign` before either spends anything.
+    It does not refuse to run -- a CPU result is still a real result and the
+    project has no business discarding measurements -- but an unlabelled CPU
+    campaign is the thing to prevent, so the label is printed where it cannot
+    be missed and is carried into the results file.
+    """
+    settings = settings or LocalLlamaSettings()
+    try:
+        LocalLlamaClient(settings=settings).generate("hi")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  placement: could not load the model to check: {exc}")
+        return False
+    on_gpu, detail = placement(settings)
+    if on_gpu:
+        print(f"  placement: OK -- {detail}")
+        return True
+    print(f"  placement: *** RUNNING ON CPU *** -- {detail}")
+    print("  Ollama falls back to CPU silently when GPU discovery times out at")
+    print("  startup; the server log line is `failure during GPU discovery`.")
+    print("  Restart Ollama on an unloaded machine and re-check before")
+    print("  committing to a long campaign -- it was ~5x slower on this box.")
+    return False
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="local LLaMA backend")
     parser.add_argument("--smoke", action="store_true", help="one live call")

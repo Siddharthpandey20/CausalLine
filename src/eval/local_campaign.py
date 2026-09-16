@@ -46,7 +46,13 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from src.common.local_llama import LocalLlamaClient, LocalLlamaSettings, available
+from src.common.local_llama import (
+    LocalLlamaClient,
+    LocalLlamaSettings,
+    available,
+    placement,
+    warn_if_cpu,
+)
 from src.eval.llm_scenarios import GeneratedScenario
 from src.eval.real_llm import (
     annotation_summary,
@@ -155,12 +161,13 @@ def run(
     return results
 
 
-def save(results: list[Any], path: Path) -> Path:
+def save(results: list[Any], path: Path, placement_note: str = "") -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(
             {
                 "frontier": "local-llama",
+                "placement": placement_note,
                 "results": [r.to_dict() for r in results],
             },
             indent=2,
@@ -190,10 +197,17 @@ def main(argv: list[str] | None = None) -> int:
         print(plan(scenarios))
         return 0
 
-    ok, detail = available(LocalLlamaSettings(model=args.model))
+    settings = LocalLlamaSettings(model=args.model)
+    ok, detail = available(settings)
     print(f"local backend: {detail}")
     if not ok:
         return 1
+    # Before anything is spent: is this actually on the GPU? The first local
+    # campaign ran entirely on CPU at a fifth of the achievable speed and
+    # nobody knew until afterwards.
+    on_gpu = warn_if_cpu(settings)
+    _placement_ok, placement_detail = placement(settings)
+    print()
     print(f"suite: {args.suite} ({len(scenarios)} test(s)), detector={args.detector}")
     print()
 
@@ -213,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
     print(annotation_summary(results))
     print()
     print(f"wall clock: {elapsed:.0f}s ({elapsed / 60:.0f} min), concurrency 1")
-    out = save(results, args.out)
+    out = save(results, args.out, placement_note=placement_detail)
     print(f"results written to {out}")
     return 0
 
