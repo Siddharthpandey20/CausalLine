@@ -203,6 +203,16 @@ class ScriptedClient:
     # token counts are not.
     chars_per_token: int = 4
 
+    # D-075. The identity this client answers under, so `run_pipeline` writes
+    # it into the trace header instead of falling through to `load_settings()`
+    # -- which returns the *Gemini* configuration and stamped
+    # `model: gemini-3.6-flash` onto every scripted trace in the repository.
+    # Same family as D-057 and D-059, one layer further out: D-057 taught the
+    # header to ask the client, and this is the client that had nothing to say.
+    # `LLMResponse.model` was already "scripted", so the header disagreed with
+    # the usage records it sits above.
+    model: str = "scripted"
+
     calls: int = 0
     total_tokens: int = 0
     throttled_s: float = 0.0

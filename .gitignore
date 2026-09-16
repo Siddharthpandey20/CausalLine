@@ -21,3 +21,6 @@ data/results/*.csv
 # needs.
 data/generated/
 data/results/real-llm*.json
+
+# Build artefact from `pip install -e .`
+*.egg-info/

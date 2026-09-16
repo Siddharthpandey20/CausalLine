@@ -589,6 +589,13 @@ reader of this file needs:
    token. Event-level unsafe was 0 on the same test, because verification had
    already forced a full restart. Both numbers are true; that is why both are
    reported.
+
+   **Root-caused, and the two pairs failed for two different reasons** — one a
+   source that was not removable from the prompt at all (D-066), one a
+   comparator with no facet for "the answer repeats the removed source"
+   (D-064). Both are now closed. `python -m src.eval.relay_diagnosis`
+   reproduces both shapes offline, with no API key and no quota, and reports
+   whether each is still open. Read it before quoting the 2/2.
 3. **The method-comparison table is not a clean comparison.** Every original run
    failed the task for a reason unrelated to the attack, verification demands
    absolute task success, so CausalLine escalated to `restart_all` on every
