@@ -637,6 +637,19 @@ class RealRunResult:
             "latency_s": round(self.latency_s, 2),
             "pipeline_tokens": self.pipeline_tokens,
             "analysis_tokens": self.analysis_tokens,
+            # D-087/D-089: what the investigation actually did. This dict is an
+            # explicit field list rather than `asdict`, so a new field that is
+            # not added here is populated in memory, printed to the console, and
+            # silently absent from the results file -- which is how the first
+            # fan-out campaign came to carry `sprt_f_star: 0` for every run.
+            "lazy_self_report": self.lazy_self_report,
+            "self_report_calls": self.self_report_calls,
+            "self_report_positives": self.self_report_positives,
+            "sprt_decision": self.sprt_decision,
+            "sprt_checks": self.sprt_checks,
+            "sprt_f_star": self.sprt_f_star,
+            "sprt_f_star_high": self.sprt_f_star_high,
+            "checks_examined": self.checks_examined,
             "api_calls": self.api_calls,
             "api_retries": self.api_retries,
             "api_rate_limited": self.api_rate_limited,

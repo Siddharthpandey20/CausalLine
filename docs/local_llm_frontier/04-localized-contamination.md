@@ -181,7 +181,23 @@ Three wirings, all of which existed and none of which reached an experiment:
 1. **D-087 — the SPRT's hypotheses now come from the cost model.**
    `config_for` had no caller outside its own tests, so every investigation this
    project ever ran used `f_star = 0.3 / 0.7`, numbers nobody measured. Both
-   inputs are now read off the trace.
+   inputs are now read off the trace, and the campaign records what was used:
+
+   | K | f_star | f_star_high | SPRT decision |
+   |---|---|---|---|
+   | 4 | 0.342 | 0.492 | continue |
+   | 8 | 0.588 | 0.738 | continue |
+   | 16 | **0.732** | 0.882 | continue |
+
+   **The gate works in both directions, which is the point.** On the chain
+   workload it derived `f_star = 0.023` and said *do not investigate* on 51 of
+   60 traces, because `A` exceeded `N` before starting. Here `f_star` **rises
+   with K** — as the workflow grows, `A/N` falls, so the break-even fraction
+   `1 - A/N` rises, so more investigation is worth paying for — and it says
+   *continue* on all 24 runs. The same rule, reading the same cost model,
+   reaches opposite conclusions on the two workloads because the two workloads
+   genuinely differ. Under the old hard-coded 0.3/0.7 it could not have
+   distinguished them at all.
 2. **D-088 — the planner's cap, examined rather than changed.** Adding the
    already-spent analysis to it was requested and is *strictly worse*: `A` is
    sunk and cancels, so counting it only turns cheap selective replays into full

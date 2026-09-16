@@ -254,5 +254,47 @@ class TestSelectiveRecoveryIsActuallyDelivered(unittest.TestCase):
         )
 
 
+
+class TestTheResultsFileCarriesWhatTheRunMeasured(unittest.TestCase):
+    """`RealRunResult.to_dict` is an explicit field list, not `asdict`.
+
+    A field added to the dataclass but not to that list is populated in memory,
+    printed to the console, and silently missing from the results file. The
+    first fan-out campaign shipped `sprt_f_star: 0` for all 24 runs that way --
+    the value was right, the record was empty, and the only reason it was caught
+    is that a report tried to read it back.
+    """
+
+    def test_every_investigation_field_survives_serialisation(self) -> None:
+        from src.eval.real_llm import RealRunResult
+
+        result = RealRunResult(
+            test_id="t", design={}, execution_model="m", execution_model_id="m",
+            generator_model="g", detector="oracle",
+        )
+        result.lazy_self_report = True
+        result.self_report_calls = 3
+        result.self_report_positives = 1
+        result.sprt_decision = "abort_restart"
+        result.sprt_checks = 5
+        result.sprt_f_star = 0.023
+        result.sprt_f_star_high = 0.173
+        result.checks_examined = 7
+
+        data = result.to_dict()
+        for field, expected in (
+            ("lazy_self_report", True),
+            ("self_report_calls", 3),
+            ("self_report_positives", 1),
+            ("sprt_decision", "abort_restart"),
+            ("sprt_checks", 5),
+            ("sprt_f_star", 0.023),
+            ("sprt_f_star_high", 0.173),
+            ("checks_examined", 7),
+        ):
+            with self.subTest(field=field):
+                self.assertIn(field, data, f"{field} never reaches the results file")
+                self.assertEqual(data[field], expected)
+
 if __name__ == "__main__":
     unittest.main()
