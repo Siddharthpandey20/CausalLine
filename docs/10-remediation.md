@@ -696,6 +696,28 @@ seconds, so it cannot rot into documentation.
 +5 for `TestStoredPromptIsTheSentPrompt`, +2 for `TestTheDiagnosticStillPasses`,
 and the skip is gone.
 
+**Fresh 30-repetition campaign: byte-identical to §8.2.**
+`data/results/campaign-30x-final.txt`, 720 cells, 3600 pipeline runs. Diffed
+against the committed `campaign-30x-remediation.txt`, **the only line that
+differs is the wall clock** (1025s against 524s, this machine being busier).
+Every cell, every interval, every unsafe count, and the same eight B1/B2 cells
+recording an unsafe preservation.
+
+That is the result this section was for. The merge and `docs/03` #18 are
+**metric-neutral**, which is what was predicted and is not the same as assumed:
+D-076 only ever rewrites the stored prompt of a *replayed* event, and no metric
+reads stored prompts — `surviving_payload()` reads `ReplayReport.issued_prompts`,
+which was already correct. A campaign that came back identical is the evidence
+for that, and a campaign that had *not* would have meant something was reading a
+prompt nobody knew it was reading.
+
+**One stale number corrected outside this document.** `README.md`'s headline
+table still carried the pre-remediation figures — 44.2 / 65.1 / 66.5 on the three
+influencing rows — while `docs/08` had been given a supersession note and
+`docs/10` §8.2 had recorded the move. A reader starting at the README would have
+got numbers no command in the repository produces. Now 42.8 / 63.2 / 63.2, with
+the one-paragraph reason and a pointer to §8.2.
+
 **A correction to §8.3, found by re-running it.** The storage row does not
 regenerate. §8.3 reports 26 499 B for this pass against a stored 26 470 B;
 `python -m src.eval.economics` produces **25 125 B**, and it produces 25 126 B

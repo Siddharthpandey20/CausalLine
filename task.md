@@ -412,8 +412,20 @@ Full narrative: `docs/10-remediation.md`. Decisions: `docs/05` D-062..D-076.
 - [x] Run the full 30-repetition campaign fresh. Report the complete results table, including anything that changed from the last stored version, and explain every change.
 
       PROOF  `data/results/campaign-30x-final.txt`, 720 cells, 3600 pipeline
-      runs. Full table and a per-delta explanation in `docs/10-remediation.md`
-      §8.2 and §8.5.
+      runs, 1025s. Diffed against the committed `campaign-30x-remediation.txt`:
+      **the only line that differs is the wall clock.** Every cell, every
+      interval, every unsafe count identical, and the same eight B1/B2 cells
+      recording an unsafe preservation. So every delta from the pre-remediation
+      stored run is the one already explained in `docs/10` §8.2 — seven
+      CausalLine cells down, all from D-067 — and the merge plus `docs/03` #18
+      changed no metric, which §8.5 states as a measured result rather than an
+      assumption.
+      Headline, oracle: A-inf 42.8% ± 4.1 vs B1 21.1 (+21.8), B-inf 63.2% ± 0.0
+      vs 57.9 (+5.3), C-inf 63.2% ± 0.0 vs 52.6 (+10.5), and the three
+      exposed-only cells 96.0 / 95.6 / 96.5. **Zero event-level unsafe
+      preservations for CausalLine across all 24 cells × 30 repetitions.**
+      `README.md`'s table was still carrying the pre-remediation figures and is
+      now corrected — see §8.5.
 
 - [x] Re-run the economics analysis fresh.
 

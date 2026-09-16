@@ -246,12 +246,21 @@ oracle detector, 30 repetitions, 95% CIs, `data/results/campaign.json`:
 
 | scenario | CausalLine | B1 | gain |
 |---|---|---|---|
-| A influencing | 44.2% ± 4.4% | 21.1% | **+23.2** |
+| A influencing | 42.8% ± 4.1% | 21.1% | **+21.8** |
 | A exposed-only | 96.0% ± 4.8% | 21.1% | **+74.9** |
-| B influencing | 65.1% ± 1.0% | 57.9% | **+7.2** |
+| B influencing | 63.2% ± 0.0% | 57.9% | **+5.3** |
 | B exposed-only | 95.6% ± 3.1% | 57.9% | **+37.7** |
-| C influencing | 66.5% ± 1.1% | 52.6% | **+13.9** |
+| C influencing | 63.2% ± 0.0% | 52.6% | **+10.5** |
 | C exposed-only | 96.5% ± 3.2% | 52.6% | **+43.9** |
+
+**Three influencing rows are lower than they were before 15-09-2026, and that is
+a safety fix showing up where a safety fix should.** A carrier clearance used to
+be written into the trace as `clean / structural / 1.0` on the strength of no
+upstream verdict at all; it now inherits what is actually recorded, and the
+Coder's contaminated memory write stopped being preserved. One more event
+recomputed out of 19 is 5.3 points. Two cells also became deterministic — their
+answer no longer depends on which self-report claims the seed happened to get
+wrong. Every delta and its cause: `docs/10-remediation.md` §8.2.
 
 The exposed-only column is where the claim pays off most directly: those are
 incidents where a poisoned source was *present but unused*, and everything a
