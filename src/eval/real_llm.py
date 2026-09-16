@@ -614,12 +614,35 @@ def run_generated(
         )
         return result
 
-    calibration = Calibration.load()
+    # D-063: a noise floor belongs to the model it was measured on.
+    #
+    # `Calibration.load()` takes a `model` and raises on a mismatch, and that
+    # guard is exactly what this call was skipping: the calibration on disk was
+    # measured on gemini-3.6-flash, and passing no model applied its exclusions
+    # -- `strategy` and `dependency` dropped from the decision comparator -- to
+    # every NVIDIA run. Same shape as D-057 and D-059: an identity field not
+    # narrowed at the layer closest to the call.
+    #
+    # Raising here would kill the campaign rather than fix it, so a mismatch
+    # falls back to an EMPTY calibration, which excludes nothing. That is the
+    # conservative setting (`Calibration.load`'s own docstring says so): every
+    # facet counts, verdicts lean towards "influenced", and the method
+    # over-invalidates rather than clearing on a floor nobody measured here.
+    execution_model = getattr(client, "model", "unknown")
+    try:
+        calibration = Calibration.load(model=execution_model)
+    except RuntimeError as exc:
+        calibration = Calibration(model=execution_model)
+        result.notes.append(
+            f"uncalibrated: {exc}. Running with every facet counted, which is "
+            "the conservative setting. Any clean verdict below rests on an "
+            "unmeasured noise floor."
+        )
     attributor = HybridAttributor(
         client=client,
         mode="self_report",
         calibration=calibration,
-        model=getattr(client, "model", "unknown"),
+        model=execution_model,
         seed=seed,
     )
 

@@ -34,6 +34,12 @@ Phase A, CausalLine beats B1 on **all six** oracle cells, influencing included:
 
 30 repetitions, 95% CIs, 96 cells, `data/results/campaign.json`.
 
+**Superseded for the three exposed-only rows on 13-09-2026.** D-062 stopped the
+estimator clearing sources it had not actually tested, and those rows are now
+94.6% / 76.7% / 76.8% — still ahead of B1 by 73.5 / 18.8 / 24.2 points. The
+influencing rows and every unsafe count are unchanged. §7.5.1, and
+`data/results/campaign-d062.txt`.
+
 The exposed-only column barely moved, which is the point: those wins always
 came from the *provenance* model and were never in doubt. The influencing
 column was where the recovery *planner* had to do the work, and it was failing
@@ -192,11 +198,13 @@ separate job.
 
 ## 4. Claims that can safely be made
 
-1. **Exposure is not influence, and it is worth real work.** 93.7–96.0% work
+1. **Exposure is not influence, and it is worth real work.** 76.7–94.6% work
    preserved on exposed-only incidents against B1's 21.1–57.9%, 30
-   repetitions, 95% CIs.
+   repetitions, 95% CIs. *(Revised down from 93.7–96.0% on 13-09-2026 by
+   D-062; see §7.5.1. The old figures included clearances the estimator had
+   not earned.)*
 2. **CausalLine beats B1 on every oracle cell**, influencing included:
-   +7.2 to +74.9 points. *(New. This could not be said before.)*
+   +7.2 to +73.5 points. *(New. This could not be said before.)*
 3. **Zero event-level unsafe preservations**, all 24 campaign cells × 30
    repetitions, under four detectors including a blind control and a real
    classifier, and under an adversarial self-reporter. *(Still true of the
@@ -433,6 +441,87 @@ model to actually comply with a planted instruction produced a 100% pair-level
 unsafe rate on the pairs it was tested on. n=2 pairs, one run — far too small to
 quote as a rate — but it is a existence proof, and the scripted matrix contains
 no such case.
+
+
+### 7.5.1 Root cause of §7.5, established 13-09-2026
+
+**The two cleared pairs failed for two different reasons.** That is the finding,
+and it took separating them to see either.
+
+The campaign's own artefacts (`data/results/real-llm.json`, `data/runs/real/`)
+are gitignored run output and are not in the repository, and no
+`NVIDIA_API_KEY_*` is configured on this machine, so the run could be neither
+re-read nor re-issued. The mechanism was reproduced instead — offline,
+deterministically, free — on the same pipeline, the same channel, the same
+short workflow, the same two events and the same pair ids:
+
+```
+python -m src.eval.relay_diagnosis      # the full evidence chain
+pytest tests/test_relay_confound.py     # the regression test
+```
+
+The reproduction recovers §7.5's numbers exactly: 2 scoreable pairs, examined
+agreement 0%, UNSAFE 2, `S14->e0013` and `S14->e0014`.
+
+**`S14 -> e0014` — the counterfactual was never a test.** The Coder's script
+prompt embeds the decision event's output verbatim under `Approach you chose:`,
+outside the source block and therefore outside everything `redact_source()` can
+reach. Because the decision had already been influenced, redacting S14 left the
+payload in the request: the model answered from the relay, the signature could
+not move, and the pair was cleared. Measured on the reproduction: the token
+appears 3 times in the original prompt and **1 time after redaction**. Fixed by
+D-062 — a clearance is refused when the source has a second, unremovable route
+into the prompt.
+
+**`S14 -> e0013` — the comparator cannot see this kind of influence.** Here
+redaction worked perfectly and the re-run's output genuinely lost the token,
+and every facet of every comparator still held still. Checked across all five
+comparators, and with the calibration's exclusions removed so it is not an
+artefact of facet exclusion. **Not fixed**, because it is not a defect: a
+decision signature is a fixed vocabulary and a canary token is in none of it.
+See D-064 and `docs/06` §2.1.
+
+**What this changes about how §7.5 should be read, and it is not a softening.**
+One of the two pairs was a plumbing failure we have now closed. The other is
+the estimator and its own ground truth disagreeing about what "influence"
+means: `observed_influence()` is a text-level relation (does the token appear
+in the output), the estimator is a decision-level one (did the answer change).
+Both are defensible definitions and the *scoring* is right — contaminated text
+propagates, and the reproduction shows it reaching the Executor's final output.
+But "the estimator was wrong" is an incomplete description of it, and the paper
+has to say which of the two it means.
+
+**The number the campaign never got to report.** §7.5 notes that the
+event-level unsafe count was 0 because verification had already forced a full
+restart. The reproduction shows what that was hiding. With both pairs cleared,
+the contamination walk finds **nothing contaminated at all** — the two carrier
+records downstream inherit the clearance and are stamped `structural`,
+confidence 1.0 (`docs/03` #17) — against a true region of seven events ending
+at the final output. The 0 was luck, not safety.
+
+**Cost of the fix, and it comes out of our own numbers.** Re-measured over the
+full 24 cells × 30 repetitions (`data/results/campaign-d062.txt`), three rows
+move and all three are exposed-only under the oracle detector:
+
+| cell | before | after | still beats B1 by |
+|---|---|---|---|
+| oracle A exposed_only | 96.0% ± 4.8% | 94.6% ± 5.4% | 73.5% |
+| oracle B exposed_only | 95.6% ± 3.1% | **76.7% ± 1.5%** | 18.8% |
+| oracle C exposed_only | 96.5% ± 3.2% | **76.8% ± 1.7%** | 24.2% |
+
+**Every influencing cell is unchanged**, so §4.3's headline comparison stands
+as written. **Every CausalLine unsafe count is still zero** at both levels, and
+the eight cells that do record an unsafe preservation are the same eight B1/B2
+baseline cells, identically. B and C plant on the Coder — the one agent whose
+prompt carries a relay — which is where the code says the effect should land.
+The ~96% exposed-only figure was resting, on two of three channels, on
+clearances the method had not earned.
+
+**Three further defects found on the way, none of them the cause.** A
+cross-model calibration leak on the real-LLM path (D-063), a false `model`
+header on every scripted trace in the repository (D-063), and `run_code` — the
+parameter that switches on the one comparator facet that *would* have caught
+`e0013` — having no caller anywhere in the project (D-064).
 
 ### 7.6 Reliability, measured rather than assumed
 

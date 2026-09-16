@@ -454,3 +454,78 @@ predicate, or exclude runs whose original `task_success` is false from the
 method comparison, or report both. Recommendation: change the predicate, then
 re-run — and say in the paper that it was changed after the first real-LLM
 campaign and why.
+
+## 16. Leave-one-out over a prompt is only sound if every route into that prompt is removable
+
+**Raised 13-09-2026 by the root-cause of `docs/08` §7.5. Half of it is fixed
+(D-062); the general statement is not, and it is the more interesting half.**
+
+The counterfactual's whole claim is: remove one source, re-issue, and any
+change is attributable to the removal. `redact_source()` removes a source from
+the **rendered source block**. Nothing in the method checks that the block was
+the source's only route into the prompt, and in this pipeline it sometimes is
+not — the Coder's script prompt quotes the decision event's output verbatim,
+the Reviewer's quotes the draft script. A source that influenced the quoted
+event survives its own redaction, and "the signature did not move" is then the
+experiment failing rather than the source being innocent.
+
+**What is fixed.** D-062 detects the quote and refuses to clear such a pair,
+recording `assumed`. Cost: two exposed-only cells, 100% → 79% work preserved.
+
+**What is open, and it is three separate things.**
+
+1. **Detection is textual.** It finds an upstream output that was *copied*. A
+   pipeline that *summarised* between agents would relay the influence with no
+   verbatim span to find, and D-062 would miss it silently. Ours only copies,
+   so the detector is complete here and not in general.
+2. **Refusing is not the same as answering.** The right answer is a *nested*
+   counterfactual: re-run the upstream event without the source, splice the new
+   output into the relay slot (`replace_in_prompt()` already does exactly this
+   for selective replay), and then test the downstream event. That is one extra
+   call per confounded pair and it would turn a refusal into a verdict. Not
+   done; it is the obvious next piece of work and it has a real cost model to
+   measure.
+3. **The invariant is not enforced anywhere.** Nothing stops a future prompt
+   from splicing content in outside the block. The structural fix is for the
+   pipeline to render *every* piece of prior content as a labelled source, so
+   that "redactable" and "in the prompt" are the same set by construction. That
+   changes every prompt in the pipeline and therefore every measurement, so it
+   is a decision rather than a patch.
+
+**Status:** partially fixed. Items 2 and 3 open.
+
+## 17. A false clean is laundered into a `structural` clearance by carrier records
+
+**Raised 13-09-2026 while measuring what the §7.5 failure actually cost.**
+
+`record_carrier()` writes, for a message or tool call that hands an earlier
+event's output onward, a check record with `method="structural",
+confidence=1.0` — for both verdicts. The *tainted* direction is sound and
+load-bearing (a verbatim copy of contaminated output is contaminated). The
+**clean** direction is not a fact about the code path: it is inherited from
+whatever the estimator concluded upstream.
+
+`real_llm.code_path_pairs()` already knows this and filters carrier records out
+of ground truth by note text, with a test pinning the phrase, on the explicit
+reasoning that "reading them back as ground truth would score the estimator
+against its own answers". **`checks.ClearancePolicy` does not apply the same
+filter.** Its docstring describes `structural` as "Fact, not estimate" and
+accepts it unconditionally, so an estimator error is re-stamped at the highest
+trust level the system has.
+
+**Measured effect on the reproduction.** The two cleared pairs at the Coder
+became four cleared pairs: `S14->e0015` and `S14->e0016` inherited the
+clearance as `structural`, confidence 1.0. The contaminated region came out
+**empty** — a poisoned script and the Executor's final output preserved
+byte-for-byte — against a true region of seven events.
+
+**It does not manufacture new error**; a carrier record is exactly as right as
+the verdict it inherits. What it does is make an estimator error invisible: a
+reader auditing clearances by method sees two `counterfactual` clears and two
+`structural` clears, and only the first two are the estimator's opinion.
+
+**Status:** OPEN. Cheap fix available — either give carrier records their own
+method name, or have `ClearancePolicy` read the note the way `code_path_pairs`
+does. Not taken here because it is a change to the trace vocabulary
+(`CheckRecord.method` is a controlled field) and belongs with the
+`docs/02` vocabulary rather than inside a root-cause fix.

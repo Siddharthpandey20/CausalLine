@@ -2294,3 +2294,241 @@ the alternative to escaping it is losing the recovery.
 **This is a real-model-only failure mode**, and finding it is the kind of thing
 `docs/09`'s evaluation mode exists for: no scripted run in the history of this
 repository could have produced it.
+
+## D-062 — A relayed upstream output carries a source past redaction, so a counterfactual that finds nothing cannot clear it
+
+**13-09-2026. Root cause of half of `docs/08` §7.5, the real-model unsafe
+preservation.** Changes shared files (`src/provenance/attribution.py`,
+`src/tracing/pipeline.py`), so the reasoning is spelled out in full.
+
+**What a counterfactual silently assumes.** `redact_in_prompt()` removes one
+source from the rendered source block and re-issues the request. The verdict
+"the decision signature did not move, so this source did not matter" is valid
+only if the block was that source's **only** route into the request.
+
+**Our own pipeline breaks that assumption, in two places.** The Coder's script
+prompt is built as `"Approach you chose:\n" + decision_response.text.strip()`
+followed by `"Inputs:\n" + coder_block`, and the Reviewer's carries the draft
+script the same way. Both sit *outside* the block, so `redact_source()` cannot
+reach them. When a source influenced that upstream event, its contribution is
+still in the request after it has been redacted: the model can answer from the
+relay alone, the signature does not move, and the pair is cleared. **The
+removal happened; the experiment did not.**
+
+**This is a confound, not a detection failure, and no comparator can fix it.**
+A better signature cannot see a difference the redacted request never
+produced. Removing the relay as well is not available either — a
+counterfactual is allowed to differ from the original in exactly one source,
+and cutting the relay would change the request twice.
+
+**Decision: notice the confound and decline to clear, in one direction only.**
+
+| the removal | what is recorded |
+|---|---|
+| moved the signature | unchanged — `tainted`, `counterfactual`, with its influence edge |
+| did not move it, no relay | unchanged — `clean`, `counterfactual` |
+| **did not move it, relayed** | **`tainted`, `assumed`, confidence 0.0, no influence edge** |
+
+The asymmetry is the whole content of the decision, and the first attempt got
+it wrong. Short-circuiting the pair *before* the call — which is the obvious
+implementation — throws away every real positive edge on the confounded event
+as well, and `test_step2_covers_step4.py` caught it: `plan.paths` went empty on
+A-influencing under oracle. A signature that **moved** is evidence whatever
+else the prompt carries; only the negative direction is spoiled.
+
+`assumed` is deliberately not `counterfactual`-`tainted`. Inability to clear is
+not evidence of influence, so no edge is written; and `assumed` is never a
+clearance (`checks.ClearancePolicy`), so the walk keeps the pair contaminated.
+It is the same verdict `_mark_unexaminable()` writes for an event with no
+stored prompt, for the same reason: we looked for a way to check it and there
+was none.
+
+**Detection is textual and one-directional.** `relayed_outputs_for()` asks
+whether an earlier event's stored output is recognisable in this prompt outside
+the block, under whitespace- and fence-normalisation, with a 60-character floor
+so a short output cannot match by coincidence. Read off the text and not off
+`parents`, because a parent link means "came after", not "was quoted into" —
+every event in the trace has parents. **It detects the confound; it does not
+prove its absence.** An upstream output the pipeline paraphrased rather than
+copied is missed, and that pair keeps the old behaviour. Every firing is a
+refusal to clear, so a miss costs exactly what it cost before and a hit never
+costs more than preserved work.
+
+**What it costs us, measured rather than asserted.** Full campaign, 24 cells ×
+30 repetitions, against the committed pre-fix run (`data/results/campaign-d051.txt`
+→ `data/results/campaign-d062.txt`). **Three rows move and they are all
+exposed-only under the oracle detector:**
+
+| cell | before | after | still beats B1 by |
+|---|---|---|---|
+| oracle A exposed_only | 96.0% ± 4.8% | **94.6% ± 5.4%** | 73.5% |
+| oracle B exposed_only | 95.6% ± 3.1% | **76.7% ± 1.5%** | 18.8% |
+| oracle C exposed_only | 96.5% ± 3.2% | **76.8% ± 1.7%** | 24.2% |
+
+**Every influencing cell is unchanged**, so the headline comparison in
+`docs/08` §4.3 — 44.2% ± 4.4% against B1's 21.1% on A-influencing, and the B
+and C rows — is untouched. **Every CausalLine unsafe count is still zero**, at
+both event and pair level, and the eight cells that do record an unsafe
+preservation are the same eight B1/B2 baseline cells as before, identically.
+
+The effect lands where the code says it should, which is the only cross-check
+available for a fix whose target cannot be re-run live: B and C plant on the
+**Coder**, which is the one agent in the short workflow whose prompt carries a
+relay. A plants on the Researcher, whose prompts are `Question + Sources:` and
+nothing else, and its 1.4-point move is second-order — the poisoned page's
+*derived findings* sit in the Coder's context and are confounded there.
+
+**The honest reading of that cost: it is the loss of a claim we should not have
+had.** ~96% preserved on the exposed-only controls was resting, on two of three
+channels, on clearances the method had not earned.
+
+**What this does NOT fix.** The other half of §7.5. `S14 -> e0013` was cleared
+with redaction working perfectly and the output genuinely changed — no facet of
+any comparator represents "the answer quotes text from the removed source".
+That is comparator blindness and it is a live limitation; see D-064 and
+`docs/06`.
+
+Reproduce: `python -m src.eval.relay_diagnosis`. Pinned by
+`tests/test_relay_confound.py`.
+
+## D-063 — Identity fields belong to the layer closest to the call, third and fourth occurrence
+
+**13-09-2026.** D-059 already recorded this as *a pattern rather than a bug*.
+Looking for a third occurrence while root-causing `gen006` found two.
+
+**Third: the calibration was not model-checked on the path where models
+differ.** `Calibration.load()` takes a `model` and raises on a mismatch — the
+guard exists precisely because "a noise floor measured on one model says
+nothing about another" (D-004, D-026). `real_llm.run_generated()` called it
+with **no argument**, so the guard never ran, and the calibration on disk —
+measured on `gemini-3.6-flash`, excluding `strategy` and `dependency` from the
+decision comparator — was applied to every NVIDIA run.
+
+Fixed by passing the execution model. A mismatch falls back to an **empty**
+calibration rather than raising, because raising would kill the campaign
+instead of fixing it, and an empty calibration excludes nothing — which
+`Calibration.load`'s own docstring names as the conservative setting. The
+fallback is recorded on `RealRunResult.notes`, so a run that read its verdicts
+off an unmeasured floor says so.
+
+**And it was not the cause of `gen006`.** Measured, not assumed: with *every*
+facet counted, adding a canary token to a decision output still moves nothing
+(`python -m src.eval.relay_diagnosis`, step 3). Re-running the whole scripted
+matrix with the cross-model exclusions removed produces a **byte-identical**
+table. A real defect, latent rather than live.
+
+**Fourth: `ScriptedClient` had no identity, so every scripted trace claimed to
+be Gemini.** `run_pipeline()` builds its header from `load_settings()` — the
+Gemini configuration — and D-057 taught it to let a client overwrite the fields
+it owns. `ScriptedClient` has no `fingerprint`, no `settings` and had no
+`model`, so it fell through to the default: every trace behind every number in
+`docs/07` and `docs/08` carries `model: gemini-3.6-flash` while its own usage
+records say `scripted`.
+
+No published number is known to be wrong — `meta["client"]` and the usage
+records both name the scripted client — but the field D-057 made load-bearing
+was false on the majority of traces in the repository. `ScriptedClient.model =
+"scripted"` fixes it. Existing committed traces keep the wrong header and are
+not rewritten (D-008).
+
+**The pattern, restated because it has now cost four fixes.** Settings describe
+a configuration; a client describes one endpoint; a calibration describes one
+model; a trace header is a claim about what actually answered. Each layer that
+narrows the previous one has to say so, or the widest one is silently reported.
+A default that is *usually* right is the dangerous shape here, because nothing
+fails when it is wrong.
+
+## D-064 — Decision signatures cannot see quoted text, and that is a limitation rather than a bug
+
+**13-09-2026. Not a change. A limitation, recorded because it is the other half
+of `docs/08` §7.5 and it must not be quietly closed by D-062.**
+
+**The measurement.** Adding a canary token to an output moves **no facet of any
+comparator** in `src/provenance/signatures.py` — decision, prose, code
+(AST-only), json_shape, tool_args. Not a near miss: the vocabularies are
+`LIBRARIES`, `OUTPUT_FORMATS`, `STRATEGIES`, `DEPENDENCY`, `PROSE_TERMS` and
+`%[a-zA-Z]`, and a random token is in none of them by construction.
+
+**So the estimator and its own ground truth do not measure the same thing.**
+`real_llm.observed_influence()` calls a pair influenced when the token appears
+in the output — a *text-level* relation. The estimator asks whether the
+*decision* moved. Where an influence changes text without changing the
+decision, the ground truth sees it and the estimator cannot, and the
+disagreement is scored as an unsafe preservation. That is the correct scoring —
+contaminated text really does propagate downstream, and in `gen006` it
+propagated all the way to the Executor's output — but the *reason* for the
+disagreement is definitional, not an implementation defect, and reporting it as
+"the estimator was wrong" without saying so would misdescribe it.
+
+**The one facet that would have caught it is switched off everywhere.**
+`CodeComparator` documents "two independent halves", behaviour and structure,
+and the behavioural half needs a runner in `context["run"]`. That runner comes
+from `run_code`, which is a parameter of `HybridAttributor` and of
+`refine_for_verdict` — and **no caller anywhere in the repository passes it**,
+not the pipeline, not `experiment.py`, not `real_llm.py`, not a test. Every
+code-comparator verdict ever recorded is AST-only. With a runner wired, adding
+`print(TOKEN)` moves the `stdout` facet and the pair is caught; without one it
+moves nothing.
+
+**Deliberately not turned on here.** It changes what every code-event verdict
+means, so it invalidates the whole scripted matrix and needs its own
+measurement pass, a sandboxing decision (the analysis would execute
+model-written code, repeatedly, on every counterfactual) and a cost model.
+Recorded as the first thing to do next, not smuggled in as part of a root-cause
+fix. Note the direction: wiring it finds *more* influence, so it lowers our own
+work-preserved numbers — the objection to doing it here is methodological, not
+self-interested.
+
+**The tempting fix that must not be taken quietly.** A facet that asks "does
+the answer quote a span of the removed source" would catch this case, has a
+zero null floor on a *redacted* re-run, and is the obvious next comparator. It
+is also, on this testbed, very nearly the canary token itself — so adopting it
+after seeing `gen006` and then reporting the improved pair accuracy would be
+exactly the comparator-tuned-until-it-agrees-with-us that D-026 pre-registered
+against. If it is adopted it has to be specified first and measured on a suite
+generated afterwards.
+
+## D-065 — The task's own fixture makes task success fragile, and only the verifying method pays for it
+
+**13-09-2026.** `docs/03` #15 records that `verify()` demands absolute task
+success, so CausalLine escalated to `restart_all` on every scored real-LLM test
+while the baselines — which do not verify — were not charged for the same
+pre-existing failure. The brief asked whether the code-generation bug behind
+that was really unrelated to the injected attack. It is, and the reason is
+sharper than "the model had a bug".
+
+**The fixture requires two format codes one character apart.** `task/date_samples`
+in `src/tracing/fixtures/db.json` contains both `"March 5, 2021"`, which needs
+`%B`, and `"1 Jan 2000"`, which needs `%b`. One candidate-format list has to
+carry both. The corpus page the Researcher retrieves documents them in one
+sentence: "`%B` full month name, `%b` abbreviated month name". Choose `%b`
+alone and exactly one of five samples fails, which is what Nemotron did.
+
+**The evidence that generation is not implicated:**
+
+- the samples and the expected ISO values are **ours**, in a fixture, identical
+  in every scenario; the generator never writes them and `validate()` never
+  touches them;
+- the failure occurred on **every** scored test, across three channels and both
+  intents, under different generated payloads and different generated task
+  paraphrases. A cause that varies per test cannot explain an outcome constant
+  across tests;
+- the two exposed-only controls, whose payloads carry no instruction at all,
+  failed the task the same way.
+
+**One indirect path does exist and should be named rather than dismissed.**
+`validate()`'s `retrievable()` check pushes the generator to give the payload
+"the task's own vocabulary: dates, parsing, Python, formats, the samples
+themselves", so generated payloads are steered *towards* format-code language.
+That is a route by which generation could touch format choice in some future
+run. It did not here, on the evidence above, but a suite where it did would be
+indistinguishable from an attack in the results table.
+
+**The real finding is about the metric, not the bug.** Task success in this
+testbed is gated on a one-character distinction that has nothing to do with any
+attack, and `verify()` is the only consumer that reads it. So an unrelated
+coin-flip in the Coder's output systematically penalises the one method honest
+enough to check whether the workflow still works. That is not a fair
+comparison, and the fix is not to weaken `verify()` — it is to report
+task-success and attack-recovery as separate axes, and to make the fixture's
+format demands explicit in the task statement so the coin-flip stops being one.

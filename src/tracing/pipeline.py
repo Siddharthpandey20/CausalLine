@@ -64,6 +64,7 @@ from src.provenance.attribution import (
     derived_links_for,
     record_carrier,
     record_structural,
+    relayed_outputs_for,
 )
 
 
@@ -200,6 +201,12 @@ class GeminiPipeline:
         # grow with the square of run length (D-022 measured 56% of stored
         # bytes). See D-028.
         self._outputs: dict[str, str] = {}
+        # (event id, output text, exposures) for every model-written event so
+        # far, so an attribution request can say which upstream outputs this
+        # prompt quotes outside its source block (D-062). Text rather than
+        # refs, because the check is a substring test; only model-written
+        # events are kept, because only those are ever spliced into a prompt.
+        self._written: list[tuple[str, str, list[str]]] = []
         # source ids currently in each agent's context -> Event.exposures
         self.context: dict[str, list[str]] = {}
         self._sources: dict[str, Any] = {}
@@ -290,6 +297,8 @@ class GeminiPipeline:
             slept_s=response.slept_s,
         )
         self._outputs[event.id] = output_ref
+        relayed = relayed_outputs_for(prompt, source_block, self._written)
+        self._written.append((event.id, response.text, list(event.exposures)))
         self.attributor.attribute(
             AttributionRequest(
                 event_id=event.id,
@@ -311,6 +320,7 @@ class GeminiPipeline:
                     lambda sid: source_producer_of(self._sources.get(sid)),
                     self._influenced_by,
                 ),
+                relayed=relayed,
             ),
             self.log,
         )

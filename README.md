@@ -247,11 +247,18 @@ oracle detector, 30 repetitions, 95% CIs, `data/results/campaign.json`:
 | scenario | CausalLine | B1 | gain |
 |---|---|---|---|
 | A influencing | 44.2% ± 4.4% | 21.1% | **+23.2** |
-| A exposed-only | 96.0% ± 4.8% | 21.1% | **+74.9** |
+| A exposed-only | 94.6% ± 5.4% | 21.1% | **+73.5** |
 | B influencing | 65.1% ± 1.0% | 57.9% | **+7.2** |
-| B exposed-only | 95.6% ± 3.1% | 57.9% | **+37.7** |
+| B exposed-only | 76.7% ± 1.5% | 57.9% | **+18.8** |
 | C influencing | 66.5% ± 1.1% | 52.6% | **+13.9** |
-| C exposed-only | 96.5% ± 3.2% | 52.6% | **+43.9** |
+| C exposed-only | 76.8% ± 1.7% | 52.6% | **+24.2** |
+
+The three exposed-only rows are **lower than they were before 13-09-2026**, and
+deliberately so: D-062 stopped the estimator clearing a source it had not
+actually tested, because our own prompts carry an upstream output past the
+redaction a counterfactual performs. The influencing rows are unchanged and no
+CausalLine unsafe count moved. See `docs/08` §7.5.1 — the drop is the loss of a
+claim the method had not earned, found by root-causing a real-model failure.
 
 The exposed-only column is where the claim pays off most directly: those are
 incidents where a poisoned source was *present but unused*, and everything a

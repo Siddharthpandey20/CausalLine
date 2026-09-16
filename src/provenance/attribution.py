@@ -48,7 +48,7 @@ prediction the "self-report only" ablation is there to confirm.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Protocol, Sequence, runtime_checkable
+from typing import Any, Callable, Iterable, Protocol, Sequence, runtime_checkable
 
 from src.common.models import InfluenceEdge
 from src.provenance import selfreport
@@ -93,6 +93,38 @@ class AttributionRequest:
     # redundancy between unrelated sources is NOT represented here and is not
     # handled. See docs/06 section 2.2.
     derived_links: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    # UPSTREAM OUTPUTS SPLICED INTO `prompt` OUTSIDE `source_block` (D-062).
+    #
+    # event id -> the sources that were in that event's context. A source
+    # listed here has a second route into this request that `redact_source()`
+    # cannot reach, so removing it from the block does not remove it from the
+    # question. See `relayed_outputs_for()` for why that makes a `clean`
+    # verdict on such a pair unearned.
+    #
+    # Empty means "no relay found", which -- like `derived_links` -- is the
+    # honest default and not a proof of absence.
+    relayed: dict[str, tuple[str, ...]] = field(default_factory=dict)
+
+    def confounded_by_relay(self, source_ids: Iterable[str]) -> str:
+        """Why these sources cannot be cleared here, or "" if they can.
+
+        One place, so the single-source counterfactual and the group-test
+        decision function cannot answer it differently.
+        """
+        blocked = relayed_sources(self.relayed)
+        hit = sorted(sid for sid in source_ids if sid in blocked)
+        if not hit:
+            return ""
+        via = sorted(
+            eid for eid, exposures in self.relayed.items()
+            if set(exposures) & set(hit)
+        )
+        return (
+            f"{','.join(hit)} also reaches this prompt through the relayed "
+            f"output of {','.join(via)}, which sits outside the source block "
+            "and is not removed by redaction. The counterfactual would not "
+            "have been a test of this source, so it cannot clear it"
+        )
 
     def catalogue(self) -> list[tuple[str, str]]:
         return [(sid, self.labels.get(sid, "source")) for sid in self.exposures]
@@ -412,3 +444,94 @@ def derived_links_for(
                     links[b].add(a)
 
     return {sid: tuple(sorted(peers)) for sid, peers in links.items() if peers}
+
+
+# --- relayed upstream output, and why a counterfactual cannot see past it -----
+
+# How much of an upstream output has to be recognisable in a prompt before the
+# match is trusted. Short outputs are skipped rather than matched loosely: a
+# 20-character answer can appear inside an unrelated prompt by coincidence, and
+# a false relay claim costs preserved work on every pair of that event.
+RELAY_MIN_CHARS = 60
+# Only the head of an upstream output is required to match. The pipeline
+# splices `response.text.strip()` and, for a script, a fence-stripped copy, so
+# the tail is the part most likely to have been altered on the way in.
+RELAY_WINDOW = 200
+
+
+def _normalised(text: str) -> str:
+    """Whitespace- and fence-insensitive form, for recognising a spliced output.
+
+    Not a similarity measure. The two texts being compared are meant to be the
+    same bytes; this only absorbs the `.strip()` and `_strip_fences()` the
+    pipeline applies on the way into a prompt.
+    """
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = stripped.split("\n", 1)[-1].rsplit("```", 1)[0]
+    return " ".join(stripped.split())
+
+
+def relayed_outputs_for(
+    prompt: str | None,
+    source_block: str | None,
+    earlier: Sequence[tuple[str, str, Sequence[str]]],
+) -> dict[str, tuple[str, ...]]:
+    """Upstream events whose output was spliced into this prompt as plain text.
+
+    THE INVARIANT A COUNTERFACTUAL SILENTLY ASSUMES
+    -----------------------------------------------
+    `redact_in_prompt()` removes a source from the rendered source block, and
+    the verdict "the answer did not move, so this source did not matter" is
+    only valid if the block was that source's *only* route into the request.
+
+    Our own pipeline breaks that. The Coder's script prompt carries
+    `Approach you chose:\n<the decision event's output>` and the Reviewer's
+    carries the draft script, both outside the block and therefore outside
+    everything `redact_source()` can reach. If a source influenced that
+    upstream event, its contribution is still in the request after it has been
+    redacted, the model can answer from the relay alone, the signature does not
+    move, and the pair is cleared. The removal happened; the experiment did
+    not.
+
+    That is a confound, not a detection failure, and it is unfixable by a
+    better comparator: no comparator can see a difference that the redacted
+    request did not produce. Removing the relay as well is not available
+    either -- a counterfactual may differ from the original in exactly one
+    source, and cutting the relay would change the request twice.
+
+    So the honest answer is to notice the confound and decline to clear. The
+    caller treats a relayed source the way it treats a redaction that failed
+    (D-029): conservative fallback, the pair stays contaminated, and the reason
+    is recorded.
+
+    `earlier` is [(event_id, that event's output text, that event's
+    exposures), ...]. Returns {event_id: exposures} for the ones recognisable
+    in `prompt` outside `source_block`. Read off the text rather than off
+    `parents`, because a parent link means "came after", not "was quoted into".
+
+    **This detects the confound; it does not prove its absence.** An upstream
+    output the pipeline paraphrased rather than copied is not found here, and
+    that pair keeps the old behaviour. The guard is one-directional: every
+    firing is a refusal to clear, so a miss costs safety exactly what it cost
+    before and a hit never costs more than preserved work.
+    """
+    if not prompt:
+        return {}
+    outside = prompt.replace(source_block, " ") if source_block else prompt
+    outside = _normalised(outside)
+    found: dict[str, tuple[str, ...]] = {}
+    for event_id, output, exposures in earlier:
+        if not output or not exposures:
+            continue
+        text = _normalised(output)
+        if len(text) < RELAY_MIN_CHARS:
+            continue
+        if text[:RELAY_WINDOW] in outside:
+            found[event_id] = tuple(exposures)
+    return found
+
+
+def relayed_sources(relayed: dict[str, tuple[str, ...]]) -> frozenset[str]:
+    """Every source with a relay route into a prompt, across all relays."""
+    return frozenset(sid for exposures in relayed.values() for sid in exposures)

@@ -96,6 +96,30 @@ having lost "always print dates in DD-MM-YYYY" (the injected directive).
 `output_format=day_first` matches both, so the facet could not tell a fact from
 an instruction.
 
+**Confirmed on a real model, 13-09-2026 (D-064).** This was previously
+demonstrated only by Phase 13.2's token validation, a construction of ours. It
+is now the proven cause of one of the two unsafe pairs in `docs/08` §7.5:
+Nemotron quoted a planted token into the Coder's decision, redaction removed
+the source correctly, the re-run's output genuinely lost the token — and every
+facet of every comparator held still. Checked mechanically across all five
+comparators and with the calibration's exclusions removed, so this is a
+property of the vocabularies and not of one facet or one model:
+`python -m src.eval.relay_diagnosis`.
+
+**The consequence for how §7.5 must be read.** The ground truth
+(`observed_influence`) calls a pair influenced when the token appears in the
+output: a *text-level* relation. The estimator asks whether the *decision*
+moved. Where those differ the disagreement is scored as an unsafe preservation,
+correctly — contaminated text propagates, and in that run it propagated to the
+Executor's final output — but the *reason* is a definitional gap between the
+instrument and its yardstick, not a coding error, and the paper has to say so.
+
+**The one facet that would have caught it is never switched on.**
+`CodeComparator`'s behavioural half needs a runner in `context["run"]`, supplied
+via `run_code` — a parameter **no caller in this repository passes**. Every
+code-comparator verdict ever recorded is AST-only. Wiring it is the first item
+of future work and it *lowers* our own numbers, since it finds more influence.
+
 **Not fixable by extending the vocabulary**, which would be exactly the
 after-the-fact tuning the pre-registration rule forbids. The fix is a graded
 signal — how far a signature moved, facet by facet — and that is future work,
@@ -178,6 +202,55 @@ that always says "influenced", which is the conservative fallback with extra
 steps.
 
 ---
+
+### 2.5 A source can reach a prompt outside the block a redaction operates on
+
+**Found 13-09-2026 while root-causing the real-model unsafe preservation in
+`docs/08` §7.5; half of that failure is this. D-062.**
+
+A counterfactual removes a source from the rendered source block. That is only
+a test of the source if the block was its **only** route into the request, and
+in this pipeline it sometimes is not: the Coder's script prompt quotes the
+decision event's output verbatim under `Approach you chose:`, and the
+Reviewer's quotes the draft script, both outside the block and outside anything
+`redact_source()` can reach.
+
+So when a source influenced that upstream event, redacting it leaves its
+contribution in the request. The model answers from the relay, the signature
+does not move, and the pair is cleared. **The unmoved signature is the
+experiment failing, and it is indistinguishable from an innocent source unless
+you look at the prompt.**
+
+Three things about this are worth keeping separate:
+
+- **It is a confound, not a weak instrument.** No comparator, however good, can
+  see a difference the redacted request never produced. §2.1 is about the
+  signature being too coarse; this is about there being nothing to measure.
+- **It is not solvable by removing the relay too.** A counterfactual may differ
+  from the original in exactly one source. Cutting the relay changes the
+  request twice and the verdict stops being attributable.
+- **What is done instead is to refuse the clearance.** D-062 records such a
+  pair `assumed`, never `clean`, so the walk keeps it contaminated. Measured
+  cost: two exposed-only cells fall from 100% to 79% work preserved. Those are
+  the two channels — memory and inter-agent message — whose payload lands on
+  the Coder, which is the agent with the relay.
+
+**What remains unfixed.** The relay is detected by looking for an upstream
+output's text in the prompt. A *paraphrased* relay — the pipeline summarising
+an upstream output rather than quoting it — is not found, and such a pair keeps
+the old behaviour. Our pipeline only ever quotes, so the detector is complete
+*here*; it is not complete in general, and a system that summarises between
+agents would need a different mechanism. The general statement is uncomfortable
+and should be in the paper as it stands: **leave-one-out over a prompt is only
+sound if every route from a source into that prompt is removable, and nothing
+in the method enforces that.**
+
+**Relationship to §2.2.** This is a redundant-cause failure — the source and
+the relay each independently suffice — but it is *not* the one D-051 fixed.
+`merge_derived_units()` merges redundant **sources**, using recorded
+`derived_from` links. The relay is not a source, has no id, and can never enter
+a unit. D-051's fix is structurally incapable of seeing it, which is why the
+failure survived that work.
 
 ## 3. Attack-success probabilities are borrowed, partial, and saturating
 

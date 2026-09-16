@@ -55,6 +55,7 @@ from src.provenance.attribution import (
     AttributionRequest,
     Sink,
     derived_links_for,
+    relayed_outputs_for,
 )
 from src.common.models import SOURCE_KINDS as _SOURCE_KINDS
 from src.provenance.signatures import (
@@ -181,6 +182,13 @@ def counterfactual(
     on the model-wide calibration: if the control moves, this event's signature
     is unstable and the verdict is not evidence, whatever the comparator's
     average floor says.
+
+    **`influenced=False` here does not mean "clean".** Whether an unmoved
+    signature is allowed to clear a pair is D-062's question, and it is decided
+    in one place -- `_log_counterfactual_verdict()` -- rather than here, so the
+    rule cannot hold on one recording path and not another. A source that also
+    reaches the prompt through a relayed upstream output is recorded `assumed`
+    however this function answers. Callers must record through that helper.
     """
     if not request.prompt or not request.source_block:
         return CounterfactualResult(
@@ -241,6 +249,68 @@ def counterfactual(
                 "flip on this event is not evidence"
             )
     return result
+
+
+def _log_counterfactual_verdict(
+    sink: Sink,
+    request: AttributionRequest,
+    sid: str,
+    influenced: bool,
+    *,
+    comparator: str,
+    before: str,
+    after: str,
+    repeats: int,
+    notes: str,
+    error: str | None,
+) -> str:
+    """Write one counterfactual verdict, with D-062's refusal to clear applied.
+
+    Every inline recording site goes through this, so the rule cannot hold on
+    one path and not another -- which is how the original defect survived:
+    `refine_for_verdict` and the three `HybridAttributor` paths each wrote
+    their own `log_check` call.
+
+    The asymmetry is the whole content. `influenced` is recorded unchanged,
+    because a signature that moved when a source left is evidence whatever
+    else the prompt carries. A `clean` is recorded only when the removal could
+    have moved it -- when the source also reaches this prompt through a
+    relayed upstream output, the check was not a check, and `assumed` (never a
+    clearance, and no influence edge) is the honest record.
+
+    Returns the verdict actually written.
+    """
+    if not influenced:
+        confound = request.confounded_by_relay([sid])
+        if confound:
+            sink.log_check(
+                sid, request.event_id, "tainted", "assumed",
+                confidence=0.0,
+                signature_before=before,
+                signature_after=after,
+                comparator=comparator,
+                repeats=repeats,
+                notes=confound,
+            )
+            return "unexaminable"
+    if influenced:
+        sink.log_influence(
+            InfluenceEdge(
+                sid, request.event_id, method="counterfactual",
+                confident=error is None,
+            )
+        )
+    sink.log_check(
+        sid, request.event_id, "tainted" if influenced else "clean",
+        "counterfactual",
+        confidence=0.5 if error else 1.0,
+        signature_before=before,
+        signature_after=after,
+        comparator=comparator,
+        repeats=repeats,
+        notes=notes,
+    )
+    return "tainted" if influenced else "clean"
 
 
 # --- the attributor the pipeline uses ----------------------------------------
@@ -435,22 +505,16 @@ class HybridAttributor:
                 event_id_=request.event_id,
                 agent_id=request.agent_id,
             )
-            if result.influenced:
-                sink.log_influence(
-                    InfluenceEdge(
-                        sid, request.event_id, method="counterfactual",
-                        confident=result.error is None,
-                    )
-                )
-            sink.log_check(
-                sid, request.event_id, result.verdict, "counterfactual",
-                confidence=0.5 if result.error else 1.0,
-                signature_before=result.before.value,
-                signature_after=result.after.value,
+            if _log_counterfactual_verdict(
+                sink, request, sid, result.influenced,
                 comparator=comparator.name,
+                before=result.before.value,
+                after=result.after.value,
                 repeats=result.repeats,
                 notes=result.notes(),
-            )
+                error=result.error,
+            ) == "unexaminable":
+                self._bump("relay_confounded")
 
         # ATOMIC UNITS BEFORE ANY REMOVAL TEST (D-051).
         # A source and the sources it was recorded as derived from are
@@ -535,28 +599,21 @@ class HybridAttributor:
         )
         error = decision.errors[0] if decision.errors else None
         for sid in unit:
-            if influenced:
-                sink.log_influence(
-                    InfluenceEdge(
-                        sid, request.event_id, method="counterfactual",
-                        confident=error is None,
-                    )
-                )
-            sink.log_check(
-                sid, request.event_id,
-                "tainted" if influenced else "clean",
-                "counterfactual",
-                confidence=0.5 if error else 1.0,
-                signature_before=decision._before.value,
-                signature_after="",
+            written = _log_counterfactual_verdict(
+                sink, request, sid, influenced,
                 comparator=comparator.name,
+                before=decision._before.value,
+                after="" if influenced else decision._before.value,
                 repeats=1,
                 notes=(
                     f"removed as one atomic unit with {list(unit)} -- these "
                     "carry a recorded derived_from link, so testing them "
                     "separately clears both (D-051)"
                 ) + (f"; error: {error}" if error else ""),
+                error=error,
             )
+            if written == "unexaminable":
+                self._bump("relay_confounded")
 
     def _single_investigate(
         self,
@@ -588,22 +645,17 @@ class HybridAttributor:
             event_id_=request.event_id,
             agent_id=request.agent_id,
         )
-        if result.influenced:
-            sink.log_influence(
-                InfluenceEdge(
-                    sid, request.event_id, method="counterfactual",
-                    confident=result.error is None,
-                )
-            )
-        sink.log_check(
-            sid, request.event_id, result.verdict, "counterfactual",
-            confidence=0.5 if result.error else 1.0,
-            signature_before=result.before.value,
-            signature_after=result.after.value,
+        written = _log_counterfactual_verdict(
+            sink, request, sid, result.influenced,
             comparator=comparator.name,
+            before=result.before.value,
+            after=result.after.value,
             repeats=result.repeats,
             notes=result.notes(),
+            error=result.error,
         )
+        if written == "unexaminable":
+            self._bump("relay_confounded")
 
     def _group_investigate(
         self,
@@ -699,26 +751,20 @@ class HybridAttributor:
         for sid in candidates:
             hit = sid in influential
             self._bump(f"counterfactual_{'tainted' if hit else 'clean'}")
-            if hit:
-                sink.log_influence(
-                    InfluenceEdge(
-                        sid, request.event_id, method="counterfactual",
-                        confident=error is None,
-                    )
-                )
-            sink.log_check(
-                sid, request.event_id, "tainted" if hit else "clean",
-                "counterfactual",
-                confidence=0.5 if error else 1.0,
-                signature_before=decision._before.value,
-                signature_after=decision._before.value if not hit else "",
+            written = _log_counterfactual_verdict(
+                sink, request, sid, hit,
                 comparator=comparator.name,
+                before=decision._before.value,
+                after=decision._before.value if not hit else "",
                 repeats=1,
                 notes=(
                     f"group-tested over {len(candidates)} candidates in "
                     f"{decision.calls} calls ({diagnostics.line()})"
                 ) + (f"; error: {error}" if error else ""),
+                error=error,
             )
+            if written == "unexaminable":
+                self._bump("relay_confounded")
 
     def _record_self_report_positive(
         self, sink: Sink, request: AttributionRequest, sid: str, claim: Any
@@ -771,6 +817,9 @@ class RefineResult:
     # instead of separately (D-051), and how many sources that covered.
     derived_units_merged: int = 0
     derived_sources_merged: int = 0
+    # Pairs settled without a call because a relayed upstream output meant no
+    # removal could have tested them (D-062).
+    relay_confounded: int = 0
 
     def summary(self) -> str:
         parts = [
@@ -788,6 +837,11 @@ class RefineResult:
                 f"SPRT: {self.sprt_decision} after {self.sprt_checks} "
                 f"observations (logLR={self.sprt_log_lr:+.2f})"
                 + (" -- ABORTED EARLY" if self.aborted_early else "")
+            )
+        if self.relay_confounded:
+            parts.append(
+                f"{self.relay_confounded} pair(s) not testable: a relayed "
+                "upstream output carries the source past redaction"
             )
         if self.calibration_skips:
             parts.append(f"calibration skipped {self.calibration_skips} checks")
@@ -888,28 +942,30 @@ def refine_for_verdict(
     def _record(log, sid, eid, request, influenced, error, before, after, repeats_done):
         """One verdict written to the trace. Shared by both investigation
         paths so a group-tested verdict and a single-source one are recorded
-        identically -- the trace must not be able to tell which found it."""
-        comparator = for_event(request.kind, request.output).name
-        if influenced:
-            result.tainted += 1
-            log.log_influence(
-                InfluenceEdge(sid, eid, method="counterfactual",
-                              confident=error is None)
-            )
-        else:
-            result.cleared += 1
-        log.log_check(
-            sid, eid, "tainted" if influenced else "clean", "counterfactual",
-            confidence=0.5 if error else 1.0,
-            signature_before=before,
-            signature_after=after,
-            comparator=comparator,
+        identically -- the trace must not be able to tell which found it.
+
+        Writes through `_log_counterfactual_verdict`, which is also what the
+        inline attributor uses, so D-062's refusal to clear a relayed source
+        cannot apply on one path and not the other. That split is how the
+        original defect survived: four separate `log_check` call sites."""
+        written = _log_counterfactual_verdict(
+            log, request, sid, influenced,
+            comparator=for_event(request.kind, request.output).name,
+            before=before,
+            after=after,
             repeats=repeats_done,
             notes=(
                 "group-tested counterfactual" if use_group_testing
                 else "single-source counterfactual"
             ) + (f"; error: {error}" if error else ""),
+            error=error,
         )
+        if written == "unexaminable":
+            result.relay_confounded += 1
+        elif written == "tainted":
+            result.tainted += 1
+        else:
+            result.cleared += 1
         result.examined += 1
         result.order.append((sid, eid))
 
@@ -1185,6 +1241,19 @@ def request_for(
     def _influencers(event: str) -> list[str]:
         return [e.source_id for e in trace.influence if e.target_event == event]
 
+    # Upstream outputs this prompt quotes outside the source block (D-062).
+    # Scanned over the events that precede this one in the trace, because the
+    # pipeline splices by value and a `parents` link would say "came after"
+    # rather than "was quoted into".
+    source_block = trace.source_block_text(event_id)
+    earlier: list[tuple[str, str, list[str]]] = []
+    for other in trace.events:
+        if other.id == event_id:
+            break
+        text = trace.output_text(other.id)
+        if text:
+            earlier.append((other.id, text, list(other.exposures)))
+
     return AttributionRequest(
         event_id=event_id,
         agent_id=event.agent_id,
@@ -1193,9 +1262,10 @@ def request_for(
         exposures=list(event.exposures),
         labels=labels,
         prompt=prompt,
-        source_block=trace.source_block_text(event_id),
+        source_block=source_block,
         system=trace.system_text(event_id),
         derived_links=derived_links_for(
             list(event.exposures), _producer, _influencers
         ),
+        relayed=relayed_outputs_for(prompt, source_block, earlier),
     )
