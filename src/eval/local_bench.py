@@ -379,7 +379,12 @@ def main(argv: list[str] | None = None) -> int:
     # together: llama3 (8B) and llama3.2 (3B) gave 4.1 and 9.5 tok/s on the same
     # box. One filename would have let the second overwrite the first.
     safe_name = args.model.replace(":", "-").replace("/", "-")
-    out = RESULTS_DIR / f"concurrency-sweep-{safe_name}.json"
+    # Placement is part of the filename, not just the payload. The GPU sweep
+    # silently overwrote the CPU one for the same model until it was: they are
+    # different experiments (58 tok/s against 9.5, and C_safe 2 against 1), and
+    # the CPU campaign's benchmark has to survive alongside the GPU one.
+    where = "GPU" if on_gpu else "CPU"
+    out = RESULTS_DIR / f"concurrency-sweep-{safe_name}-{where}.json"
     out.write_text(
         json.dumps(
             {
