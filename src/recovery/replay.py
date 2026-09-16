@@ -257,12 +257,33 @@ class SplicingClient:
         self._queue = pipeline_model_events(self.original)
         self._index = 0
         self._pending: tuple[str, str] | None = None
+        # The text the most recent real call actually went out with, for the
+        # pipeline to store instead of the one it composed (docs/03 #18).
+        # None after a splice or a self-report, because neither issued a
+        # pipeline prompt and inheriting the previous one would be a new lie.
+        self._last_issued: str | None = None
         self.total_tokens = 0
         self.throttled_s = getattr(self.inner, "throttled_s", 0.0)
         self.report.original_shape = [
             (self.original.event(eid).agent_id, self.original.event(eid).kind)
             for eid in self._queue
         ]
+
+    def last_issued_prompt(self) -> str | None:
+        """The prompt the last `generate()` really sent, or None.
+
+        docs/03 #18: the pipeline composes a prompt, calls the client, and then
+        writes the composed text into the content store -- but redaction happens
+        *inside* this client, so for a replayed event the stored prompt was the
+        un-redacted one and the trace recorded a request that was never made.
+        The pipeline now asks for this after the call and stores the answer.
+
+        None means no pipeline prompt was issued: a spliced event made no call
+        at all, and a self-report is analysis rather than a pipeline event. The
+        caller keeps what it composed in that case, which is what it has always
+        done.
+        """
+        return self._last_issued
 
     def announce(self, agent_id: str, kind: str) -> None:
         """The pipeline says what the next model call is for.
@@ -280,6 +301,7 @@ class SplicingClient:
         json_output: bool = False,
         temperature: float | None = None,
     ) -> LLMResponse:
+        self._last_issued = None
         if SELF_REPORT_MARKER in prompt:
             return self.inner.generate(
                 prompt, system=system, json_output=json_output, temperature=temperature
@@ -344,6 +366,7 @@ class SplicingClient:
         if self.clean_prompt is not None:
             cleaned = self.clean_prompt(event_id, cleaned)
         self.report.issued_prompts[event_id] = cleaned
+        self._last_issued = cleaned
         response = self.inner.generate(
             cleaned, system=system, json_output=json_output, temperature=temperature
         )

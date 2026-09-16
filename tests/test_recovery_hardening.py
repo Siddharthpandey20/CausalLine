@@ -32,12 +32,14 @@ from src.common.prompts import render_sources
 from src.eval.scripted import ScriptedClient
 from src.provenance.attribution import AttributionRequest
 from src.provenance.estimator import counterfactual
+from src.eval.attacks import build, label_malicious
 from src.recovery.replay import (
     RedactionError,
     SpliceError,
     SplicingClient,
     pipeline_model_events,
     redact_flagged,
+    replay,
 )
 from src.recovery.verify import surviving_payload
 from src.tracing.logger import read_trace
@@ -264,9 +266,10 @@ class TestIndependentRecheck(unittest.TestCase):
         )
 
     def test_no_issued_prompt_means_no_prompt_check(self) -> None:
-        """A spliced event has no re-issued prompt, and the stored one is the
-        un-redacted copy the pipeline wrote before the client redacted it.
-        Checking that copy would fail every successful recovery."""
+        """A spliced event has no re-issued prompt, so there is nothing to
+        check against. (Since docs/03 #18 was closed the stored prompt for a
+        *replayed* event is the one that was sent; a spliced event made no call
+        at all, so the stored prompt there is still the composed one.)"""
         source = self.trace.sources[2]
         failures = surviving_payload(self.trace, self._some_event(), source.id)
         self.assertFalse(any("re-issued prompt" in f for f in failures))
@@ -337,6 +340,152 @@ class TestControlRunSymmetry(unittest.TestCase):
         self.assertIs(result.control_stable, False, result.notes())
         self.assertEqual(result.verdict, "tainted")
 
+
+
+
+class TestStoredPromptIsTheSentPrompt(unittest.TestCase):
+    """docs/03 #18: a recovered trace stored a prompt that was never sent.
+
+    The pipeline composed a prompt, called the client, and wrote the *composed*
+    text into the content store -- while redaction happened inside
+    `SplicingClient.generate()`. So for a replayed event the trace recorded the
+    un-redacted request, which is the one request we can be sure was not made.
+
+    Nothing depended on it until D-068 started reading prompts back, and it was
+    mitigated there by reading `ReplayReport.issued_prompts` instead of the
+    store. This closes it at the source: the pipeline now asks the client what
+    it actually sent and stores that.
+
+    The two tests below are the two halves of the guarantee the issue asked
+    for -- the prompt is faithful, and the source block still belongs to it.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._tmp = tempfile.TemporaryDirectory()
+        tmp = Path(cls._tmp.name)
+
+        attack = build("B", influencing=True)
+        original_path = tmp / "original.jsonl"
+        tools = attack.apply(
+            Tools.from_fixtures(
+                memory_path=original_path.with_suffix(".memory.json")
+            )
+        )
+        run_pipeline(
+            original_path, client=ScriptedClient(seed=20260906), tools=tools
+        )
+        cls.original = read_trace(original_path)
+        cls.flagged = label_malicious(original_path, attack.marker)
+        assert cls.flagged, "the marker never reached the trace"
+
+        # Invalidate everything downstream of the poisoned memory value, so the
+        # Coder's events are genuinely re-issued rather than spliced.
+        cls.invalidation = {
+            e.id
+            for e in cls.original.events
+            if set(e.exposures) & set(cls.flagged)
+        }
+
+        recovered_path = tmp / "recovered.jsonl"
+        _result, cls.report = replay(
+            cls.original,
+            cls.invalidation,
+            ScriptedClient(seed=20260906),
+            recovered_path,
+            tools=attack.apply(
+                Tools.from_fixtures(
+                    memory_path=recovered_path.with_suffix(".memory.json")
+                )
+            ),
+            flagged=cls.flagged,
+        )
+        cls.recovered = read_trace(recovered_path)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._tmp.cleanup()
+
+    def _replayed_model_events(self) -> list[str]:
+        """Recovered events that the client really re-issued a prompt for.
+
+        `ReplayReport.issued_prompts` is keyed by the *original*'s event ids,
+        and the recovered trace renumbers from e0001 -- but both pipelines make
+        the same calls in the same order, which is exactly what `announce`
+        asserts, so position in `pipeline_model_events` maps one to the other.
+        """
+        original_calls = pipeline_model_events(self.original)
+        recovered_calls = pipeline_model_events(self.recovered)
+        self.assertEqual(len(original_calls), len(recovered_calls))
+        return [
+            recovered
+            for original, recovered in zip(original_calls, recovered_calls)
+            if original in self.report.issued_prompts
+        ]
+
+    def test_the_replay_actually_reissued_something(self) -> None:
+        """Guard on the guard: if nothing was re-issued the two tests below
+        would pass vacuously."""
+        self.assertTrue(self.report.replayed)
+        self.assertTrue(self._replayed_model_events())
+
+    def test_no_replayed_event_stores_a_flagged_source(self) -> None:
+        """The assertion docs/03 #18 asked whoever took it to add."""
+        contents = {
+            sid: self.original.source(sid).content for sid in self.flagged
+        }
+        for event_id in self._replayed_model_events():
+            stored = self.recovered.prompt_text(event_id)
+            self.assertIsNotNone(stored)
+            for sid, content in contents.items():
+                with self.subTest(event=event_id, source=sid):
+                    self.assertNotIn(
+                        content.strip(),
+                        stored,
+                        f"{event_id}'s stored prompt still contains {sid}, "
+                        "which the recovery reports as redacted. The trace is "
+                        "recording a request that was not made.",
+                    )
+
+    def test_the_stored_block_still_belongs_to_the_stored_prompt(self) -> None:
+        """Correcting one and not the other would store two texts from
+        different requests, and `splice_block()` refuses a block it cannot
+        find -- which is every counterfactual on a recovered trace."""
+        for event_id in self._replayed_model_events():
+            block = self.recovered.source_block_text(event_id)
+            if block is None:
+                continue  # deliberately dropped rather than guessed
+            with self.subTest(event=event_id):
+                self.assertIn(
+                    block,
+                    self.recovered.prompt_text(event_id),
+                    f"{event_id}: the stored source block is not inside the "
+                    "stored prompt, so the two came from different requests",
+                )
+
+    def test_a_client_that_does_not_rewrite_prompts_is_unaffected(self) -> None:
+        """`last_issued_prompt` is an optional capability. A plain client has
+        none, and the original run must store exactly what it composed."""
+        self.assertFalse(hasattr(ScriptedClient(), "last_issued_prompt"))
+        for event in self.original.events:
+            stored = self.original.prompt_text(event.id)
+            block = self.original.source_block_text(event.id)
+            if stored and block:
+                with self.subTest(event=event.id):
+                    self.assertIn(block, stored)
+
+    def test_a_spliced_event_reports_no_issued_prompt(self) -> None:
+        """No call was made, so there is nothing to correct and the client must
+        say so rather than handing back the previous call's text."""
+        client = SplicingClient(
+            original=self.original,
+            invalidation=set(),  # splice everything
+            inner=ScriptedClient(seed=20260906),
+            flagged=set(self.flagged),
+        )
+        first = pipeline_model_events(self.original)[0]
+        client.generate(self.original.prompt_text(first) or "x")
+        self.assertIsNone(client.last_issued_prompt())
 
 if __name__ == "__main__":
     unittest.main()

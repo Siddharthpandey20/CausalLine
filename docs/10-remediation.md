@@ -1,23 +1,33 @@
 # 10 — Remediation Report (phase-gated pass)
 
 Covers Phases 0–8 of `task.md`. Supersedes `docs/08` on the numbers it
-re-measures, and `docs/03` on issues #12, #13, #15, #16 and #17.
+re-measures, and `docs/03` on issues #12, #13, #15, #16, #17 and #18.
+
+**Two passes, and §8.5 is the second.** §§1–8.4 are the phase-gated pass
+(`fd266dd`). §8.5 is the closing pass of 16-09-2026: the merge with the
+independent relay-confound branch, `docs/03` #18 closed, the real-LLM
+diagnostic `task.md` Phase 8 asked for, and a correction to §8.3 that re-running
+it produced. Where the two disagree, §8.5 is later and says why.
 
 **Everything here was measured in this pass.** Where something was not run, it
 says so and says why. The real-LLM mode was deliberately not exercised: it costs
 hosted-model quota, and nothing in Phases 0–7 needs it. `docs/09` stands
 unchanged and §9 below says exactly which of its claims this pass moves.
+§8.5 revisits the one place that mattered — Phase 8's real-LLM box — and closes
+it with a deterministic diagnostic that measures *around* the circularity §8.4
+identified rather than stopping at it.
 
 Commands that regenerate every number:
 
 ```
-python -m pytest                                  # 390 passed, 1 skipped
+python -m pytest                                  # 398 passed, 114 subtests
 python -m src.eval.action_census                  # Phase 0
 python -m src.provenance.scripted_noise           # Phase 2 (floors)
 python -m src.eval.robustness                     # Phase 2 (repeats + control)
 python -m src.eval.selfreport_value               # Phase 6
 python -m src.eval.campaign                       # Phase 8, 30 reps, ~525s
 python -m src.eval.economics                      # Phase 8
+python -m src.eval.relay_diagnosis                # Phase 8, both failure shapes
 ```
 
 ---
@@ -535,15 +545,23 @@ claims to be:
 | A, inline attribution | 800 | 800 |
 | A, targeted attribution | 200 | 200 |
 | f (contaminated fraction) | 0.675 | 0.677 |
-| storage per run | 26470 B | 26499 B |
+| storage per run | 26470 B | ~~26499 B~~ **25125 B** — see §8.5 |
 | inline: selective wins | 0 / 24 | 0 / 24 |
 | targeted: selective wins | 12 / 24 | 12 / 24 |
 | attack-rate threshold | none | none |
 
-**Materially unchanged.** `f` moves by 0.002 and storage by 29 bytes, both
-consistent with the one extra invalidated event. `docs/03` #7's uncomfortable
-answer stands: on this testbed the check still costs more than the rerun, and no
-attack rate makes the storage tax worth paying.
+**Materially unchanged.** `f` moves by 0.002, consistent with the one extra
+invalidated event. `docs/03` #7's uncomfortable answer stands: on this testbed
+the check still costs more than the rerun, and no attack rate makes the storage
+tax worth paying.
+
+**The storage row is corrected, 16-09-2026.** Re-running this command produces
+25 125 B, not the 26 499 B printed above, and it produces 25 126 B at `fd266dd`
+itself — checked in a detached worktree at that commit, so the figure is not a
+consequence of anything that landed later. The number as first reported does not
+come back from its own command. Nothing downstream of it moves: the threshold is
+`NONE` at either value, because `A + f*N` already exceeds `N`. Kept struck
+through rather than silently replaced. §8.5.
 
 ### 8.4 The real-LLM diagnostic: not run, and what that means
 
@@ -572,6 +590,122 @@ behave on a real model rather than on a reproduction of one. That is the next
 thing to spend quota on, and it should be done before any real-LLM number from
 this pass is quoted.
 
+
+### 8.5 The closing pass, 16-09-2026 — the merge, `docs/03` #18, and the diagnostic
+
+`§8.4` above left one `task.md` box open and one issue mitigated rather than
+closed. This section is that work, and it is deliberately separate so its diff
+can be read on its own — which is precisely the argument §8.4 and `docs/03` #18
+used to defer things, honoured here rather than quoted.
+
+**The merge (`16d5446`).** The relay-confound line the brief calls Investigation
+A turned out to exist after all, on its own branch, and it had independently
+found the same real-model failure. Its relay guard and this pass's
+`removability` check answer the same question, and `removability` answers it
+better: the guard only looked for a residual route *outside* the source block,
+while `removability` shingles the removed source's content and finds a residual
+route anywhere in the redacted prompt, **including inside another rendered
+source**. So every conflicted file resolved in favour of this branch and the
+guard was dropped rather than merged — two mechanisms answering one question is
+how they drift apart.
+
+Three things from that branch were not covered here and were kept:
+
+- `src/eval/relay_diagnosis.py`, below;
+- `real_llm.run_generated()` called `Calibration.load()` with **no model**, so
+  D-070's correction — made for the scripted path — had an exact twin on the
+  real-LLM path that nobody had looked at. A mismatch now falls back to an
+  empty, excludes-nothing calibration and says so on the result row;
+- `ScriptedClient` had no `model`, so `run_pipeline()` fell through to
+  `load_settings()` and **every scripted trace in this repository claims
+  `model: gemini-3.6-flash`** while the usage records inside it say `scripted`.
+
+Both identity defects are D-075, and both are the D-057/D-059/D-070 pattern at
+its fourth and fifth occurrence. Neither changes a published number — the
+scripted calibration is loaded from its own file by name, and `meta["client"]`
+always named the scripted client — but the field D-057 made load-bearing was
+false on most traces here.
+
+**`docs/03` #18 is closed (D-076).** The deferral's stated reason was that
+fixing it alongside the verification rework would make two changes
+indistinguishable in the campaign diff. That diff is now published, so the
+objection is spent. The pipeline asks the client what it actually sent and
+stores that; `None` — a spliced event, a self-report — leaves the composed text
+alone.
+
+The half that was not in #18's write-up is the one that would have bitten.
+Correcting the prompt and leaving `source_block` behind stores two texts from
+different requests, and `splice_block()` refuses a block it cannot locate — so
+**every counterfactual on a recovered trace would have begun raising**, turning
+a silent inaccuracy into a loud failure somewhere unrelated. `_follow_redaction()`
+performs the same removal on the block and returns `None` rather than a guess
+when the result does not land inside the sent prompt: a missing block reads as
+unexaminable everywhere, which contaminates, while a wrong one is the D-029
+hazard. Five tests, and they fail on the pre-fix path — `e0013` and `e0014` both
+store the poisoned memory value the recovery reports as redacted.
+
+**The diagnostic, and how it gets a non-circular answer.** §8.4 declined to run
+the real-LLM confirmation for two reasons: quota, and the fact that scoring
+`carryover` against canary-token ground truth is partly true by construction.
+The first is still binding — there is no `NVIDIA_API_KEY_*` on this machine. The
+second is not a reason to report nothing; it is a reason to measure around it,
+and `python -m src.eval.relay_diagnosis` does.
+
+It runs the full pipeline plus the targeted refinement twice, offline:
+
+| | run 1 | run 2 |
+|---|---|---|
+| payload carries | a canary token | ordinary prose, **no token-shaped string** |
+| `carryover` matched via | the **distinctive-token** path — `cl-7f3a-9d21` | **9 word shingles**, zero tokens |
+| circular with token ground truth? | **yes, and labelled so** | **no** |
+
+`distinctive_spans()` has exactly two paths — word shingles, and single spans
+carrying both letters and digits — and a canary token is the second kind. Run 2
+contains nothing of that kind anywhere, which
+`tests/test_relay_confound.py::TestTheDiagnosticStillPasses::test_the_no_token_run_carries_no_token_shaped_string`
+asserts directly. So run 2 is the evidence that `carryover` is a
+**content-overlap facet and not a canary detector**, and it is the run that
+carries the claim. Run 1 exists to reproduce `gen006` exactly and is reported as
+circular.
+
+It also attributes each fix to the mechanism that earns it, which the naive
+version does not:
+
+- at **e0014**, `carryover` also fires — the Coder's script repeats the payload
+  too — so the recorded verdict is `tainted` with `removability=unchecked`,
+  because removability is only consulted when the signature did *not* move. Run
+  again with `carryover` excluded and the signature holds still: verdict
+  `tainted`, `removability=residual`, 1 residual span in run 1 and 9 in run 2.
+  **Removability alone closes e0014**, and that half is not circular with
+  anything — it is a question about a prompt on disk answered by reading the
+  prompt on disk.
+- at **e0013**, `removability=verified` — S14 really is gone from that prompt —
+  so the e0014 fix cannot be what saved it. The pre-D-064 comparator returns
+  `clean`; the current one returns `tainted` with `carryover` as the facet that
+  moved. **The facet alone closes e0013.**
+
+Per D-064's first binding consequence, pair scoring is printed **both ways**:
+unsafe 0 with `carryover`, **1 without**. The second number is the non-circular
+one and it is the honest reading — without the facet, `e0013` is still missed,
+which is exactly why the facet exists.
+
+The diagnostic exits non-zero on regression and runs from the suite in under two
+seconds, so it cannot rot into documentation.
+
+**Fresh test suite: 398 passed, 114 subtests.** Was 390 + 1 skipped at §8.1;
++5 for `TestStoredPromptIsTheSentPrompt`, +2 for `TestTheDiagnosticStillPasses`,
+and the skip is gone.
+
+**A correction to §8.3, found by re-running it.** The storage row does not
+regenerate. §8.3 reports 26 499 B for this pass against a stored 26 470 B;
+`python -m src.eval.economics` produces **25 125 B**, and it produces 25 126 B
+at `fd266dd` itself, checked in a detached worktree at that exact commit. So the
+discrepancy is not the merge and not `docs/03` #18 — the reported figure simply
+does not come back from its own command. Every other economics number in §8.3
+reproduces exactly: N=600, A 800 / 200, f=0.6767, inline 0/24, targeted 12/24,
+threshold NONE. The conclusion is untouched in either direction, and the row is
+corrected rather than left standing, because a number that does not regenerate
+is the specific thing this project has decided to stop shipping.
 ---
 
 ## 9. What can now be said that could not be said before
@@ -591,10 +725,15 @@ this pass is quoted.
    meant. That is fixed at the point of writing and at the point of reading, and
    fixing it removed a genuinely contaminated event from the preserved set.
    (`docs/03` #17, D-067.)
-3. **Post-recovery verification is independent of the recovery plan.** Before:
-   it cleared events because redaction had been *called*. Now it reads the
-   re-issued prompt and the recovered output. Building it immediately exposed a
-   trace-fidelity defect nobody knew about (`docs/03` #18).
+3. **Post-recovery verification is independent of the recovery plan, and the
+   trace it reads is now honest.** Before: verification cleared events because
+   redaction had been *called*. Now it reads the re-issued prompt and the
+   recovered output. Building it immediately exposed a trace-fidelity defect
+   nobody knew about — a recovered trace stored the un-redacted prompt, the one
+   request we can be certain was not made — and that is **now closed too**: the
+   pipeline stores what the client actually sent, and the source block is
+   carried with it or dropped rather than guessed. (`docs/03` #18, D-068,
+   D-076.)
 4. **The comparator can represent verbatim carry-over, and the price of that is
    declared.** One slice of `docs/06` §2.1's blind spot is closed; the rest is
    not; and the circularity it creates with real-LLM ground truth is written
@@ -620,6 +759,20 @@ this pass is quoted.
    than left standing**: `docs/03` #15's "this change is a no-op" (it costs an
    unsafe preservation, D-069), and self-report as a cost-ordering heuristic (it
    is more expensive and buys safety, D-072).
+10. **`carryover` is demonstrably a content-overlap facet and not a canary
+    detector — and that is measured, not argued.** §8.4 could only declare the
+    circularity with the real-LLM ground truth. §8.5 separates it: on a payload
+    containing **no token-shaped string anywhere**, the facet still fires,
+    through word shingles rather than the distinctive-token path that a canary
+    takes. That is the one claim about `carryover` that the circular
+    measurement could never have supported, and it is now regression-tested.
+11. **Each of the two `gen006` failures is attributed to the mechanism that
+    actually closes it.** They overlap at `e0014` — `carryover` fires there too
+    and gets to the verdict first — so a naive check credits the wrong fix. With
+    the facet excluded, `removability=residual` closes `e0014` on its own; at
+    `e0013` `removability=verified`, so the `e0014` fix provably cannot be what
+    saved it and the facet closes it on its own. Two mechanisms, two pairs,
+    each shown necessary. (`python -m src.eval.relay_diagnosis`.)
 
 **Claims this pass does NOT earn, and must not be made.**
 
@@ -628,7 +781,11 @@ this pass is quoted.
   run under this code. §8.4.
 - **Not "the estimator's real-LLM pair-level agreement improved."** That number
   cannot be computed honestly with `carryover` active, because it now shares a
-  mechanism with the ground truth it is scored against.
+  mechanism with the ground truth it is scored against. The diagnostic prints
+  it **both ways** for this reason, and the non-circular column is the worse
+  one: unsafe 0 with the facet, **1 without**. Without `carryover`, `e0013` is
+  still missed — which is the point of the facet, and not a result that can be
+  quoted as an improvement in agreement.
 - **Not "false cleans are eliminated."** Three narrownesses remain and they are
   the same narrowness: `carryover`, the removability check and the canary-token
   ground truth are all **textual**. An influence that is paraphrased rather than
@@ -646,3 +803,8 @@ this pass is quoted.
 - **Nothing here touches `docs/06` §4.** The analysis still does not pay for
   itself: A/N is unchanged, and turning on the Phase 2 machinery would raise it
   from 1.25 to 1.92.
+- **Not "every number in this report regenerates."** One did not: §8.3's storage
+  row, which re-runs to 25 125 B against the 26 499 B printed there, at this
+  commit and at `fd266dd` alike. Corrected in §8.5. It changes no conclusion,
+  and it is listed here because finding it by re-running rather than by being
+  told is the only reason it is listed at all.

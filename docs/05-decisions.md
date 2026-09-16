@@ -2756,3 +2756,84 @@ Confidence is a tiebreak inside an event, not a replacement for the frontier.
 Detection *timing* stays unread, and `docs/02-architecture.md` now says why: this
 system is post-hoc and batch, and `detected_at` exists to make the batch problem
 harder, not to drive an interrupt.
+
+## D-075 — Two more identity fields that were never narrowed
+
+**16-09-2026.** D-070 found that `experiment.py` loaded the Gemini calibration
+for scripted runs because `Calibration.load()` was called with no model. Two
+more instances of the same call shape survived that pass, both found by the
+parallel relay-confound line of work and merged in here.
+
+**The real-LLM path had the same bug D-070 fixed for the scripted one.**
+`real_llm.run_generated()` called `Calibration.load()` with no argument, so the
+guard that exists to refuse a cross-model transfer never fired, and the
+gemini-3.6-flash exclusions — `strategy` and `dependency` dropped from the
+decision comparator — were applied to every NVIDIA run. Fixed by passing the
+execution model. A mismatch **falls back to an empty calibration** instead of
+raising: raising kills the campaign rather than fixing it, and an empty
+calibration excludes nothing, which `Calibration.load`'s own docstring names as
+the conservative setting. The fallback is recorded on `RealRunResult.notes`, so
+a run whose verdicts rest on an unmeasured floor says so on its own row.
+
+**And `ScriptedClient` had no identity at all.** `run_pipeline()` builds its
+header from `load_settings()` — the Gemini configuration — and D-057 taught it
+to let a client overwrite the fields it owns. `ScriptedClient` has no
+`fingerprint`, no `settings` and had no `model`, so it fell through to the
+default: **every scripted trace in this repository carries
+`model: gemini-3.6-flash`** while the usage records inside it say `scripted`.
+
+No published number is known to be wrong — `meta["client"]` and the usage
+records both name the scripted client, and `scripted_noise` reads its own file —
+but the field D-057 made load-bearing was false on the majority of traces here.
+`ScriptedClient.model = "scripted"` fixes it; existing committed traces keep the
+wrong header and are not rewritten (D-008).
+
+**The pattern, now at five occurrences.** Settings describe a configuration; a
+client describes one endpoint; a calibration describes one model; a trace header
+is a claim about what actually answered. Each layer that narrows the previous one
+must say so, or the widest is silently reported. The dangerous shape is a default
+that is *usually* right, because nothing fails when it is wrong — which is why
+all five were found by reading rather than by a test.
+
+## D-076 — The content store records the prompt that was sent
+
+**16-09-2026. Closes `docs/03` #18, which D-068 opened and deferred.**
+
+`_call()` composes a prompt, calls the client, and writes the composed text into
+the content store. Redaction happens *inside* `SplicingClient.generate()`. So on
+a recovered trace the stored prompt for a replayed event was the un-redacted
+one — the single request we can be certain was **not** made.
+
+**Why the deferral is spent.** #18's stated reason for leaving it was that
+changing it in the same pass as the verification rework would make two changes
+indistinguishable in the campaign diff. That pass is recorded and its diff is
+explained, so this is now an isolated change with a diff of its own.
+
+**Decision: the pipeline asks the client what it sent.**
+`last_issued_prompt()` is an optional capability read by `getattr`, exactly as
+`announce` is (docs/03 #13) — a client that does not rewrite prompts has nothing
+to correct and is unaffected, which
+`test_a_client_that_does_not_rewrite_prompts_is_unaffected` pins. `None` means no
+pipeline prompt was issued: a spliced event made no call, and a self-report is
+analysis rather than a pipeline event. In both cases the composed text stands,
+which is what it always did.
+
+**The half that was not in the write-up, and would have bitten.** Correcting the
+prompt and leaving `source_block` alone stores two texts from different requests.
+Every reader that locates the block inside the prompt — `splice_block()`, and
+therefore every counterfactual — would then raise on a recovered trace, turning a
+silent inaccuracy into a loud failure somewhere else. `_follow_redaction()`
+performs the same removal on the block, over exactly the sources the redaction
+took out, and returns **None** rather than a guess when the result does not land
+inside the sent prompt. A missing block reads as unexaminable everywhere, which
+contaminates; a wrong block is the D-029 hazard — a redaction that removes the
+wrong text and reports no influence.
+
+**What it buys.** The assertion #18 asked for now holds as a property rather than
+a hope: no replayed event's stored prompt contains a flagged source. It fails on
+the pre-fix path — `e0013` and `e0014` both store the poisoned memory value the
+recovery reports as redacted — and passes now. D-068's re-check can go on reading
+`issued_prompts`; the point is that the trace no longer disagrees with it.
+
+Measured effect on the campaign: none. The corrected text is only ever written
+for a replayed event, and no metric read it.

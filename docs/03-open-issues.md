@@ -600,7 +600,7 @@ contaminated.
 
 ---
 
-## 18. A recovered trace stores a prompt that was never sent
+## 18. A recovered trace stores a prompt that was never sent — CLOSED
 
 Found while building the independent post-recovery re-check (D-068), which
 reported flagged material surviving in the prompt of every *successful* recovery.
@@ -617,17 +617,33 @@ back. It matters for anything that will:
   text and could report a redaction that had already happened as a change
 - a reader auditing what a recovered run actually saw would be misled
 
-**Current handling:** `ReplayReport.issued_prompts` records the text actually
-issued, and the re-check reads that rather than the store. That is enough for the
-consumer that exists.
+**Interim handling, 15-09-2026:** `ReplayReport.issued_prompts` records the text
+actually issued, and the re-check reads that rather than the store. Enough for
+the consumer that existed, and it left the trace itself still wrong.
 
-**Not fixed, and the reason is scope.** Making the store faithful means moving
-redaction out of the client and into the pipeline, or giving the pipeline a
-prompt-preparation hook it consults before writing content — and both change a
-shared file on a path every method goes through, for a defect with one known
-consumer that is already handled. Doing it in the same pass that changed
-verification would make two changes hard to tell apart in the campaign diff.
+**CLOSED 16-09-2026 (D-076).** The deferral's stated reason was that fixing it in
+the same pass as the verification change would make two changes hard to tell
+apart in the campaign diff. That pass is recorded, so the objection is spent, and
+this is now its own isolated change with its own diff.
 
-**Status: OPEN, mitigated. Raised 15-09-2026.** Whoever takes it should also add
-an assertion that the stored prompt for a replayed event contains no flagged
-source, which is the cheap version of the same guarantee.
+The pipeline asks the client what it actually sent (`last_issued_prompt()`, an
+optional capability read by `getattr` exactly as `announce` is) and stores that.
+`None` means no pipeline prompt was issued — a spliced event made no call, a
+self-report is not a pipeline event — and the composed text stands, which is what
+it always did.
+
+The second half was not in the original write-up and is the part that would have
+bitten: correcting the prompt and leaving `source_block` alone stores two texts
+from different requests, and `splice_block()` refuses a block it cannot locate —
+so every counterfactual on a recovered trace would have started raising.
+`_follow_redaction()` performs the same removal on the block, and returns
+**None** rather than a guess if the result does not land inside the sent prompt.
+A missing block reads as unexaminable everywhere, which contaminates; a wrong one
+is the D-029 hazard.
+
+The assertion this issue asked for is
+`tests/test_recovery_hardening.py::TestStoredPromptIsTheSentPrompt`, five tests,
+and they fail on the pre-fix path: `e0013` and `e0014` both store the poisoned
+memory value the recovery reports as redacted.
+
+**Status: CLOSED 16-09-2026** (D-076). Was OPEN, mitigated, from 15-09-2026.

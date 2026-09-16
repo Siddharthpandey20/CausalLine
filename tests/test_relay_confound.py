@@ -47,6 +47,7 @@ from src.provenance.checks import ClearancePolicy, is_carrier
 from src.provenance.estimator import counterfactual
 from src.provenance.signatures import (
     CARRYOVER_FACET,
+    SHINGLE,
     Calibration,
     carryover_facet,
     distinctive_spans,
@@ -379,6 +380,53 @@ class TestCarrierClearances(unittest.TestCase):
                 "no carrier verdict moved after refinement; the pointers are "
                 "not being followed",
             )
+
+
+class TestTheDiagnosticStillPasses(unittest.TestCase):
+    """`python -m src.eval.relay_diagnosis` is a check, not a printout.
+
+    Phase 8 of the remediation brief asks for a re-run of the real-LLM
+    diagnostic confirming e0013 is resolved and e0014 remains resolved. That
+    cannot be a hosted run here -- there is no key, and D-064 makes a
+    token-scored real-LLM confirmation of `carryover` circular anyway -- so the
+    diagnostic reproduces both shapes deterministically and returns non-zero if
+    either regresses.
+
+    Running it from the suite is what stops it rotting into documentation. It
+    costs under two seconds because nothing in it calls a model.
+    """
+
+    def test_it_exits_zero(self) -> None:
+        from src.eval.relay_diagnosis import main
+
+        self.assertEqual(
+            main(["--quiet"]), 0,
+            "the relay diagnostic reports a regression; run "
+            "`python -m src.eval.relay_diagnosis` for the evidence",
+        )
+
+    def test_the_no_token_run_carries_no_token_shaped_string(self) -> None:
+        """The non-circular half is only non-circular if it really is
+        token-free. `distinctive_spans` promotes any span with both letters and
+        digits to a single-token match, which is exactly what a canary is."""
+        from src.eval.relay_diagnosis import (
+            PROSE_CARRY,
+            PROSE_PAYLOAD,
+            PROSE_SENTENCE,
+        )
+        from src.provenance.signatures import distinctive_spans
+
+        for text in (PROSE_PAYLOAD, PROSE_CARRY, PROSE_SENTENCE):
+            with self.subTest(text=text[:40]):
+                singles = [
+                    span for span in distinctive_spans(text)
+                    if len(span.split()) < SHINGLE
+                ]
+                self.assertEqual(
+                    singles, [],
+                    f"{singles} would be matched the way a canary token is, so "
+                    "this payload cannot separate carryover from the token",
+                )
 
 
 if __name__ == "__main__":

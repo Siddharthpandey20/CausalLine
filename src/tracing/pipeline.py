@@ -57,7 +57,7 @@ from src.common.cassette import Cassette, CassetteClient
 from src.common.config import Settings, load_settings
 from src.common.llm import GeminiClient, LLMError, LLMResponse, QuotaExhausted
 from src.common.models import Event
-from src.common.prompts import render_sources
+from src.common.prompts import redact_source, render_sources, sources_in
 from src.provenance.attribution import (
     AttributionRequest,
     Attributor,
@@ -317,6 +317,30 @@ class GeminiPipeline:
         if announce is not None:
             announce(agent, kind)
         response = self.client.generate(prompt, system=system, json_output=json_output)
+
+        # STORE THE PROMPT THAT WAS SENT, NOT THE ONE WE COMPOSED (docs/03 #18).
+        # A replay client redacts flagged sources inside its own `generate`, so
+        # until now a recovered trace stored the un-redacted text and recorded a
+        # request that was never made. Anything reading prompts back off a
+        # recovered trace -- post-hoc counterfactuals, the D-068 re-check, a
+        # human auditing what the rerun actually saw -- was reading fiction.
+        #
+        # Optional capability, asked for by `getattr` like `announce` above: a
+        # client that does not rewrite prompts has nothing to correct, and
+        # `None` means this call issued no pipeline prompt (a spliced event made
+        # no call), in which case what we composed is the best available record.
+        issued = getattr(self.client, "last_issued_prompt", None)
+        if issued is not None:
+            sent = issued()
+            if sent is not None and sent != prompt:
+                # The block has to follow the prompt or the two stop belonging
+                # to the same request, and `splice_block()` refuses a block it
+                # cannot find -- which would make a post-hoc counterfactual on a
+                # recovered trace unrunnable rather than merely wrong. The same
+                # surgery, over the sources the redaction took out.
+                source_block = _follow_redaction(prompt, sent, source_block)
+                prompt = sent
+
         prompt_ref = self.log.put_content(prompt, kind="prompt", meta={"agent": agent})
         refs = [prompt_ref]
         if source_block:
@@ -1188,6 +1212,34 @@ def task_outcome(expected: list[str], stdout: str) -> tuple[bool, str]:
     if ISO_DATE.findall(stdout) == expected:
         return True, "iso_scan"
     return False, "mismatch"
+
+
+
+def _follow_redaction(
+    composed: str, sent: str, block: str | None
+) -> str | None:
+    """The stored source block, after the client removed sources from the prompt.
+
+    docs/03 #18's second half. Correcting the prompt and leaving the block
+    behind would store two texts from different requests, and every reader that
+    locates the block inside the prompt -- `splice_block`, and therefore every
+    counterfactual -- would fail on a recovered trace.
+
+    Returns None rather than a guess when the reconstruction does not land
+    inside the sent prompt. A missing block is handled everywhere (the pair
+    reads as unexaminable, which contaminates); a wrong one is the D-029
+    hazard, a redaction that removes the wrong text and reports no influence.
+    """
+    if not block:
+        return block
+    removed = [sid for sid in sources_in(block) if sid not in sources_in(sent)]
+    out = block
+    for sid in removed:
+        try:
+            out = redact_source(out, sid)
+        except Exception:  # noqa: BLE001 -- any failure means "do not guess"
+            return None
+    return out if out in sent else None
 
 
 def _strip_fences(text: str) -> str:
