@@ -201,6 +201,7 @@ def collect(results_path: Path) -> list[RunMetrics]:
         by_test.setdefault(row["test_id"], row)
 
     out: list[RunMetrics] = []
+    skipped: list[str] = []
     for workdir in sorted(Path("data/runs/local_llama").glob("*")):
         if not workdir.is_dir():
             continue
@@ -210,11 +211,22 @@ def collect(results_path: Path) -> list[RunMetrics]:
         scenario = suite.get(test_id)
         if scenario is None:
             continue
-        measured = measure_run(
-            test_id, repeat, workdir, scenario, by_test.get(test_id)
-        )
+        try:
+            measured = measure_run(
+                test_id, repeat, workdir, scenario, by_test.get(test_id)
+            )
+        except (ValueError, KeyError, OSError) as exc:
+            # A run still being written: the trace's last line is half a JSON
+            # record. That is a race with a live campaign, not corrupt data, so
+            # the run is skipped and counted rather than crashing a report
+            # somebody is using to watch the campaign.
+            skipped.append(f"{workdir.name}: {type(exc).__name__}")
+            continue
         if measured is not None:
             out.append(measured)
+    if skipped:
+        print(f"  (skipped {len(skipped)} run(s) still being written: "
+              f"{', '.join(s.split(':')[0] for s in skipped)})")
     return out
 
 
@@ -237,6 +249,56 @@ def safety_verdict(runs: list[RunMetrics]) -> str:
         )
     return "SAFETY: unsafe preservations by method -- " + ", ".join(
         f"{m}={v}" for m, v in totals.items()
+    )
+
+
+
+def paired_vs(runs: list[RunMetrics], challenger: str, baseline: str) -> str:
+    """Per-run paired comparison, which is the test this design actually calls for.
+
+    Unpaired means with overlapping intervals are the weakest reading of these
+    data and the easiest to over-claim from: at n=6 CausalLine's work-preserved
+    interval overlaps B1's, so an unpaired reading says "not separated" while
+    the runs themselves may agree unanimously.
+
+    Every method sees the *same* run, so the runs are paired and the question
+    is "on how many runs did the challenger beat the baseline, and by how
+    much". A sign test on that is exact, needs no normality assumption, and is
+    honest at small n -- including honest about the fact that six unanimous
+    runs give p = 0.031 and three give p = 0.125, which is not significance.
+    """
+    landed = [r for r in runs if r.landed]
+    if not landed:
+        return f"  {challenger} vs {baseline}: no landed run to pair"
+    wins = losses = ties = 0
+    deltas: list[float] = []
+    for run in landed:
+        a = run.method[challenger]["work_preserved"]
+        b = run.method[baseline]["work_preserved"]
+        deltas.append(a - b)
+        if a > b:
+            wins += 1
+        elif a < b:
+            losses += 1
+        else:
+            ties += 1
+    n = wins + losses
+    # Two-sided exact sign test: P(as extreme as this under a fair coin).
+    if n:
+        k = max(wins, losses)
+        tail = sum(math.comb(n, i) for i in range(k, n + 1)) / (2 ** n)
+        p = min(1.0, 2 * tail)
+    else:
+        p = 1.0
+    mean_delta = statistics.mean(deltas) if deltas else 0.0
+    verdict = (
+        "significant at 0.05" if p < 0.05
+        else "NOT significant at 0.05 -- directionally consistent, underpowered"
+    )
+    return (
+        f"  {challenger} vs {baseline}: {wins}W-{losses}L-{ties}T over "
+        f"{len(landed)} paired run(s), mean delta {mean_delta:+.1%} work "
+        f"preserved" + chr(10) + f"      sign test p={p:.3f} ({verdict})"
     )
 
 
@@ -308,6 +370,11 @@ def render(runs: list[RunMetrics]) -> str:
         if len(landed) < 3:
             lines.append("  (n < 3: means are printed without intervals, because an "
                          "interval over two points is decoration)")
+
+    # --- paired comparison ------------------------------------------------
+    lines += ["", "3b. PAIRED COMPARISON (same runs, so pair them)"]
+    for baseline in ("B0", "B1", "B2"):
+        lines.append(paired_vs(runs, "CausalLine", baseline))
 
     # --- safety -----------------------------------------------------------
     lines += ["", "4. SAFETY", "  " + safety_verdict(runs)]
