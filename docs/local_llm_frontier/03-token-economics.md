@@ -151,9 +151,18 @@ must fall as `N` grows. With lever 1 applied:
 | 0.10 | 0.62 | 0.29 |
 
 A testbed where one poisoned source touches 10% of a long workflow is where this
-method is supposed to pay, and **this project has never built one.** Every
-scenario here plants a source the Coder or Researcher reads directly, so it
-propagates to most of the run by construction.
+method is supposed to pay, and when this was written **the project had never
+built one.** Every scenario here plants a source the Coder or Researcher reads
+directly, so it propagates to most of the run by construction.
+
+> **SUPERSEDED 16-09-2026 — it has now been built and run.** The fan-out
+> workflow (D-091) holds the contaminated region at a constant three events
+> while the trace grows, giving `f` = 0.21 / 0.12 / **0.06** at K = 4 / 8 / 16.
+> Measured with lazy self-report on, `A/N + f` came out at **0.93** (K=8) and
+> **0.59** (K=16) -- the win condition met on executed runs, against the 0.92
+> projected below. See `docs/local_llm_frontier/04`, and read its §5 before
+> quoting either number: the chain result is *not* overturned, and the testbed
+> was designed to have the property being tested.
 
 ---
 
@@ -199,7 +208,14 @@ re-measurement that obliges. It is the highest-value unwired thing left.
 
 ## 5. What this means for the paper
 
-**Do not claim CausalLine is cheaper. It is not, and three models agree.**
+> **UPDATED 16-09-2026.** Everything in this section is about the **chain**
+> workflow and remains true of it. On the fan-out workflow with lazy
+> self-report, CausalLine *is* cheaper -- `A/N + f` = 0.93 at K=8 and 0.59 at
+> K=16, measured. The claim below is therefore now conditional on workflow
+> shape rather than absolute. `docs/local_llm_frontier/04`.
+
+**On chain-shaped workflows, do not claim CausalLine is cheaper. It is not, and
+three models agree.**
 
 The claim the measurements support is narrower than it looked, and narrower
 than the earlier draft of this file said: CausalLine **identifies a smaller

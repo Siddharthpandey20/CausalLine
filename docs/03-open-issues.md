@@ -485,6 +485,25 @@ fresh campaign, and to record as such.
 the four methods are exempt from a check the fourth is failing for a reason
 unrelated to what any of them are being measured on.
 
+**Status: ROOT-CAUSED 16-09-2026 AND NO LONGER BLOCKING. See D-090, D-091.**
+
+All 58 task failures from the 60-run local GPU campaign were classified through
+the *same* `iso_scan` the shipped checker uses. **Zero were scoring artefacts.**
+They were crashed scripts, dropped dates and day/month swaps: a 3B model that
+cannot reliably write a date-parsing program. D-065 already forgives formatting,
+so nothing is left for a checker change to fix, and D-069 already established
+that relaxing the `verify()` predicate instead costs safety.
+
+So this was never a bug in CausalLine or in the checker. It was a task the
+execution model could not do. The fix is a different task: the fan-out workflow
+(D-091) asks for extraction rather than code generation, its controls pass the
+task 3 of 3, and all 18 of its selective replays pass the task check -- on the
+same model that failed the chain task 56 times out of 60.
+
+**The chain workflow's #15 condition still stands and is still recorded**
+(`VerifyResult.original_task_success`); it simply no longer blocks the
+task-recovery conclusion, because there is now a shape that can answer it.
+
 **Status: DECIDED 15-09-2026, AND THE RECOMMENDATION ABOVE WAS REVERSED BY A
 MEASUREMENT.** See D-069.
 

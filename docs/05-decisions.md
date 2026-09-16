@@ -3472,3 +3472,213 @@ of the four methods that checks, and the only one charged for the answer; B1's
 observed CausalLine execute a selective recovery that verification certified.
 Until one does, the work-preservation claim is about *identification*, and every
 table has to say so.
+
+## D-087 — The SPRT's hypotheses come from the cost model, not from taste
+
+**16-09-2026. `src/provenance/estimator.py`.**
+
+`sprt_investigate.config_for(analysis_tokens, restart_tokens)` derives
+`f* = 1 - A/N` — the contamination fraction below which investigating is worth
+starting. Grepped across the repository, it **had no caller outside its own
+module and its own tests, and `sprt_config=` was passed by nobody.** So every
+investigation this project has ever run used `SPRTConfig()`'s defaults,
+`f_star = 0.3` / `f_star_high = 0.7`: numbers chosen by taste and never measured.
+
+**Both inputs are now read off the trace, so no constant is introduced.**
+`N` is `trace.pipeline_tokens()`. `A` is estimated as the sum of the per-event
+pipeline cost over the pairs that would be examined — a counterfactual check
+re-runs one event, so it costs about what that event cost — times `repeats`.
+A trace with no pipeline usage, or nothing to check, gets the old defaults back:
+a cost model built on a zero denominator is worse than an admitted guess.
+
+**Measured on all 60 chain traces from the GPU campaign**, reconstructing the
+pre-refinement pair set (the stored traces already carry the refinement's own
+check records, and using them directly silently drops every run whose
+investigation finished — keeping only the ones that ran out of budget, which is
+a biased sample and was caught before it was reported):
+
+| | old (taste) | new (cost model) |
+|---|---|---|
+| f_star | 0.300 | **0.023** |
+| f_star_high | 0.700 | **0.173** |
+
+mean estimated `A` 12 638 against mean `N` 5 752, so `A/N = 2.33` ex ante.
+**On 59 of 60 traces the estimate says `A >= N`: no value of `f` makes
+investigating that workload worth starting.** Under the old defaults 0 of 60
+traces would have aborted; under the cost model 51 of 60 would.
+
+That is an uncomfortable answer and it is the right one. The ex-ante estimate is
+deliberately an **upper bound** — it assumes every pair in the region is checked,
+where group testing, the frontier expansion and the SPRT itself all cut that
+down, which is why the realized `A` is 6 489 rather than 12 638. The gate is
+therefore conservative in the direction of restarting. It does not change the
+conclusion on this workload: even the realized `A/N` is 1.18, still above 1.
+
+`RefineResult` now carries `sprt_f_star` and `sprt_f_star_high`, because a
+result computed from per-trace hypotheses that does not record them cannot be
+reproduced or argued with.
+
+---
+
+## D-088 — The planner's cap excludes the analysis it has already paid, and that is correct
+
+**16-09-2026. `src/recovery/planner.py`, `tests/test_investigation_cost.py`.**
+
+Raised as a bug: `greedy_cover` compares accumulated *replay* cost against
+`restart_all_cost`, and `A` — the dominant term, 1.18 × N measured — is not in
+the comparison at all. The requested fix was to include the analysis already
+committed.
+
+**Worked through on the campaign's own numbers, that fix is strictly worse.**
+By the time the planner runs, `A` is spent. It appears in both arms and cancels:
+
+```
+finish selectively : A + spent + best.cost
+restart now        : A + restart_all_cost
+```
+
+With A=6489, N=5520, selective=2153: finishing costs 8642, restarting costs
+12009. Adding the sunk term to the left-hand side makes the gate fire earlier,
+and firing earlier converts the 8642 into the 12009 — **3367 tokens worse per
+run, and never better.** A sunk cost cannot be saved by spending more.
+
+**Decision: the cap does not move.** `count_sunk_analysis` exists as a switch,
+**off by default**, so the claim is measurable rather than asserted, and two
+tests pin it — one that the default keeps the cheap replay, one that enabling it
+forces the restart, with the arithmetic in the assertions. `committed_analysis`
+is recorded on every plan either way, so the total cost of a plan is visible
+without changing what the plan is.
+
+**Where `A` can still be avoided is before it is spent** — `ex_ante_decision`
+and the SPRT hypotheses of D-087. That is the real answer to the concern that
+raised this.
+
+---
+
+## D-089 — Lazy self-report reached an experiment, and it is the largest single cost effect measured
+
+**16-09-2026. `src/eval/real_llm.py`, `src/eval/fanout_campaign.py`.**
+
+D-082 built the deferred self-report and left it default-off. `run_generated`
+had no way to ask for it: the pipeline always installed
+`HybridAttributor(mode="self_report")`, and `self_report_first` was never passed
+to `refine_for_verdict`. `lazy_self_report=True` now does both — no attributor
+during the pipeline, the question asked once per event the frontier actually
+reaches.
+
+`refine_for_verdict`'s return value was also being **discarded**, so no campaign
+could say how many self-reports it asked, whether the SPRT aborted, or on what
+hypotheses. It is now captured onto `RealRunResult`. The swallowing `except`
+around it prints the exception type and message: that branch once hid a
+`TypeError` and let a run finish with `analysis_tokens=0`, which looks entirely
+plausible and is entirely wrong.
+
+**Measured on the fan-out campaign**, identical runs differing in this one flag:
+
+| K | A eager | A lazy | reduction |
+|---|---|---|---|
+| 4 | 1 647 | 850 | −48% |
+| 8 | 2 851 | 983 | −66% |
+| 16 | 5 248 | **1 246** | **−76%** |
+
+Delivered work preserved, blast radius and unsafe preservations are **identical
+between the arms**. The reduction is not bought with anything measured here.
+
+The mechanism is why it scales: eager self-report asks every model event of
+every run, so `A` grows with the **workflow**. Lazy asks only about events the
+contaminated region reaches, so `A` grows with the **region** — which the
+fan-out shape holds constant. That is what turns `A/N` from 2.24 into 0.53 at
+K=16.
+
+---
+
+## D-090 — docs/03 #15 is a capability failure, not a scoring mismatch
+
+**16-09-2026. Root-caused rather than worked around, as the brief asked.**
+
+#15 has blocked the task-recovery conclusion on three real-model campaigns. The
+open question was whether the task check was rejecting correct work.
+
+**It is not.** All 58 task failures from the 60-run local GPU campaign were
+classified through the **same `iso_scan` the shipped checker uses**, so a bucket
+labelled "scoring" would be one `task_outcome` could have accepted:
+
+| count | class |
+|---|---|
+| 19 | script crashed partway — 4 of 5 dates missing |
+| 16 | 1 wrong date, 1 missing — the day/month swap the task is *about* |
+| 8 | script crashed outright (`datetime.datetime` after `from datetime import datetime`) |
+| 6 | 1 of 5 dates missing |
+| 4 | 2 of 5 missing (`Invalid date format` printed instead) |
+| 4 | 1 wrong date, 5 missing |
+| 1 | empty stdout, no error |
+| **0** | **scoring artefact** |
+
+D-065's `iso_scan` already forgives formatting — including the
+`2024-03-12T00:00:00` suffix that a naive comparison would reject. Nothing is
+left for a checker change to fix.
+
+**So #15 cannot be fixed without changing the testbed's task design**, which is
+the second option the brief allowed, and D-069 already established that
+relaxing the `verify()` predicate instead costs safety (it took the
+lying-self-reporter condition from zero unsafe preservations to one).
+
+The change is therefore to the task: the fan-out workflow (D-091) asks a model
+to extract a value rather than to write a date-parsing program. **Its control
+runs pass the task 3 of 3**, and all 18 of its selective replays pass the task
+check — on the same 3B model that failed the chain task 56 times out of 60.
+#15 was never a bug in CausalLine or in the checker; it was a task the
+execution model could not do.
+
+---
+
+## D-091 — A fan-out workflow, because `f` had never been allowed to be small
+
+**16-09-2026. Adds `src/tracing/fanout.py`, `src/eval/fanout_scenarios.py`,
+`src/eval/fanout_campaign.py`, `src/eval/fanout_report.py`,
+`tests/test_fanout.py`. `run_pipeline` gains `workflow=` (default `"chain"`).**
+
+**The problem this fixes is an evaluation-design problem, not a code one.**
+Every measurement in this project used a chain, where a poisoned source
+contaminates everything downstream, so `f` is large by construction. `docs/03`
+§3 measured a 26% longer chain moving `A/N + f` by 0.00. The method's central
+claim — that it pays when contamination is *localized* — had therefore never
+been tested in the regime where it could possibly hold.
+
+`K` analysts each fetch and read their **own** document; an aggregator collects;
+an executor compares. One analyst's document has a planted note beside it. The
+contaminated region is a **constant three events** against a trace of `3K + 2`,
+so `f` runs 0.21 (K=4) → 0.12 (K=8) → **0.06** (K=16).
+
+`FanoutScenario` answers the same duck-typed interface `run_generated` already
+asks of a `GeneratedScenario`, so detector, refinement, contamination walk,
+planner, selective replay, verification, the three baselines and every metric
+run **unchanged**. `run_pipeline` dispatches on `workflow`, defaulting to
+`"chain"`, and `replay()` reads the shape off the trace header for the same
+reason it already reads `research_rounds`: replaying a fan-out trace into a
+chain rerun would line the event ids up far enough to splice the wrong outputs
+into the wrong agents.
+
+**Two faults the shape exposed, both found by measurement and both against us:**
+
+1. Documents logged with no `origin_event` left `baselines.entry_events` empty,
+   so **B1 and B2 discarded nothing at all** and CausalLine was being compared
+   against baselines that were not running. Documents now arrive through a tool
+   call, as web sources do everywhere else.
+2. The payload was spliced into the only document carrying the required fact, so
+   redaction removed the fact with it, every replay produced a wrong answer and
+   CausalLine escalated on every run. It is now a **separate planted source**,
+   which is how every other scenario here plants an attack.
+
+**Result (24 runs, 4 design points, 2 arms, 3 repetitions, `llama3.2:3b` on
+GPU):** zero escalations on all 18 landed runs; all 18 selective replays pass
+the task check; delivered work preserved 87.0% against B1's 82.7%, B2's 78.4%
+and B0's 0%, 18W–0L–0T at p = 0.00001; blast radius a constant 3 against B0's
+30; controls landed 0 of 6; safety tied at zero unsafe.
+**`A/N + f = 0.93` at K=8 and `0.59` at K=16 — the win condition met on measured
+runs for the first time in this project**, against a projection of 0.92.
+
+**What it does not show is in `docs/local_llm_frontier/04` §5 and must be read
+with the numbers.** In particular: the chain result is not overturned, this
+testbed was *designed* to have the property being tested, n = 3 per cell, and
+the task is deliberately easier than the chain's.

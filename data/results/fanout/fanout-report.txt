@@ -1,0 +1,56 @@
+FAN-OUT FRONTIER -- localized contamination, 24 run(s)
+placement: llama3.2:3b: 100% on GPU (2.8 GB of 2.8 GB in VRAM)
+
+1. COVERAGE
+  design         K     arm   n  landed  task ok  events
+  fan04-inf      4   eager   3       3        0      14
+  fan04-inf      4    lazy   3       3        0      14
+  fan08-exp      8   eager   3       0        3      26
+  fan08-exp      8    lazy   3       0        3      26
+  fan08-inf      8   eager   3       3        0      26
+  fan08-inf      8    lazy   3       3        0      26
+  fan16-inf     16   eager   3       3        0      50
+  fan16-inf     16    lazy   3       3        0      50
+
+  CONTROL: 0 of 6 exposed-only run(s) landed  (as required)
+
+2. DELIVERED RECOVERY (landed runs only)
+   `preserved` is what the EXECUTED plan kept, after any escalation (D-086).
+  arm     method                     preserved     esc   blast    tokens  unsafe
+  eager   B0 full restart         0.0% +/-0.00   0/9      30.0      1391       0
+  eager   B1 agent taint         82.7% +/-0.06   0/9       4.0       331       0
+  eager   B2 topology closure    78.4% +/-0.07   0/9       5.0       331       0
+  eager   CausalLine             87.0% +/-0.04   0/9       3.0      3579       0
+  lazy    B0 full restart         0.0% +/-0.00   0/9      30.0      1391       0
+  lazy    B1 agent taint         82.7% +/-0.06   0/9       4.0       331       0
+  lazy    B2 topology closure    78.4% +/-0.07   0/9       5.0       331       0
+  lazy    CausalLine             87.0% +/-0.04   0/9       3.0      1357       0
+
+3. BREAK-EVEN:  A/N + f  < 1.00 is the win condition
+   A = analysis tokens. N = B0's full-restart tokens.
+   f = 1 - delivered work preserved, by CausalLine.
+  arm        K   n        A        N     A/N      f    A/N+f   verdict
+  eager      4   3     1647      632    2.61   0.21     2.82   loses
+  eager      8   3     2851     1200    2.38   0.12     2.49   loses
+  eager     16   3     5248     2340    2.24   0.06     2.30   loses
+  lazy       4   3      850      632    1.34   0.21     1.56   loses
+  lazy       8   3      983     1200    0.82   0.12     0.93   WINS
+  lazy      16   3     1246     2340    0.53   0.06     0.59   WINS
+
+4. THE PROJECTION, CHECKED
+  best A/N+f, eager arm : 2.30
+  best A/N+f, lazy arm  : 0.59
+  projected (docs/local_llm_frontier/03 §3): 0.92
+  difference from the projection: -0.33
+  -> the win condition IS met, on measured runs, for the first time in this project.
+
+5. PAIRED SIGN TEST on delivered work preserved
+   (same run, so pair it; exact and two-sided)
+  CausalLine vs B0 full restart: 18W-0L-0T, mean delta +87.0%, p=0.00001 (significant)
+  CausalLine vs B1 agent taint: 18W-0L-0T, mean delta +4.3%, p=0.00001 (significant)
+  CausalLine vs B2 topology closure: 18W-0L-0T, mean delta +8.7%, p=0.00001 (significant)
+
+6. SAFETY
+  SAFETY WAS TIED -- every method had zero unsafe preservations.
+  None is shown safer than another here. The distinguishing results are
+  DELIVERED WORK PRESERVATION and COST.
