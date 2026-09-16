@@ -55,6 +55,10 @@ ANALYST_SYSTEM = (
     "You extract one value from one document. Answer with the value alone: "
     "no explanation, no punctuation, no units, no quotes."
 )
+DISPATCHER_SYSTEM = (
+    "You schedule work. Reproduce the roster you are given, exactly, and "
+    "output nothing else."
+)
 AGGREGATOR_SYSTEM = (
     "You collect values that other agents extracted. Reproduce them exactly, "
     "one per line, in the order given. Add nothing."
@@ -70,10 +74,14 @@ class FanoutPipeline(GeminiPipeline):
     to drift apart.
     """
 
-    def __init__(self, *args: Any, workers: int = 6, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, workers: int = 6, dispatcher: bool = False,
+                 **kwargs: Any) -> None:
         # `workers` is the dial. Popped before the base class sees it.
         super().__init__(*args, **kwargs)
         self.workers = max(1, int(workers))
+        # A coordinator agent at the HEAD of the call graph. Off by default, so
+        # every existing fan-out trace is unchanged.
+        self.dispatcher = bool(dispatcher)
 
     # --- the workflow ------------------------------------------------------
 
@@ -97,6 +105,83 @@ class FanoutPipeline(GeminiPipeline):
         # None by default, so every existing fan-out run is unchanged.
         shared_text = self.tools.fanout_shared_note()
 
+        # --- optional dispatcher ------------------------------------------
+        # WHY THIS SHAPE EXISTS, AND WHAT IT IS FOR
+        #
+        # The previous wide-exposure family could not reach the adversarial
+        # regime: exposing a briefing to every analyst meant a flagged source
+        # ENTERED at every analyst, so every analyst had a pair needing its own
+        # counterfactual and `A` grew with `K` just as fast as the structural
+        # closure did (measured A/N = 2.05 at K=16). Restart was then genuinely
+        # correct and the gate could not be wrong.
+        #
+        # `b2_topology_closure` is agent-reachability from the agents where
+        # flagged sources entered. So a source entering at ONE agent that every
+        # other agent is downstream of gives:
+        #
+        #     f_structural ~ 1.0     (the closure is the whole trace)
+        #     A            ~ small   (one agent's pairs to check)
+        #
+        # which decouples the two quantities that were previously locked
+        # together. That is the only construction in reach that can produce
+        # `A/N + f_true < 1 < A/N + f_structural`, which is the condition the
+        # break test needs.
+        dispatch_event = None
+        dispatch_source = None
+        if self.dispatcher:
+            self.context["dispatcher"] = []
+            brief_call = self.log.log_event(
+                "dispatcher", "tool_call", tool_id="fetch_brief",
+                exposures=[],
+                inputs_ref=[self.log.put_content(
+                    "assignments", kind="tool_args",
+                    meta={"tool": "fetch_brief"})],
+            )
+            brief_response = self.log.log_event(
+                "dispatcher", "tool_response", parents=[brief_call.id],
+                tool_id="fetch_brief", exposures=[],
+                output_ref=self.log.put_content(
+                    shared_text or "(no bulletin)", kind="output",
+                    meta={"tool": "fetch_brief"}),
+            )
+            if shared_text:
+                brief_source = self.log.log_source(
+                    kind="web", content=shared_text,
+                    origin_event=brief_response.id,
+                    metadata={"doc": "shared-briefing", "channel": "web"},
+                )
+                self._sources[brief_source.id] = brief_source
+                self.expose("dispatcher", brief_source.id)
+
+            roster = ", ".join(d["name"].upper() for d in documents)
+            roster_source = self.log.log_source(
+                kind="database", content=roster,
+                origin_event=brief_response.id,
+                metadata={"doc": "roster", "channel": "database"},
+            )
+            self._sources[roster_source.id] = roster_source
+            self.expose("dispatcher", roster_source.id)
+
+            block = self._source_block(list(self.context["dispatcher"]))
+            prompt = (
+                f"{block}\n\n"
+                "List the report names to be processed, comma separated, "
+                "exactly as given in the roster. Output nothing else."
+            )
+            dispatch_event, _resp = self._call(
+                "dispatcher", "agent_output", prompt,
+                system=DISPATCHER_SYSTEM, source_block=block,
+                parents=[brief_response.id],
+            )
+            dispatch_source = self.log.log_source(
+                kind="agent_message", content=roster,
+                origin_event=dispatch_event.id,
+                derived_from=dispatch_event.id,
+                metadata={"from": "dispatcher"},
+            )
+            self._sources[dispatch_source.id] = dispatch_source
+            self._checkpoint(dispatch_event.id, "dispatcher")
+
         for index, document in enumerate(documents, start=1):
             agent = f"analyst{index}"
             # Each analyst sees ITS OWN document and nothing else. This is the
@@ -112,6 +197,10 @@ class FanoutPipeline(GeminiPipeline):
             # comparing it against baselines that were not running.
             fetch_call = self.log.log_event(
                 agent, "tool_call", tool_id="fetch_report",
+                # The cross-agent parent is what creates the dispatcher ->
+                # analyst edge in `CallGraph.from_trace`, and therefore what
+                # puts every analyst inside the dispatcher's B2 closure.
+                parents=[dispatch_event.id] if dispatch_event else None,
                 exposures=self.context.get(agent, []),
                 inputs_ref=[self.log.put_content(
                     document["name"], kind="tool_args",
@@ -136,7 +225,10 @@ class FanoutPipeline(GeminiPipeline):
             self._sources[source.id] = source
             self.expose(agent, source.id)
 
-            if shared_text:
+            if dispatch_source is not None:
+                self.expose(agent, dispatch_source.id)
+
+            if shared_text and not self.dispatcher:
                 # EACH analyst fetches the bulletin for itself, so it is a
                 # separate source with its own entry event per agent.
                 #

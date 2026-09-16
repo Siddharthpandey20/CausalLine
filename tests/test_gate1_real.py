@@ -147,5 +147,111 @@ class TestScoringClassifiesHonestly(unittest.TestCase):
                 self.assertEqual((a + min(r, n)) < n, expected)
 
 
+
+class TestTheBreakTestConstruction(unittest.TestCase):
+    """The dispatcher shape, which is what made the target regime reachable.
+
+    The previous wide-exposure family could not reach `A/N < 1` because a
+    briefing read by every analyst ENTERED at every analyst, so `A` grew with
+    `K` exactly as fast as the structural closure. A coordinator at the head of
+    the call graph decouples them: one entry event, whole-trace closure.
+    """
+
+    def _trace(self, workers, dispatcher):
+        from src.eval.attacks import label_malicious
+        from src.eval.gate1_experiment import FanoutScriptedClient
+        from src.tracing.pipeline import run_pipeline
+        from src.tracing.tools import Tools, fanout_corpus
+
+        scenario = FanoutScenario.build_shared(workers, "benign",
+                                               dispatcher=dispatcher)
+        docs = [dict(d) for d in fanout_corpus(workers)]
+        tmp = tempfile.TemporaryDirectory()
+        path = Path(tmp.name) / "b.jsonl"
+        tools = scenario.apply(
+            Tools.from_fixtures(memory_path=path.with_suffix(".memory.json")))
+        run_pipeline(
+            path,
+            client=FanoutScriptedClient(docs=docs, marker=scenario.marker,
+                                        token=scenario.token),
+            tools=tools, **scenario.workflow_kwargs)
+        label_malicious(path, scenario.marker)
+        return read_trace(path), tmp
+
+    def test_the_dispatcher_gives_one_entry_point_not_K(self) -> None:
+        trace, tmp = self._trace(8, dispatcher=True)
+        try:
+            flagged = [s.id for s in trace.sources if s.malicious]
+            self.assertEqual(len(flagged), 1)
+        finally:
+            tmp.cleanup()
+
+    def test_the_closure_is_still_the_whole_trace(self) -> None:
+        """One entry point, total structural reach -- the decoupling."""
+        trace, tmp = self._trace(8, dispatcher=True)
+        try:
+            flagged = [s.id for s in trace.sources if s.malicious]
+            self.assertGreaterEqual(structural_prior(trace, flagged), 0.99)
+        finally:
+            tmp.cleanup()
+
+    def test_without_the_dispatcher_every_analyst_is_an_entry_point(self) -> None:
+        trace, tmp = self._trace(8, dispatcher=False)
+        try:
+            flagged = [s.id for s in trace.sources if s.malicious]
+            self.assertEqual(len(flagged), 8)
+        finally:
+            tmp.cleanup()
+
+    def test_every_analyst_is_downstream_of_the_dispatcher(self) -> None:
+        """The call-graph edge is what puts them in the closure at all."""
+        from src.tracing.graphs import CallGraph
+
+        trace, tmp = self._trace(6, dispatcher=True)
+        try:
+            reach = CallGraph.from_trace(trace).reachable_from("dispatcher")
+            for i in range(1, 7):
+                with self.subTest(analyst=i):
+                    self.assertIn(f"analyst{i}", reach)
+        finally:
+            tmp.cleanup()
+
+
+class TestTheTargetRegimePredicate(unittest.TestCase):
+    """A case only falsifies the gate if restart was NOT already justified.
+
+    `A/N >= 1`, or `A/N + f_true >= 1`, means restarting is correct and the
+    gate agreeing with it is not an error. The previous family D was rejected
+    as evidence on exactly this ground.
+    """
+
+    @staticmethod
+    def _in_target(a, n, r, f_struct):
+        an = a / n
+        f_true = min(1.0, r / n)
+        return an < 1 and an + f_true < 1 and an + f_struct > 1
+
+    def test_a_cheap_investigation_under_a_wide_bound_is_in_the_regime(self) -> None:
+        self.assertTrue(self._in_target(a=202, n=3812, r=0, f_struct=1.0))
+
+    def test_an_expensive_investigation_is_not_in_the_regime(self) -> None:
+        """Family D of the previous suite: A/N = 2.05, restart correct."""
+        self.assertFalse(self._in_target(a=7149, n=3491, r=430, f_struct=1.0))
+
+    def test_a_narrow_bound_is_not_in_the_regime(self) -> None:
+        """If the bound is not pessimistic there is nothing to falsify."""
+        self.assertFalse(self._in_target(a=1737, n=3549, r=552, f_struct=0.18))
+
+
+class TestInvestigationModeChangesNoDefault(unittest.TestCase):
+    def test_the_default_is_still_self_report(self) -> None:
+        import inspect
+
+        from src.eval.real_llm import run_generated
+
+        default = inspect.signature(run_generated).parameters[
+            "investigation_mode"].default
+        self.assertEqual(default, "self_report")
+
 if __name__ == "__main__":
     unittest.main()

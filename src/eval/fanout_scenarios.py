@@ -116,6 +116,11 @@ class FanoutScenario:
     # closure covers everything while the true influence may be nil (family D)
     # or confined to a single named report (family E).
     shared_payload: str = ""
+    # Put a coordinator at the head of the call graph. The flagged source then
+    # enters at ONE agent that every other agent is downstream of, which makes
+    # the structural closure the whole trace while leaving only one agent's
+    # pairs to actually investigate.
+    dispatcher: bool = False
     annotation: FanoutAnnotation | None = None
     generation: FanoutGeneration = field(default_factory=FanoutGeneration)
     notes: list[str] = field(default_factory=list)
@@ -191,6 +196,7 @@ class FanoutScenario:
         workers: int,
         mode: str,
         test_id: str | None = None,
+        dispatcher: bool = False,
     ) -> "FanoutScenario":
         """Wide exposure, by a briefing every analyst reads.
 
@@ -233,6 +239,7 @@ class FanoutScenario:
             payload=payload,
             marker=marker,
             shared_payload=payload,
+            dispatcher=dispatcher,
             poisoned_indices=(),
             annotation=FanoutAnnotation(
                 expected_exposure=[f"analyst{i + 1}" for i in range(workers)],
@@ -258,7 +265,8 @@ class FanoutScenario:
 
     @property
     def workflow_kwargs(self) -> dict[str, Any]:
-        return {"workflow": "fanout", "workers": self.design.workers}
+        return {"workflow": "fanout", "workers": self.design.workers,
+                "dispatcher": self.dispatcher}
 
     def apply(self, tools: Tools) -> Tools:
         """A NEW Tools whose poisoned analyst's document carries the payload.

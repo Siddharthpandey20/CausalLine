@@ -733,6 +733,13 @@ def run_generated(
     refine: bool = True,
     replay_client_factory: Any = None,
     lazy_self_report: bool = False,
+    # "self_report" (the default paths) or "counterfactual_only", the third
+    # ablation `HybridAttributor` already documents: no self-report at all,
+    # evidence for every verdict. Exposed here because the Gate-1 break test
+    # needs to know whether EVIDENCE-based clearing at a hub agent prunes the
+    # frontier, where an accepted self-report POSITIVE does not. Changes no
+    # default: `investigation_mode="self_report"` is what every caller gets.
+    investigation_mode: str = "self_report",
     gate1_enabled: bool = True,
     **detector_kwargs: Any,
 ) -> RealRunResult:
@@ -820,7 +827,8 @@ def run_generated(
     # event, the first time the frontier reaches it. The pipeline therefore
     # runs with no attributor at all in this mode -- influence edges come from
     # the refinement instead -- which is the change, and the only one.
-    attributor = None if lazy_self_report else HybridAttributor(
+    counterfactual_only = investigation_mode == "counterfactual_only"
+    attributor = None if (lazy_self_report or counterfactual_only) else HybridAttributor(
         client=client,
         mode="self_report",
         calibration=calibration,
@@ -897,7 +905,7 @@ def run_generated(
                 calibration=calibration,
                 budget=CheckBudget(),
                 model=getattr(client, "model", "unknown"),
-                self_report_first=lazy_self_report,
+                self_report_first=lazy_self_report and not counterfactual_only,
             )
             result.self_report_calls = refined.self_report_calls
             result.self_report_positives = refined.self_report_positives

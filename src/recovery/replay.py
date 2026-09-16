@@ -423,6 +423,7 @@ def replay(
         # trace written before the header carried this key replays unchanged.
         workflow=str(original.meta.get("workflow") or "chain"),
         workers=int(original.meta.get("workers") or 6),
+        dispatcher=bool(original.meta.get("dispatcher") or False),
     )
     # Recorded at the one point every method passes through, so no caller has
     # to reconstruct "what was discarded" from something narrower.

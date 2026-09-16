@@ -1273,6 +1273,7 @@ def run_pipeline(
     checkpoint_interval: float | None = None,
     workflow: str = "chain",
     workers: int = 6,
+    dispatcher: bool = False,
 ) -> PipelineResult:
     """Run the pipeline and write a trace, its checkpoints, and its memory.
 
@@ -1337,6 +1338,7 @@ def run_pipeline(
         "checkpoint_interval": checkpoint_interval,
         "workflow": workflow,
         "workers": workers,
+        "dispatcher": dispatcher,
         **settings.fingerprint(),
     }
     if client is not None:
@@ -1390,7 +1392,8 @@ def run_pipeline(
                 from src.tracing.fanout import FanoutPipeline
 
                 return FanoutPipeline(
-                    log, client, tools, workers=workers, **common
+                    log, client, tools, workers=workers,
+                    dispatcher=bool(dispatcher), **common
                 ).run()
             return GeminiPipeline(log, client, tools, **common).run()
 
