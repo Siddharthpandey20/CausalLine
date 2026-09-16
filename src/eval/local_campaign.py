@@ -141,12 +141,17 @@ def _one(
     settings: LocalLlamaSettings,
     detector: str,
     repeat: int,
+    lazy_self_report: bool = False,
+    arm: str = "",
 ) -> tuple[Any, float, int, str]:
     """One (scenario, repeat). Returns (result | None, elapsed, calls, label)."""
-    label = f"{scenario.test_id}#r{repeat}"
+    label = f"{scenario.test_id}#r{repeat}" + (f"[{arm}]" if arm else "")
     # Each repeat gets its own directory, or repeat 2 would overwrite repeat 1's
-    # trace and the repetitions would all be the last one.
-    workdir = RUNS_DIR / f"{scenario.test_id}-r{repeat}"
+    # trace and the repetitions would all be the last one. The arm is in the
+    # path for the same reason: two arms of the same (scenario, repeat) are two
+    # runs, and sharing a directory would make the second overwrite the first.
+    suffix = f"-{arm}" if arm else ""
+    workdir = RUNS_DIR / f"{scenario.test_id}-r{repeat}{suffix}"
     client = LocalLlamaClient(settings=settings)
     started = time.time()
     try:
@@ -161,6 +166,7 @@ def _one(
             # "variance" would be zero by construction.
             seed=20260910 + repeat,
             replay_client_factory=lambda: LocalLlamaClient(settings=settings),
+            lazy_self_report=lazy_self_report,
         )
     except Exception as exc:  # noqa: BLE001 -- one dead test must not end a campaign
         return None, time.time() - started, client.stats.calls, f"{label}: FAILED {type(exc).__name__}: {exc}"

@@ -583,6 +583,18 @@ class RealRunResult:
     latency_s: float = 0.0
     pipeline_tokens: int = 0
     analysis_tokens: int = 0
+    # D-089: what the investigation actually did. `refine_for_verdict`'s result
+    # was previously discarded, so a campaign could not say how many
+    # self-reports it asked, whether the SPRT aborted, or on what hypotheses --
+    # which is exactly what the lazy-vs-eager comparison needs to be checkable.
+    lazy_self_report: bool = False
+    self_report_calls: int = 0
+    self_report_positives: int = 0
+    sprt_decision: str = ""
+    sprt_checks: int = 0
+    sprt_f_star: float = 0.0
+    sprt_f_star_high: float = 0.0
+    checks_examined: int = 0
     api_calls: int = 0
     api_retries: int = 0
     api_rate_limited: int = 0
@@ -702,6 +714,7 @@ def run_generated(
     seed: int = 20260910,
     refine: bool = True,
     replay_client_factory: Any = None,
+    lazy_self_report: bool = False,
     **detector_kwargs: Any,
 ) -> RealRunResult:
     """One generated scenario, end to end, on a real model.
@@ -742,7 +755,14 @@ def run_generated(
     # context. Discovering that afterwards costs a whole pipeline: measured at
     # 592 seconds and 12 requests for a run that then reported "marker reached
     # no source". The gate is offline and takes milliseconds.
-    problems = validate(scenario)
+    # A scenario family may carry its own pre-flight. `validate()` here is the
+    # *generated chain suite's* -- web retrievability, ISO task wording, decoy
+    # counts -- and none of those are meaningful for a differently-shaped
+    # workflow. Asking the scenario lets a new family be checked properly
+    # instead of being checked wrongly or waved through; the chain suite has no
+    # such method and reaches the same `validate()` it always did.
+    own = getattr(scenario, "validate", None)
+    problems = own() if callable(own) else validate(scenario)
     if problems:
         result.ok = False
         result.failure = "scenario failed validation before running: " + "; ".join(
@@ -774,7 +794,14 @@ def run_generated(
             "the conservative setting. Any clean verdict below rests on an "
             "unmeasured noise floor."
         )
-    attributor = HybridAttributor(
+    # D-082 / D-089: `lazy_self_report` moves the self-report off the pipeline
+    # and into the investigation. Eagerly, every model event of every run is
+    # asked before anyone knows whether an attack happened, and a clean run
+    # pays the whole bill for nothing. Lazily, the question is asked once per
+    # event, the first time the frontier reaches it. The pipeline therefore
+    # runs with no attributor at all in this mode -- influence edges come from
+    # the refinement instead -- which is the change, and the only one.
+    attributor = None if lazy_self_report else HybridAttributor(
         client=client,
         mode="self_report",
         calibration=calibration,
@@ -822,18 +849,32 @@ def run_generated(
     verdict = build_detector(detector_name, **detector_kwargs).flag(trace)
     flagged = verdict.sources()
 
+    result.lazy_self_report = lazy_self_report
     if refine and flagged:
         try:
-            refine_for_verdict(
+            refined = refine_for_verdict(
                 orig_path,
                 flagged,
                 client,
                 calibration=calibration,
                 budget=CheckBudget(),
                 model=getattr(client, "model", "unknown"),
+                self_report_first=lazy_self_report,
             )
+            result.self_report_calls = refined.self_report_calls
+            result.self_report_positives = refined.self_report_positives
+            result.sprt_decision = refined.sprt_decision
+            result.sprt_checks = refined.sprt_checks
+            result.sprt_f_star = refined.sprt_f_star
+            result.sprt_f_star_high = refined.sprt_f_star_high
+            result.checks_examined = refined.examined
         except Exception as exc:  # noqa: BLE001
-            result.notes.append(f"refinement skipped: {type(exc).__name__}: {exc}")
+            # This branch once swallowed a TypeError and let a run finish with
+            # analysis_tokens=0 -- plausible-looking, entirely wrong. The note
+            # is the only thing standing between that and a silent bad number,
+            # so it carries the type and the message, and the campaign prints
+            # every note it finds.
+            result.notes.append(f"refinement FAILED: {type(exc).__name__}: {exc}")
         trace = read_trace(orig_path)
 
     trace.validate()

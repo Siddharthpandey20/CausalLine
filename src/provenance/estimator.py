@@ -858,6 +858,11 @@ class RefineResult:
     sprt_checks: int = 0
     sprt_log_lr: float = 0.0
     sprt_trajectory: list[float] = field(default_factory=list)
+    # D-087: the hypotheses actually used. Recorded because they are now
+    # derived per trace rather than fixed, so a result that does not carry them
+    # cannot be reproduced or argued with.
+    sprt_f_star: float = 0.0
+    sprt_f_star_high: float = 0.0
     aborted_early: bool = False
     calibration_skips: int = 0
     fallback_invocations: int = 0
@@ -913,6 +918,56 @@ class RefineResult:
                 f"{self.carriers_downgraded} downgraded), 0 calls"
             )
         return "; ".join(parts)
+
+
+def _sprt_config_from_trace(trace: Any, flagged: Iterable[str], repeats: int) -> Any:
+    """The SPRT's hypotheses, derived from this trace's own cost model.
+
+    WHY THIS IS NOT A CONSTANT
+    ---------------------------
+    `sprt_investigate.config_for` computes f* = 1 - A/N, the contamination
+    fraction below which investigating is worth starting at all. It needs A and
+    N. N is the trace's own pipeline cost -- the thing a full restart would
+    re-spend. A has to be estimated *before* the investigation, because
+    measuring A is exactly what the investigation buys, so an estimate that
+    needs the measurement has no ex-ante content (`economics.f_star_ex_ante`
+    says so in its own docstring).
+
+    The estimate used here: a counterfactual check re-runs one event, so it
+    costs about what that event cost. Summing the per-event pipeline cost over
+    the pairs that would be examined, times `repeats`, gives A without
+    inventing a rate. Events whose cost the trace does not record fall back to
+    the mean cost of the ones it does.
+
+    A degenerate trace -- no pipeline usage recorded, nothing to check -- gets
+    `SPRTConfig()`'s defaults back, because a cost model built on a zero
+    denominator is worse than an admitted guess.
+    """
+    from src.provenance.contamination import contaminate
+    from src.recovery.sprt_investigate import SPRTConfig, config_for
+
+    restart_tokens = float(trace.pipeline_tokens())
+    if restart_tokens <= 0:
+        return SPRTConfig()
+
+    per_event: dict[str, int] = {}
+    for record in trace.usage:
+        if record.purpose == "pipeline" and record.event_id:
+            per_event[record.event_id] = (
+                per_event.get(record.event_id, 0) + record.total_tokens
+            )
+    if not per_event:
+        return SPRTConfig()
+    typical = sum(per_event.values()) / len(per_event)
+
+    region = contaminate(trace, set(flagged))
+    pairs = _unchecked_in_region(trace, region.sources)
+    if not pairs:
+        return SPRTConfig()
+
+    analysis_tokens = sum(per_event.get(eid, typical) for eid, _sid in pairs)
+    analysis_tokens *= max(1, repeats)
+    return config_for(analysis_tokens, restart_tokens)
 
 
 def refine_for_verdict(
@@ -1024,10 +1079,22 @@ def refine_for_verdict(
     # and only for events the detector's region actually brings up.
     asked: dict[str, Any] = {}
 
-    sprt = SPRTState(config=sprt_config or SPRTConfig()) if use_sprt else None
-
     trace = read_trace(trace_path)
     trace.validate()
+
+    # D-087: the SPRT's hypotheses come from the cost model, not from taste.
+    # `config_for` derives f* = 1 - A/N and has had no caller outside its own
+    # tests since it was written, so every investigation this project has ever
+    # run used SPRTConfig()'s defaults -- f_star=0.3 / 0.7, numbers nobody
+    # measured. Both inputs below come off the trace, so no constant is
+    # introduced here.
+    if use_sprt and sprt_config is None:
+        sprt_config = _sprt_config_from_trace(trace, flagged, repeats)
+
+    sprt = SPRTState(config=sprt_config or SPRTConfig()) if use_sprt else None
+    if sprt is not None:
+        result.sprt_f_star = sprt.config.f_star
+        result.sprt_f_star_high = sprt.config.f_star_high
 
     def _record(log, sid, eid, request, influenced, error, before, after, repeats_done):
         """One verdict written to the trace. Shared by both investigation

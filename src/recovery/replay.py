@@ -416,6 +416,13 @@ def replay(
         handoff_hook=handoff_hook,
         research_rounds=int(original.meta.get("research_rounds") or 1),
         reviewer=bool(original.meta.get("reviewer") or False),
+        # The agent graph itself, read off the trace for exactly the reason the
+        # length is: replaying a fan-out trace into a chain rerun would line up
+        # event ids far enough to splice, and then splice the wrong outputs
+        # into the wrong agents. "chain" is the pre-existing default, so every
+        # trace written before the header carried this key replays unchanged.
+        workflow=str(original.meta.get("workflow") or "chain"),
+        workers=int(original.meta.get("workers") or 6),
     )
     # Recorded at the one point every method passes through, so no caller has
     # to reconstruct "what was discarded" from something narrower.

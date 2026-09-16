@@ -426,3 +426,54 @@ class TestFallbackOnlyFiresWhenSparsityFails(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSunkAnalysisInThePlannerCap(unittest.TestCase):
+    """D-088: why the planner's cap excludes the analysis it has already paid.
+
+    The cap was reported as buggy for comparing replay cost only, never the
+    analysis -- the dominant term at 1.18 x N. The switch exists so the claim
+    can be measured instead of argued, and these assertions are the
+    measurement: including the sunk term cannot save a token and does cost
+    real ones.
+    """
+
+    def _cover(self, count_sunk: bool):
+        from src.recovery.planner import greedy_cover
+        from src.recovery.policy import Action
+
+        # One cheap selective action that breaks the only path, and the
+        # restart that always exists. Selective is far cheaper than restart.
+        selective = Action(kind="replay", target="e1", cost=2153,
+                           invalidates=frozenset({"e1"}))
+        full = Action(kind="restart_all", target="*", cost=5520)
+        paths = [_OnePath()]
+        return greedy_cover(
+            paths, [selective, full], cap=5520,
+            committed_analysis=6489, count_sunk_analysis=count_sunk,
+        )
+
+    def test_by_default_the_sunk_analysis_does_not_force_a_restart(self) -> None:
+        chosen = self._cover(count_sunk=False)
+        self.assertEqual([a.kind for a in chosen], ["replay"])
+
+    def test_counting_it_forces_a_restart_that_costs_strictly_more(self) -> None:
+        chosen = self._cover(count_sunk=True)
+        self.assertEqual([a.kind for a in chosen], ["restart_all"])
+
+        # The arithmetic that settles it. A is spent either way, so it is in
+        # both arms and cancels; the only thing the switch changes is which
+        # of the two replay costs is paid on top of it.
+        analysis, selective, restart = 6489, 2153, 5520
+        self.assertLess(analysis + selective, analysis + restart)
+        self.assertEqual((analysis + restart) - (analysis + selective), 3367)
+
+
+class _OnePath:
+    """A path both candidate actions break, so cost alone decides."""
+
+    events = ("e1",)
+    edges = ()
+
+    def __init__(self) -> None:
+        pass

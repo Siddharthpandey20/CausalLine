@@ -471,11 +471,42 @@ def greedy_cover(
     paths: list[InfluencePath],
     actions: list[Action],
     cap: int,
+    committed_analysis: int = 0,
+    count_sunk_analysis: bool = False,
 ) -> list[Action]:
     """Greedy set cover: min cost(a) / paths_broken(a), cap at restart_all.
 
     Actions that break nothing are ignored. Ties break by lower cost, then
     by label, so the choice is deterministic across runs.
+
+    ON COUNTING THE ANALYSIS IN THIS CAP (D-088)
+    ---------------------------------------------
+    The cap compares accumulated *replay* cost against `restart_all_cost`, and
+    the investigation's cost `A` -- the dominant term, measured at 1.18 x N on
+    the local frontier -- is not in it. That looks like an omission, and it was
+    raised as one. It is not, and the arithmetic says why.
+
+    By the time this function runs, `A` is spent. It is in both arms of the
+    choice and cancels:
+
+        finish selectively : A + spent + best.cost
+        restart now        : A + restart_all_cost
+
+    So the comparison that decides correctly is the one already here, without
+    `A`. Adding `A` to the left side only makes the gate fire earlier, and
+    firing earlier converts a cheap selective replay into a full restart. On
+    the campaign's own numbers (A=6489, N=5520, selective=2153) that turns
+    8642 tokens into 12009: **3367 tokens worse per run, and never better.**
+    A sunk cost cannot be saved by spending more.
+
+    `count_sunk_analysis` exists so that claim is measurable rather than
+    asserted, and is **off by default** because the measurement says it should
+    be. The place where `A` can still be avoided is *before* it is spent --
+    `economics.ex_ante_decision` and the SPRT hypotheses D-087 now derives from
+    the cost model -- not here.
+
+    `committed_analysis` is recorded either way, so the total cost of a plan is
+    visible without changing what the plan is.
     """
     remaining = set(range(len(paths)))
     selected: list[Action] = []
@@ -510,7 +541,8 @@ def greedy_cover(
             # happen while restart_all is in the set. Fall back to it.
             full = next(a for a in actions if a.kind == "restart_all")
             return [full]
-        if spent + best.cost > cap and best.kind != "restart_all":
+        sunk = committed_analysis if count_sunk_analysis else 0
+        if sunk + spent + best.cost > cap and best.kind != "restart_all":
             full = next(a for a in actions if a.kind == "restart_all")
             return [full]
         selected.append(best)
@@ -561,6 +593,7 @@ def plan_recovery(
     malicious: Iterable[str],
     checkpoints: list[Checkpoint] | None = None,
     policy: Policy | None = None,
+    count_sunk_analysis: bool = False,
 ) -> RecoveryPlan:
     """Steps 0, 1 and 2, in order. Does not replay anything."""
     checkpoints = checkpoints or []
@@ -570,6 +603,10 @@ def plan_recovery(
     paths = malicious_to_output_paths(trace, malicious, set(taint.events))
     actions = candidate_actions(trace, set(taint.events), frontiers, order)
     cap = restart_all_cost(trace)
+    # Already spent investigating this trace, read off its own usage records.
+    # Recorded on the plan either way; only counted in the cap when the caller
+    # asks for it, for the reason in `greedy_cover`'s docstring (D-088).
+    committed_analysis = trace.analysis_tokens()
 
     # STEP 2'S COVERING TARGET IS THE CONTAMINATION CLOSURE (D-047)
     # ------------------------------------------------------------
@@ -612,7 +649,11 @@ def plan_recovery(
         selected: list[Action] = []
         invalidation: set[str] = set()
     else:
-        selected = greedy_cover(cover_targets, actions, cap)
+        selected = greedy_cover(
+            cover_targets, actions, cap,
+            committed_analysis=committed_analysis,
+            count_sunk_analysis=count_sunk_analysis,
+        )
         invalidation = set()
         for action in selected:
             invalidation |= action.invalidates

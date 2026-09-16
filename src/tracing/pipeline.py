@@ -1271,8 +1271,19 @@ def run_pipeline(
     research_rounds: int = 1,
     reviewer: bool = False,
     checkpoint_interval: float | None = None,
+    workflow: str = "chain",
+    workers: int = 6,
 ) -> PipelineResult:
     """Run the pipeline and write a trace, its checkpoints, and its memory.
+
+    `workflow` selects the agent graph. "chain" is the original
+    Researcher -> Coder -> Executor and is the default, so every existing
+    measurement and every existing trace is unaffected. "fanout" is the
+    localized-contamination shape in `src/tracing/fanout.py`, where `workers`
+    independent analysts each read their own document. It is recorded in the
+    trace header for the same reason `research_rounds` is: `replay()` must
+    rebuild a run of the same shape and cannot be left to a caller to
+    remember.
 
     With `cassette_path`, calls are recorded or replayed instead of (or as
     well as) hitting the API. A replayed run is marked in the trace header so
@@ -1324,6 +1335,8 @@ def run_pipeline(
         "research_rounds": research_rounds,
         "reviewer": reviewer,
         "checkpoint_interval": checkpoint_interval,
+        "workflow": workflow,
+        "workers": workers,
         **settings.fingerprint(),
     }
     if client is not None:
@@ -1364,10 +1377,7 @@ def run_pipeline(
 
     with TraceLogger(path, meta=meta) as log:
         with CheckpointStore(checkpoint_path_for(path)) as store:
-            return GeminiPipeline(
-                log,
-                client,
-                tools,
+            common = dict(
                 task=task,
                 checkpoints=store,
                 attributor=attributor,
@@ -1375,7 +1385,14 @@ def run_pipeline(
                 research_rounds=research_rounds,
                 reviewer=reviewer,
                 checkpoint_interval=checkpoint_interval,
-            ).run()
+            )
+            if workflow == "fanout":
+                from src.tracing.fanout import FanoutPipeline
+
+                return FanoutPipeline(
+                    log, client, tools, workers=workers, **common
+                ).run()
+            return GeminiPipeline(log, client, tools, **common).run()
 
 
 def _settings_or_offline(settings: Settings | None) -> Settings:
