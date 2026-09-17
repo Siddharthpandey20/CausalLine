@@ -37,20 +37,28 @@ Anonymous Submission
 \maketitle
 
 \begin{abstract}
-Work on prompt injection in multi-agent LLM systems overwhelmingly addresses
-\emph{detection}. We study what happens next. Once an agent is known to be
-compromised, current practice discards that agent's output and everything
-downstream of it. In a 56-agent workflow with a broadcast hub, that is
-$85.5\%$ of the execution trace for a single poisoned record.
+That \emph{exposure is not influence} in LLM agents---that a source present in
+a context window need not have changed what the agent produced---is by now
+established~\cite{neurotaint2026,granularity2026}, as is counterfactual
+re-execution as the tool for establishing which it
+was~\cite{car2026,causalflow2026}. What is not established is what to
+\emph{do} with that distinction once a detector has fired on a live
+multi-agent system. Current practice discards the compromised agent's output
+and everything downstream of it; in a 56-agent workflow with a broadcast hub
+that is $85.5\%$ of the execution trace for a single poisoned record, against
+a true influenced fraction of $72.4\%$.
 
-We observe that this over-discards because it confuses two different
-relations: a source being \emph{present} in an agent's context (exposure) and
-a source \emph{changing} what the agent produced (influence). \sys{} records
-provenance during execution, establishes influence per (source, event) pair,
-propagates contamination only along influence and derivation edges, replays
-only the affected events, and---critically---\emph{verifies} the recovered run
-before accepting it, escalating to agent restart and then full restart when
-verification fails.
+We present \sys{}, a \emph{detector-triggered, verified} recovery procedure.
+It restricts contamination propagation to three named relations---influence,
+derivation, and ingestion---rather than call-graph reachability; it replays
+only affected events, splicing every other event byte-exactly under asserted
+invariants; and it \emph{verifies} the recovered run before accepting it,
+escalating to agent restart and then full restart when verification fails.
+That ladder is the design's load-bearing element: a recent survey of execution
+provenance notes that rollback can itself produce semantically unsafe
+re-executions~\cite{trustsurvey2026}, and verification-with-escalation is what
+makes ``never worse than restart in outcome'' a structural property rather
+than an empirical hope.
 
 Across 15 runs of a real 56-agent, three-provider system (50 local
 Llama-3-8B, 2 Gemini, 4 Nemotron) under three attack channels and three
@@ -72,25 +80,62 @@ can. We further report two negative results that shaped the work: the
 falsification of our own ex-ante economic gate, and a provenance defect whose
 correction removed an apparent $+17.2$ point performance win that was, in
 fact, a safety failure.
+
+\textbf{Scope of the claim.} We claim neither the exposure/influence
+distinction nor counterfactual attribution as contributions; both are prior
+work. What we claim is the specific combination---detector-triggered recovery,
+three-relation propagation, byte-exact splicing, and verification with
+escalation---together with its evaluation at a scale and heterogeneity the
+recovery literature has not yet used, and an economic characterisation that
+tells a practitioner when \emph{not} to use it.
 \end{abstract}
 
 \section{Introduction}
 
 A multi-agent LLM system is a pipeline of agents that read from tools, memory,
 the web, and each other. Any of those channels can carry an injected
-instruction~\cite{greshake2023,perez2022,liu2024}. A large and growing
-literature studies how to \emph{notice} this.
+instruction~\cite{greshake2023,perez2022,liu2024}.
 
-Far less attention is paid to the step after. Suppose detection works: an
-operator learns at 14:03 that the Researcher agent consumed a poisoned page.
-What should be thrown away?
+Suppose detection works: an operator learns at 14:03 that the Researcher agent
+consumed a poisoned page. What should be thrown away?
 
 The answer in practice is: that agent's output, and everything downstream of
-it. This is safe and it is enormously wasteful. It is wasteful because
-\emph{reachability is not causation}. An agent that received a poisoned value
-in its context may never have used it. A hub that broadcasts a roster of
-twelve records to twelve specialists exposes all twelve to a poisoned record,
-while each specialist uses exactly one.
+it. This is safe and it is enormously wasteful, because \emph{reachability is
+not causation}. An agent that received a poisoned value in its context may
+never have used it. A hub that broadcasts a roster of twelve records to twelve
+specialists exposes all twelve to a poisoned record, while each specialist
+uses exactly one.
+
+\paragraph{What is already known, and what is not.}
+We want to be precise about where this paper sits, because the surrounding
+literature moved quickly in 2026 and several of its results are ours to build
+on rather than to claim.
+
+The distinction between a source being present in a context and a source
+changing an output is \emph{established for LLM agents}. NeuroTaint argues
+that classical taint analysis fails here because propagation is governed by
+probabilistic natural-language reasoning rather than memory writes, and that
+tracking must therefore model semantic transformation and causal influence on
+decisions~\cite{neurotaint2026}; argument-level provenance makes the same
+separation at the granularity of individual tool
+arguments~\cite{granularity2026}. Counterfactual re-execution as the mechanism
+for establishing influence is likewise established: Causal Agent Replay models
+a run as a structural causal model and intervenes on a step to measure the
+shift in outcome~\cite{car2026}, and CausalFlow scores step-level causal
+responsibility by intervention to synthesise minimal
+repairs~\cite{causalflow2026}. That contamination in multi-agent traces is a
+real and measurable phenomenon has been characterised
+empirically~\cite{tracelevel2026}.
+
+What none of that settles is the operational question. Those systems detect,
+attribute, or repair capability failures. The step we address is: a detector
+has named a malicious source in a system that has already executed---which
+of the completed work is safe to keep, and how do you know before you keep it?
+A recent survey of execution provenance places recovery in its taxonomy of
+trust functions but populates it with retry-based repair, transactional
+compensation, and checkpoint-restore, and observes that rollback can itself
+produce semantically unsafe re-executions~\cite{trustsurvey2026}. That
+observation is the gap we target.
 
 \paragraph{The gap, measured.}
 In our 56-agent testbed the distinction is not subtle. Table~\ref{tab:gap}
@@ -118,25 +163,33 @@ a canary token shows was actually affected.}
 \paragraph{Contributions.}
 \begin{enumerate}
 \itemsep2pt
-\item \textbf{A recovery method, not a detector.} \sys{} takes a detector's
-verdict as input and produces a minimal, verified recovery
+\item \textbf{A recovery procedure, not a detector or an attributor.} \sys{}
+consumes a detector's verdict and produces a minimal recovery whose
+contamination propagation is restricted to three named relations---influence,
+derivation, and \emph{ingestion}---rather than call-graph reachability
 (Section~\ref{sec:design}).
-\item \textbf{A soundness discipline that survives adversarial reporting.}
-Anything not \emph{established} clean is treated as contaminated; a source an
-agent falsely claims not to have used still contaminates unless a
-counterfactual says otherwise (Section~\ref{sec:attribution}).
-\item \textbf{Verification with escalation.} A recovery is never shipped
-unverified. Failure escalates selective $\rightarrow$ agent restart
-$\rightarrow$ full restart (Section~\ref{sec:verify}).
-\item \textbf{Evaluation on a real heterogeneous system}: 56 agents, six
-stages, three inference providers, three attack channels, three contamination
-regimes, 15 runs (Section~\ref{sec:eval}).
-\item \textbf{An honest economic characterisation}, including the finding
-that \sys{} costs more tokens than full restart, and the exact condition under
-which it is nonetheless correct to use (Section~\ref{sec:econ}).
-\item \textbf{Two negative results} we consider as important as the positive
-ones (Section~\ref{sec:negative}).
+\item \textbf{Verification with escalation}, which is what converts
+attribution into a safe operation. A recovery is never shipped unverified;
+failure escalates selective $\rightarrow$ agent restart $\rightarrow$ full
+restart, so the procedure cannot be worse than restart in \emph{outcome},
+only in cost (Section~\ref{sec:verify}). This directly addresses the unsafe
+re-execution hazard that~\cite{trustsurvey2026} identifies in checkpoint
+rollback.
+\item \textbf{Evaluation at a scale the recovery literature has not used}: 56
+agents, six stages, three inference providers, three attack channels, three
+contamination regimes, 15 runs (Section~\ref{sec:eval}).
+\item \textbf{An economic characterisation that argues against our own
+method} where the evidence does: \sys{} costs more tokens than full restart,
+and we give the condition under which it is nonetheless correct
+(Section~\ref{sec:econ}).
+\item \textbf{Two negative results} we consider as load-bearing as the
+positive ones---a falsified economic gate, and a provenance defect that
+presented itself as a performance win (Section~\ref{sec:negative}).
 \end{enumerate}
+
+We do \emph{not} claim the exposure/influence distinction or counterfactual
+attribution; Section~\ref{sec:related} states what each of the works above
+established first.
 
 \section{Problem Setting}
 
@@ -244,6 +297,32 @@ It never walks parent edges. Parent edges are execution history, not
 causation; walking them transitively reproduces \btwo{} exactly. A method that
 silently reproduces its own baseline has no result left to report, and the
 failure is invisible because the numbers still come out.
+
+\paragraph{Completeness of the three-relation rule is an open question, and we
+state what would falsify it.}
+Safety rests on the claim that contamination cannot reach an event except
+along one of these three relations. We have \emph{not} proved that. What we
+have is: the rule held on every trace we produced ($0$ escapes from the
+structural closure in 15 real runs and across the scripted matrix), and it is
+cheaply checkable at runtime, so a topology that violated it would be caught
+rather than silently mis-recovered.
+
+We are explicit here because our own history argues for caution: the third
+relation, ingestion, was \emph{missing} until a defect forced us to find it
+(Section~\ref{sec:negative}), and its absence produced exactly the failure
+this claim is supposed to exclude. One missing edge type has already been
+found; we cannot argue from experience that there is not a fourth.
+
+Candidate fourth relations we have \emph{not} ruled out, offered so that a
+reader can attack them: influence through shared sampling state or temperature
+between agents served by one endpoint; timing or ordering channels, where a
+poisoned source changes \emph{when} an agent acts rather than what it writes;
+any agent that updates model weights or a retrieval index from contaminated
+material, which would carry contamination outside the trace entirely; and
+implicit coordination through an external store our tool surface does not
+mediate. A falsifying observation is a single event whose output carries
+attacker-controlled content and which lies outside the closure; our test suite
+asserts the absence of exactly that, and would fail loudly on it.
 
 \subsection{Recovery planning and selective replay}
 
@@ -395,6 +474,31 @@ The two ties are informative and not noise. In both, selective recovery failed
 verification and escalated to agent restart, at which point \sys{}'s discard
 set becomes \btwo{}'s by construction. The ladder gives up the gain rather
 than ship an uncertified recovery.
+
+\paragraph{Why the medium regime's standard deviation is exactly zero.}
+This number will look like a bug and it is not, so we explain it rather than
+leave a reader to guess. In this campaign the five seeds within a regime do
+\emph{not} vary the workload: they reach the attributor and the models'
+sampling, while the corpus, the payloads and the poisoned placements are
+byte-identical across all five. The contaminated fraction is therefore
+identical too, which Table~\ref{tab:main} shows as a single $f_{\text{true}}$
+per regime rather than a mean.
+
+Given a fixed workload, \sys{}'s discard set is a deterministic function of the
+recorded influence edges. On the medium regime every one of the five runs
+produced the same edges, so the invalidation set, the preserved fraction and
+hence the paired difference were identical five times over. The small and
+large regimes have non-zero deviation for one reason only: in one run each,
+model non-determinism caused a replay to fail verification, and the escalation
+ladder moved that run to agent restart.
+
+So $\text{sd}=0.00$ is the \emph{expected} reading for a deterministic
+recovery on a fixed workload, and its appearance is the clearest evidence in
+our own data for Limitation~1 below: this campaign measures model
+non-determinism, not workload variation. We have since implemented
+seed-dependent placement and verified it yields five distinct workloads per
+regime with differing contaminated fractions, but the campaign reported here
+is the fixed one and we do not report the varied one as a result.
 
 \subsection{Safety}
 
@@ -621,38 +725,158 @@ descriptive statistics and a sign count, not a $p$-value.
 \item \textbf{Cost is measured in tokens}, not money or latency, and
 attribution is routed to the same model that produced the output; a cheaper
 attribution model would change the economics and is untested.
+\item \textbf{The three-relation propagation rule is not proved complete.}
+It is measured, runtime-checkable, and has already been wrong once
+(Section~\ref{sec:negative}). Section~\ref{sec:design} lists the candidate
+fourth relations we have not excluded.
 \end{enumerate}
 
+\paragraph{What would most change our confidence.}
+In order: (i) a workload-varied campaign, since the present one is three
+design points rather than fifteen; (ii) a task with branching control flow and
+side-effecting tools, rather than the copy task chosen to isolate
+contamination from capability; (iii) an adversarial pass aimed specifically at
+finding a fourth propagation relation, rather than the single defect we found
+by accident; and (iv) a real detector in place of the oracle. We regard (i)
+and (ii) as prerequisites for any quantitative claim about how \emph{often}
+the benefit appears.
+
+\section*{Artifact Availability}
+
+The implementation, the 56-agent testbed, the attack scenarios, the baselines,
+the evaluation harness and the per-run result files behind every table are
+available at \url{https://github.com/Siddharthpandey20/CausalLine}. Each table
+in this paper names the command that regenerates it. The two external
+providers require API keys, which are read from the environment and are not
+distributed; the scripted mode and the graph-level tests run offline with no
+key and no quota, and reproduce every structural result including the
+zero-escape and zero-unsafe-preservation checks.
+
 \section{Related Work}
+\label{sec:related}
 
-Work on indirect prompt injection establishes the threat and its
-channels~\cite{greshake2023,liu2024}, and a substantial literature addresses
-detection and defence at the prompt or model
-level~\cite{perez2022,chen2024}. Our work is downstream of all of it: we
-assume detection and ask what to discard.
+\subsection{Attack and detection}
 
-Provenance and taint tracking have a long history in systems
-security~\cite{newsome2005,king2003}, where the standard discipline is
-conservative reachability---precisely the \btwo{} baseline. The distinguishing
-difficulty in the LLM setting is that presence in a context window is not
-usage, and usage is not observable from the execution trace alone; it must be
-established by asking the model or by counterfactual re-execution. The
-asymmetric treatment of positive and negative evidence in
-Section~\ref{sec:attribution} is our response to that.
+Indirect prompt injection establishes the threat and its
+channels~\cite{greshake2023,perez2022,liu2024}, and a substantial literature
+addresses prevention at the prompt or model level~\cite{chen2024}. Our work is
+strictly downstream: we assume a detector and ask what to discard.
 
-Checkpoint-and-replay is standard in fault-tolerant
-computing~\cite{elnozahy2002}; what differs here is that replay is not
-required to be deterministic. Recovery never depends on a model reproducing a
-prior output---it re-invokes only invalidated events and reuses logged bytes
-everywhere else.
+\subsection{Taint and influence tracking for LLM agents}
+
+Classical dynamic taint analysis~\cite{newsome2005} and intrusion
+backtracking~\cite{king2003} propagate along reachability, which is exactly
+our \btwo{} baseline. NeuroTaint~\cite{neurotaint2026} argues that this
+transfers badly to LLM agents because propagation is governed by probabilistic
+natural-language reasoning rather than memory writes, and that tracking must
+model semantic transformation and causal influence on decisions; it evaluates
+source-to-sink propagation across a 400-scenario benchmark spanning 20 agent
+frameworks. Argument-level provenance~\cite{granularity2026} makes the same
+exposure/influence separation at the granularity of individual tool arguments
+and uses it for enforcement.
+
+\textbf{Relation to this work.} These establish the distinction our method
+exploits, and we do not claim it. They are oriented toward \emph{detection and
+prevention}---auditing source-to-sink flows, or refusing a tainted argument
+before a tool runs. \sys{} begins after a flow has already completed and asks
+which of the resulting artefacts survive.
+
+\subsection{Counterfactual attribution in agent traces}
+
+Causal Agent Replay~\cite{car2026} models a run as a structural causal model,
+intervenes on a step, re-executes forward under the same stochastic policy, and
+measures the shift in the outcome distribution, with a Shapley estimator for
+interactions. CausalFlow~\cite{causalflow2026} computes step-level causal
+responsibility by intervention and synthesises minimal counterfactual repairs
+that flip a failure to a success. Our attribution mechanism
+(Section~\ref{sec:attribution}) is the same family and we claim no novelty for
+it.
+
+\textbf{Relation to this work.} Both target \emph{capability} failures---a
+wrong tool call, a bad answer---under no adversary, and neither has a safety
+obligation: a repair that is merely wrong costs accuracy, whereas a recovery
+that is wrong preserves an attack. That difference is why our estimator treats
+positive and negative evidence asymmetrically and why unchecked pairs
+contaminate.
+
+\subsection{Contamination measurement in multi-agent traces}
+
+Mazhar et al.~\cite{tracelevel2026} inject structured perturbations into
+artifact-derived data and measure contamination by trace divergence over 614
+paired runs, finding that structural divergence and outcome corruption are
+decoupled---workflows can diverge and still be correct, or stay quiet and be
+wrong. They explicitly leave provenance-based origin attribution and causal
+tracing back to the responsible artefact as future work.
+
+\textbf{Relation to this work.} This is the closest characterisation of the
+phenomenon we recover from, under a \emph{natural-noise} rather than
+adversarial model, and it measures rather than repairs. Their decoupling
+finding is also a caution we inherit: it is why our evaluation reports the
+attack's canary landing separately from the task outcome, so that a run the
+models ignored is not read as a recovery success.
+
+\subsection{Intervention and replay economics}
+
+DoVer~\cite{dover2026} checkpoints per step, loads a prior failed run,
+modifies an agent message at a chosen step and resumes---mechanically the
+closest published system to our checkpoint-and-splice plumbing---for
+hypothesis-driven debugging rather than contamination recovery, and without a
+verification obligation. Knowledge-based zero-replay
+debugging~\cite{zeroreplay2026} compiles a trace into an event knowledge graph
+and predicts where a scarce replay budget should be spent, explicitly trying to
+approximate what a counterfactual-replay oracle would find \emph{without}
+paying for it.
+
+\textbf{Relation to this work.} \cite{zeroreplay2026} and our
+Section~\ref{sec:econ} are the two ends of one trade-off: they reduce the cost
+of attribution by predicting it, we pay it and report exactly when that is
+worth doing. Neither of us has shown the other unnecessary.
+
+\subsection{Provenance as a substrate for trust}
+
+The survey of~\cite{trustsurvey2026} defines execution provenance as a typed
+graph over an agent run and places retrieval grounding, claim support,
+tool-use safety, memory lineage, observability, debugging, audit and
+\emph{recovery} on it as trust functions. Under recovery it collects
+retry-based repair, transactional compensation and rollback, and notes that
+checkpoint-restore can create semantically unsafe re-executions.
+
+\textbf{Relation to this work.} We read this survey as the umbrella our
+contribution sits under rather than as a competitor, and the unsafe-rollback
+observation is precisely what Section~\ref{sec:verify} is for. To our
+knowledge, no system in that recovery category is triggered by a detector's
+verdict on a \emph{malicious} source, restricts propagation below reachability,
+and gates the result on verification with escalation. That combination is what
+we claim.
+
+\subsection{Fault tolerance}
+
+Checkpoint-and-rollback is long established in message-passing
+systems~\cite{elnozahy2002}. The difference here is that replay need not be
+deterministic: recovery never depends on a model reproducing a prior output,
+because non-invalidated events are spliced from logged bytes and only
+invalidated ones are re-invoked.
 
 \section{Conclusion}
 
-Exposure is not influence, and in a multi-agent system with any fan-out the
-difference is large enough to matter: $13.1$ points of a 145-event trace in
-our heaviest regime. \sys{} exploits that difference to preserve more correct
-work than a reachability closure---in 13 of 15 runs, never fewer, with zero
-unsafe preservations and recall $1.0$.
+That exposure is not influence is now established for LLM
+agents~\cite{neurotaint2026,granularity2026}; that the difference is large
+enough to act on is a question about deployed systems, and in ours it is
+$13.1$ points of a 145-event trace in the heaviest regime. \sys{} converts
+that difference into a recovery procedure that preserves more correct work
+than a reachability closure---in 13 of 15 runs, never fewer, with zero unsafe
+preservations and recall $1.0$.
+
+The part we claim is narrow and we would rather state it narrowly: not the
+distinction, not counterfactual attribution, but a detector-triggered
+procedure that restricts propagation below reachability and \emph{gates its
+own output on verification}, so that the worst case is restart's outcome at
+more than restart's price rather than a silently unsafe preservation. The
+survey that places recovery among the trust functions built on execution
+provenance notes that rollback can itself be semantically
+unsafe~\cite{trustsurvey2026}; the escalation ladder is our answer to that,
+and it is the reason the safety column in Table~\ref{tab:safety} can be read
+as a property rather than as luck.
 
 It is not cheaper. It costs $1.6\times$--$2.4\times$ a full restart in tokens,
 and where work is freely re-executable we recommend restarting. Its value is
@@ -688,6 +912,53 @@ Y.~Liu et al.
 S.~Chen et al.
 \newblock Defending against prompt injection with structured queries.
 \newblock In {\em USENIX Security}, 2024.
+
+\bibitem{neurotaint2026}
+Y.~Cai, W.~Tang, C.~Wen, and S.~Qin.
+\newblock Ghost in the agent: Redefining information flow tracking for LLM
+agents.
+\newblock {\em arXiv:2604.23374}, 2026.
+
+\bibitem{granularity2026}
+L.~Fan, Z.~Li, Y.~Tian, Y.~Wang, R.~Li, and X.~Wang.
+\newblock The granularity mismatch in agent security: Argument-level
+provenance solves enforcement and isolates the LLM reasoning bottleneck.
+\newblock {\em arXiv:2605.11039}, 2026.
+
+\bibitem{car2026}
+J.~Shah.
+\newblock Causal agent replay: Counterfactual attribution for LLM-agent
+failures.
+\newblock {\em arXiv:2606.08275}, 2026.
+
+\bibitem{causalflow2026}
+A.~Bonagiri, D.~Borkar, G.~J. Anderias, S.~Rafatirad, and H.~Homayoun.
+\newblock CausalFlow: Causal attribution and counterfactual repair for LLM
+agent failures.
+\newblock {\em arXiv:2605.25338}, 2026.
+
+\bibitem{tracelevel2026}
+A.~Mazhar, H.~Suri, and S.~Galhotra.
+\newblock Trace-level analysis of information contamination in multi-agent
+systems.
+\newblock {\em arXiv:2604.27586}, 2026.
+
+\bibitem{dover2026}
+M.~Ma, J.~Zhang, F.~Yang, Y.~Kang, Q.~Lin, S.~Rajmohan, and D.~Zhang.
+\newblock DoVer: Intervention-driven auto debugging for LLM multi-agent
+systems.
+\newblock {\em arXiv:2512.06749}, 2026.
+
+\bibitem{zeroreplay2026}
+D.~H. Kang, H.~Cha, and D.~Weon.
+\newblock Knowledge-based zero-replay debugging of multi-agent LLM traces.
+\newblock {\em arXiv:2606.14805}, 2026.
+
+\bibitem{trustsurvey2026}
+Y.~Wang, J.~Zhang, Z.~Wu, et al.
+\newblock From agent traces to trust: A survey of evidence tracing and
+execution provenance in LLM agents.
+\newblock {\em arXiv:2606.04990}, 2026.
 
 \bibitem{newsome2005}
 J.~Newsome and D.~Song.
