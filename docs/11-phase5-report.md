@@ -1,5 +1,8 @@
 # 11 — Phase 5 Report: the located bugs, the adopted proposal, the declined one
 
+> **CORRECTION (17-09-2026).** Every CausalLine `work_preserved` figure below is superseded by `docs/12-issue20-correction.md`, which lists the exact cells and replacements (10 of 96 scripted cells, all CausalLine, -4.6 to -5.3 points). No baseline number, recovery-success rate or unsafe-preservation count changes. The originals are left in place deliberately: they were correct measurements of a system with a provenance defect, and the defect is part of the record.
+
+
 Covers the five phases of the third remediation round (`task.md`, 16-09-2026).
 Supersedes `docs/10` §8.2 on the campaign numbers and `docs/09` §8.2 on the
 `gen001` result. Decisions D-079..D-083 in `docs/05`.

@@ -1,5 +1,8 @@
 # 08 — Final Push Report
 
+> **CORRECTION (17-09-2026).** Every CausalLine `work_preserved` figure below is superseded by `docs/12-issue20-correction.md`, which lists the exact cells and replacements (10 of 96 scripted cells, all CausalLine, -4.6 to -5.3 points). No baseline number, recovery-success rate or unsafe-preservation count changes. The originals are left in place deliberately: they were correct measurements of a system with a provenance defect, and the defect is part of the record.
+
+
 Covers Phases A–D of the Final Push brief. Supersedes `docs/07` where they
 disagree; `07` remains the record of the integration sprint that preceded this.
 

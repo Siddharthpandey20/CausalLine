@@ -246,21 +246,35 @@ oracle detector, 30 repetitions, 95% CIs, `data/results/campaign.json`:
 
 | scenario | CausalLine | B1 | gain |
 |---|---|---|---|
-| A influencing | 42.8% ± 4.1% | 21.1% | **+21.8** |
-| A exposed-only | 95.6% ± 4.9% | 21.1% | **+74.6** |
-| B influencing | 63.2% ± 0.0% | 57.9% | **+5.3** |
-| B exposed-only | 95.6% ± 3.1% | 57.9% | **+37.7** |
-| C influencing | 63.2% ± 0.0% | 52.6% | **+10.5** |
-| C exposed-only | 96.5% ± 3.2% | 52.6% | **+43.9** |
+| A influencing | 38.2% ± 3.4% | 21.1% | **+17.2** |
+| A exposed-only | 90.4% ± 4.9% | 21.1% | **+69.3** |
+| B influencing | 57.9% ± 0.0% | 57.9% | **+0.0** |
+| B exposed-only | 90.4% ± 3.1% | 57.9% | **+32.5** |
+| C influencing | 57.9% ± 0.0% | 52.6% | **+5.3** |
+| C exposed-only | 91.2% ± 3.2% | 52.6% | **+38.6** |
 
-**Three influencing rows are lower than they were before 15-09-2026, and that is
-a safety fix showing up where a safety fix should.** A carrier clearance used to
-be written into the trace as `clean / structural / 1.0` on the strength of no
-upstream verdict at all; it now inherits what is actually recorded, and the
-Coder's contaminated memory write stopped being preserved. One more event
-recomputed out of 19 is 5.3 points. Two cells also became deterministic — their
-answer no longer depends on which self-report claims the seed happened to get
-wrong. Every delta and its cause: `docs/10-remediation.md` §8.2.
+**Every CausalLine figure here is lower than it was before 17-09-2026, and one
+gain has gone to zero.** Both are the same safety fix showing up where a safety
+fix should — issue #20, `docs/12-issue20-correction.md`.
+
+An event that *retrieves* a source stores that source's text in its own output,
+but the source does not exist yet when the event is logged, so it was never in
+the event's `exposures`, so no verdict was ever written for the pair and the
+contamination walk never considered it. The event sat outside the recovery
+region **holding the payload**. One such event exists per run, on every channel
+— web, memory and inter-agent message alike — and recovering it costs about 5
+points out of 19 events.
+
+**On scenario B, influencing, that one event was the entire margin over B1.**
+The honest reading is that fine-grained attribution buys nothing over
+agent-level taint on that cell. It still buys 17.2 points on A, and the
+exposed-only column is untouched in kind: those are incidents where a poisoned
+source was present but unused, and reachability baselines discard all of it for
+nothing.
+
+An earlier correction on 15-09-2026, for a different defect (carrier
+clearances written as `clean / structural / 1.0` with no upstream verdict), is
+documented in `docs/10-remediation.md` §8.2 and is unrelated to this one.
 
 The exposed-only column is where the claim pays off most directly: those are
 incidents where a poisoned source was *present but unused*, and everything a

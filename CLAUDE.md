@@ -42,6 +42,17 @@ affected part from the nearest trusted checkpoint.
   gap, the nested removability check, carrier clearances, and a fresh campaign
   with every delta explained. **Supersedes `08` on the numbers it re-measures**,
   and its §9 is the current claims-you-can / claims-you-cannot list
+- `docs/12-issue20-correction.md` — issue #20: an event that stores a source's
+  content was never checked against it. **Supersedes every CausalLine
+  `work_preserved` figure in `07`, `08`, `10`, `11` and `gate1/` on the cells it
+  re-measures**; no baseline, recovery-success or unsafe number changes
+- `docs/real_mixed_model_60_agent_experiment.md` — the 56-agent, three-provider
+  testbed: architecture, Phase 0 API findings, and the fault log. **Its results
+  sections 6-12 are superseded** by:
+- `docs/13-mixed56-validation.md` — the repeated validation (5 seeds x 3
+  regimes, 15/15 completed) on the fixed code, with the safety, economic and
+  publication-readiness analysis. **Read §9 Limitation 1 and §12 before quoting
+  any number from it**
 
 ## Repo layout
 
