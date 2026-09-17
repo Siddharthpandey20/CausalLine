@@ -412,6 +412,59 @@ def _upstream_ids(copied_from: str) -> list[str]:
     return [part.strip() for part in copied_from.split(",") if part.strip()]
 
 
+def record_ingestion(sink: Sink, event_id: str, materialised: list[str]) -> None:
+    """The event that BROUGHT a source into the trace, and stored its content.
+
+    ISSUE #20. THE HOLE THIS CLOSES IS A MISSING EDGE, NOT A WRONG VERDICT.
+    ---------------------------------------------------------------------
+    `contaminate()` walks two relations: `influence` (source -> event) and
+    `derived_from` (event -> source). There is a third that nothing recorded.
+
+    A source does not appear from nowhere. Some event retrieves it -- a
+    `tool_response` returning web pages, a `memory_read` returning a stored
+    value, a hand-off `message` carrying a planted instruction -- and that
+    event's own `output_ref` stores the retrieved text. The source is then
+    logged with `origin_event` pointing back at it.
+
+    But the source does not exist when that event is logged, so it is not in
+    the event's `exposures`, so `record_structural()` writes nothing for the
+    pair, so the walk never considers it. The event sits outside the
+    contaminated region **holding the payload verbatim**, and every recovery
+    method preserves it.
+
+    Measured on all three chain scenarios before the fix:
+
+        A (web)            e0005 researcher/tool_response holds S3
+        B (memory)         e0012 coder/memory_read        holds S14
+        C (agent_message)  e0011 researcher/message       holds S13
+
+    and on the 56-agent mixed workflow as 5 unsafe preservations in the large
+    regime -- the only safety failure that campaign produced.
+
+    WHY AN INFLUENCE EDGE AND NOT A CHECK RECORD
+    ---------------------------------------------
+    `Trace.validate()` rejects a check record naming a source that was never in
+    the event's context, and that invariant is right: a check claiming to have
+    examined something the agent never saw is a fabrication. An influence edge
+    carries no such claim -- it states a relation, and here the relation is a
+    fact about the code path (`output_ref` literally contains the text), so it
+    is `structural` and confident.
+
+    WHY NOT `derived_from`
+    -----------------------
+    That field means "this source IS that event's output", and
+    `Trace.validate()` enforces one wrapping source per event -- a memory read
+    of two keys produces two sources from one event and would fail it.
+
+    This only widens the region, never narrows it, so it cannot cause an unsafe
+    preservation; it can only cost preserved work.
+    """
+    for sid in materialised:
+        sink.log_influence(
+            InfluenceEdge(sid, event_id, method="structural", confident=True)
+        )
+
+
 def record_structural(
     sink: Sink, event_id: str, exposures: list[str], used: list[str], why: str = ""
 ) -> None:

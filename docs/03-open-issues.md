@@ -719,3 +719,99 @@ scripted results; both are blockers for quoting the real-LLM method comparison
 as a comparison.
 
 **Status: CLOSED 16-09-2026.** 19a by D-079, 19b by D-080. Both with before/after numbers and a stated direction.
+
+
+## 20. An event that stores a source's content verbatim can never be checked against it, so it is preserved — CLOSED
+
+**Found 17-09-2026 by the 56-agent mixed-provider campaign, and it is not
+specific to that workflow.**
+
+### What happens
+
+`record_structural()` writes a verdict for each source in an event's
+`exposures`. A source produced *by* an event — one whose `origin_event` is that
+event — is by construction never in that event's own `exposures`, because it
+does not exist until after the event is logged.
+
+So if such an event also stores the source's content in its `output_ref`, the
+pair (source, event) has **no check record at all**. The contamination walk
+never considers it, the event stays outside the recovery region, and every
+method preserves it — while the stored bytes are the attack.
+
+The verdict is not wrong. It is absent, which is worse, because a missing
+record is invisible to every consumer that looks for a wrong one.
+
+Recording the pair afterwards is not available: `Trace.validate()` rejects a
+check against a source that was never in the event's context, and that
+invariant is correct — a check that claims to have examined something the agent
+never saw is a fabrication.
+
+### Where it bites
+
+The memory channel, because a memory read is the one operation whose output
+*is* the retrieved value. The web path escapes by accident of shape:
+`Tools.web_search`'s response stores the clean page and a planted payload is a
+separate source, so no event output holds it.
+
+Measured, in both pipelines:
+
+```
+mixed56 (large regime)   e0049 e0052 e0055 e0058 e0064   all norm*/memory_read
+                         -> 5 unsafe preservations by CausalLine, the only
+                            safety failure in the campaign
+
+chain (scenario B)       e0012 coder/memory_read
+                         -> stores the payload, outside the region
+```
+
+### Why it has never been seen before
+
+**Scripted ground truth cannot see it.** It is a per-(source, event) table
+built by construction, and by construction a source did not influence the event
+that produced it — which is true about *influence* and says nothing about
+whether the event's stored bytes contain it. The real-LLM frontier's observed
+ground truth is "does this output carry the canary", which catches it
+immediately.
+
+That is a point in favour of observed ground truth and against reading
+`unsafe_preservations = 0` from the scripted matrix as covering this case. It
+does not.
+
+### What was done, and what was not
+
+`src/tracing/mixed.py` stores the key and whether it resolved, not the value —
+one copy of the content, in the tracked place, which is what the web path
+already does. `tests/test_mixed.py` pins the general property: no event may
+store the payload and sit outside the region.
+
+**`src/tracing/pipeline.py` is NOT changed.** Its `memory_read` has the same
+shape, deliberately: the comment there records that key/value pairs live with
+the reading event so verification can tell whether live memory still points at
+something an invalidated event wrote. Changing it would move every scenario-B
+number in `docs/07`, `08` and `10`, and that is a decision to take deliberately
+with a re-run, not a side effect of a different experiment.
+
+**Status: CLOSED 17-09-2026, in BOTH pipelines.** Raised and closed the same
+day. `record_ingestion()` in `src/provenance/attribution.py` records a
+structural influence edge from each materialised source to the event that
+materialised it, at every ingestion site. The reproduction showed the defect
+was never memory-specific: scenario A (web, `e0005`) and scenario C
+(agent_message, `e0011`) had it too, from the same cause.
+
+The earlier note below said the chain pipeline was deliberately left alone
+because fixing it would move published numbers. It was fixed, and the numbers
+it moves are enumerated in `docs/12-issue20-correction.md`: **10 of 96 scripted
+cells, all CausalLine, all downward by 4.6-5.3 points**, with zero change to
+any baseline, to any recovery-success rate, or to any unsafe-preservation
+count. Regression coverage is `tests/test_issue20_memory_provenance.py`.
+
+**Consequence for existing numbers:** see `docs/12-issue20-correction.md`.
+
+One observation survives the fix and is worth keeping: **scripted ground truth
+is structurally blind to this class of defect.** It is a per-(source, event)
+table built by construction, and by construction a source did not influence the
+event that produced it -- true about *influence*, silent about whether that
+event's stored bytes contain it. The real-LLM frontier's observed ground truth
+("does this output carry the canary") caught it on the first attempt. That is a
+concrete argument for the observed instrument, and a reason
+`unsafe_preservations = 0` in the scripted matrix never covered this case.

@@ -65,6 +65,7 @@ from src.provenance.attribution import (
     derived_links_for,
     ABSENT_UPSTREAM,
     record_carrier,
+    record_ingestion,
     record_structural,
 )
 
@@ -587,6 +588,7 @@ class GeminiPipeline:
             web_call.id,
             upstream_verdict=self._verdict_on(web_call.id),
         )
+        page_sources = []
         for page in pages:
             source = remember(
                 self.log.log_source(
@@ -596,7 +598,11 @@ class GeminiPipeline:
                     metadata={"url": page.url, "title": page.title},
                 )
             )
+            page_sources.append(source.id)
             self.expose("researcher", source.id)
+        # Issue #20: this response's stored output is the JSON of these pages,
+        # so a flagged page makes the response itself contaminated.
+        record_ingestion(self.log, web_response.id, page_sources)
 
         db_keys = ("environment/installed_packages", "task/date_samples", "task/day_first")
         db_call = self.log.log_event(
@@ -639,6 +645,7 @@ class GeminiPipeline:
             used=[],
             why="fixture lookup determined by literal keys",
         )
+        db_sources = []
         for key in db_keys:
             source = remember(
                 self.log.log_source(
@@ -648,7 +655,9 @@ class GeminiPipeline:
                     metadata={"key": key},
                 )
             )
+            db_sources.append(source.id)
             self.expose("researcher", source.id)
+        record_ingestion(self.log, db_response.id, db_sources)
 
         # --- researcher: one call per finding ------------------------------------
         findings: list[tuple[Event, str]] = []
@@ -739,6 +748,7 @@ class GeminiPipeline:
                 followup_call.id,
                 upstream_verdict=self._verdict_on(followup_call.id),
             )
+            fresh_sources = []
             for page in fresh:
                 seen_urls.add(page.url)
                 source = remember(
@@ -749,7 +759,9 @@ class GeminiPipeline:
                         metadata={"url": page.url, "title": page.title},
                     )
                 )
+                fresh_sources.append(source.id)
                 self.expose("researcher", source.id)
+            record_ingestion(self.log, followup_response.id, fresh_sources)
 
             block = self._source_block(self.context["researcher"])
             question = (
@@ -801,6 +813,7 @@ class GeminiPipeline:
             ", ".join(e.id for e, _ in findings),
             upstream_verdict=self._verdict_on(*[e.id for e, _ in findings]),
         )
+        handed_on: list[str] = []
         for event, text in findings:
             source = remember(
                 self.log.log_source(
@@ -810,6 +823,7 @@ class GeminiPipeline:
                     derived_from=event.id,
                 )
             )
+            handed_on.append(source.id)
             self.expose("coder", source.id)
         for extra in extra_messages:
             # Planted inter-agent message: not derived from a model event in
@@ -823,7 +837,13 @@ class GeminiPipeline:
                     metadata={"injected": True, "channel": "researcher->coder"},
                 )
             )
+            handed_on.append(source.id)
             self.expose("coder", source.id)
+        # Issue #20. `to_coder`'s stored output is the JSON of the findings AND
+        # the planted messages, so a flagged one of either is inside it. This is
+        # the scenario-C case: the injected source has no `derived_from`, so
+        # nothing else in the trace connects it back to the event carrying it.
+        record_ingestion(self.log, to_coder.id, handed_on)
 
         # --- coder ----------------------------------------------------------------
         self._checkpoint(to_coder.id, "researcher")
@@ -862,6 +882,7 @@ class GeminiPipeline:
             used=[],
             why="memory keys are literals in the pipeline; the read consults no source",
         )
+        memory_sources = []
         for key, value in read_values.items():
             source = remember(
                 self.log.log_source(
@@ -871,7 +892,11 @@ class GeminiPipeline:
                     metadata={"key": key},
                 )
             )
+            memory_sources.append(source.id)
             self.expose("coder", source.id)
+        # Issue #20, the case it was found on: this event's stored output is
+        # `json.dumps(read_values)`, so a poisoned entry is inside it.
+        record_ingestion(self.log, memory_event.id, memory_sources)
 
         samples = self.tools.db_lookup("task/date_samples") or []
         coder_sources = self.context["coder"]
@@ -1274,6 +1299,7 @@ def run_pipeline(
     workflow: str = "chain",
     workers: int = 6,
     dispatcher: bool = False,
+    topology: dict[str, Any] | None = None,
 ) -> PipelineResult:
     """Run the pipeline and write a trace, its checkpoints, and its memory.
 
@@ -1339,6 +1365,12 @@ def run_pipeline(
         "workflow": workflow,
         "workers": workers,
         "dispatcher": dispatcher,
+        # The 56-agent graph, for the same reason `workers` is here: `replay()`
+        # rebuilds the run and splices logged outputs in by event id, so a
+        # rerun of a different shape lines the ids up far enough to splice the
+        # wrong output into the wrong agent. None for every other workflow, and
+        # for every trace written before this key existed.
+        "topology": topology,
         **settings.fingerprint(),
     }
     if client is not None:
@@ -1394,6 +1426,12 @@ def run_pipeline(
                 return FanoutPipeline(
                     log, client, tools, workers=workers,
                     dispatcher=bool(dispatcher), **common
+                ).run()
+            if workflow == "mixed":
+                from src.tracing.mixed import MixedPipeline
+
+                return MixedPipeline(
+                    log, client, tools, topology=topology, **common
                 ).run()
             return GeminiPipeline(log, client, tools, **common).run()
 
