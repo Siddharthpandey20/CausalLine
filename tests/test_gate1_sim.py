@@ -188,5 +188,59 @@ class TestTheCostEstimateIsAnUpperBound(unittest.TestCase):
                     self.assertGreaterEqual(a_hat(w), spent)
 
 
+
+class TestH2IsFalsifiedByComparatorBlindness(unittest.TestCase):
+    """The smallest counterexample that breaks H2, preserved.
+
+    H2's safety argument is that `removability.check()` guards against
+    believing an unsound clean verdict. It does -- for the failure mode it
+    checks. `removability` answers "does redacting this source remove its
+    information from the prompt?" It does NOT answer "would the comparator
+    notice if the output changed?", and those are different questions: D-026
+    removed text comparison deliberately, so a decision signature can miss a
+    real semantic change.
+
+    Five events. The probed pair is removable, so the guard passes; it genuinely
+    influences, so the verdict is wrong; the comparator cannot see it, so the
+    probe returns clean. H2 investigates a workflow that is 3/5 contaminated and
+    for which restart was the cheaper action.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.w = build("cb", "hub", "comparator_blind", 2, Path(self.tmp.name))
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_the_counterexample_is_five_events(self) -> None:
+        self.assertEqual(len(self.w.trace.events), 5)
+
+    def test_the_removability_guard_passes_on_the_probed_pair(self) -> None:
+        """If this ever starts failing, the counterexample has stopped being
+        one -- the guard would be catching it."""
+        probed = [(s, e) for s, e in self.w.truth.influences]
+        self.assertTrue(probed)
+        for source, event in probed:
+            with self.subTest(pair=(source, event)):
+                self.assertTrue(self.w.is_removable(source, event))
+
+    def test_the_probe_returns_clean_while_influence_is_real(self) -> None:
+        oracle = ProbeOracle(self.w)
+        for source, event in self.w.truth.influences:
+            with self.subTest(pair=(source, event)):
+                self.assertTrue(self.w.truth.influenced(source, event))
+                self.assertFalse(oracle.probe(source, event))
+
+    def test_h2_makes_a_false_recovery_here(self) -> None:
+        full = {self.w.name: full_investigation(self.w)}
+        out = evaluate("h2", make_sound_bottleneck_gate(3), [self.w], full)[0]
+        self.assertEqual(out.verdict, "FALSE RECOVERY")
+        self.assertGreater(out.unsafe, 0)
+
+    def test_the_workflow_is_majority_contaminated(self) -> None:
+        self.assertEqual(self.w.f_true, 1.0)
+        self.assertEqual(len(self.w.true_region()), 3)
+
 if __name__ == "__main__":
     unittest.main()

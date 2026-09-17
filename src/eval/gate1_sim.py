@@ -159,7 +159,10 @@ class ProbeOracle:
         return answer
 
 
-def full_investigation(workflow: Workflow) -> tuple[int, set[str]]:
+def full_investigation(
+    workflow: Workflow,
+    seed_verdicts: dict | None = None,
+) -> tuple[int, set[str]]:
     """What the real estimator would spend, and what it would conclude.
 
     `refine_for_verdict`'s frontier expansion, reproduced over the probe oracle:
@@ -171,7 +174,10 @@ def full_investigation(workflow: Workflow) -> tuple[int, set[str]]:
     from src.provenance.contamination import contaminate
 
     oracle = ProbeOracle(workflow)
-    verdicts: dict[tuple[str, str], bool] = {}
+    # A deployed gate would not throw away verdicts it just paid for: they are
+    # real counterfactuals. `seed_verdicts` models that reuse, and it is the
+    # only way a gate's own mistake can reach the investigation's conclusion.
+    verdicts: dict[tuple[str, str], bool] = dict(seed_verdicts or {})
     all_pairs = {(s, e.id) for e in workflow.trace.events for s in e.exposures}
 
     while True:
@@ -358,6 +364,24 @@ def build(
             for kid in downstream_of.get(head.id, []):
                 for sid in _EXPOSURES.get(kid.id, []):
                     influence(sid, kid, visible=False)
+        elif pattern == "comparator_blind":
+            # The source IS removable -- redaction genuinely removes its
+            # information -- and it DID change the output. The comparator just
+            # does not register the change: decision signatures capture
+            # decisions, not every semantic shift (D-026 removed text
+            # comparison deliberately). The removability guard passes and the
+            # verdict is still wrong. This is the attack on F5.
+            influence(bad_id, head, visible=False)
+            for kid in downstream_of.get(head.id, []):
+                for sid in _EXPOSURES.get(kid.id, []):
+                    influence(sid, kid, visible=False)
+        elif pattern == "hub_tainted_local":
+            # Real influence at the hub that does NOT propagate. The true region
+            # is one event; the structural closure is the whole trace. Probing
+            # the max-closure pair returns TAINTED, so nothing prunes, and the
+            # closure can only be cut by clearing each downstream pair one at a
+            # time -- more probes than any fixed budget. Attack on F4.
+            influence(bad_id, head)
         elif pattern == "none_blocked":
             # No influence at all, but nothing is removable. A gate that
             # refuses to trust unsound verdicts then has NOTHING it may probe
@@ -397,7 +421,7 @@ def build(
 
     trace = read_trace(path)
     # Under redundancy the influence is real and NO probe can see it.
-    if pattern == "redundant":
+    if pattern in ("redundant", "comparator_blind"):
         detectable = set()
     elif pattern == "deep_hidden":
         # Only the hidden deep pair is invisible; everything else behaves.
