@@ -53,10 +53,10 @@ affected part from the nearest trusted checkpoint.
   regimes, 15/15 completed) on the fixed code, with the safety, economic and
   publication-readiness analysis. **Read §9 Limitation 1 and §12 before quoting
   any number from it**
-- `docs/14-workload-variation-sanity.md` — the seed-dependent attack placement
-  that answers §9 Limitation 1, and a **three-run sanity check of it**. Those
-  three runs are infrastructure validation, **not** a result, and must never be
-  combined with the fifteen
+- `docs/14-workload-varied-validation.md` — **the primary result**: 15 runs on
+  15 distinct attack placements, which is what `13` could not do. Wins 5/5 in
+  medium and large, **loses in small**; 0 unsafe, 0 escapes. `13` is retained
+  as the fixed-workload control that isolates model non-determinism
 
 ## Repo layout
 

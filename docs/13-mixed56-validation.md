@@ -1,5 +1,17 @@
 # The 56-agent validation: 5 seeds x 3 regimes, on the fixed code
 
+> **SUPERSEDED AS THE PRIMARY RESULT (18-09-2026).** This campaign repeats a
+> *fixed* workload five times per regime, so it measures model
+> non-determinism rather than workload variation -- the limitation its own
+> Sec 9 states. `docs/14-workload-varied-validation.md` runs the same 15-cell
+> design with 15 *distinct* attack placements and is the result to quote.
+>
+> This document is kept, not retired: the fixed-workload control is what
+> establishes that the medium regime's sd of 0.00 is determinism rather than a
+> defect, and that two runs escalate where three identical ones do not. Its
+> headline (13 wins, 2 ties, 0 losses) is **more flattering than the varied
+> campaign**, which records a loss -- that difference is the point.
+
 > This supersedes sections 6-12 of `docs/real_mixed_model_60_agent_experiment.md`,
 > which reported a single run per regime taken before issue #20 was fixed.
 > That document's architecture, Phase 0 findings and fault log (sections 0-5c)

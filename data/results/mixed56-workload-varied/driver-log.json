@@ -1,10 +1,98 @@
 [
   {
-    "seed": 20260917,
+    "seed": 20260918,
+    "regime": "small",
+    "status": "ok",
+    "wall_clock_s": 439.3,
+    "produced": true,
+    "tail": "=== small ===\n  ok=True task_success=False 439.0s routing={'local': 166, 'gemini': 9, 'nvidia': 14}\nwrote data\\results\\mixed56-workload-varied\\seed20260918-small.json"
+  },
+  {
+    "seed": 20260918,
+    "regime": "medium",
+    "status": "ok",
+    "wall_clock_s": 474.0,
+    "produced": true,
+    "tail": "=== medium ===\n  ok=True task_success=False 473.5s routing={'local': 240, 'gemini': 12, 'nvidia': 24}\nwrote data\\results\\mixed56-workload-varied\\seed20260918-medium.json"
+  },
+  {
+    "seed": 20260918,
     "regime": "large",
     "status": "ok",
-    "wall_clock_s": 961.5,
+    "wall_clock_s": 535.1,
     "produced": true,
-    "tail": "=== large ===\n  ok=True task_success=False 961.2s routing={'local': 288, 'gemini': 12, 'nvidia': 24}\nwrote data\\results\\mixed56-workload-varied\\seed20260917-large.json"
+    "tail": "=== large ===\n  ok=True task_success=False 534.5s routing={'local': 282, 'gemini': 12, 'nvidia': 24}\nwrote data\\results\\mixed56-workload-varied\\seed20260918-large.json"
+  },
+  {
+    "seed": 20260919,
+    "regime": "small",
+    "status": "ok",
+    "wall_clock_s": 395.4,
+    "produced": true,
+    "tail": "=== small ===\n  ok=True task_success=False 395.0s routing={'local': 165, 'gemini': 9, 'nvidia': 14}\nwrote data\\results\\mixed56-workload-varied\\seed20260919-small.json"
+  },
+  {
+    "seed": 20260919,
+    "regime": "medium",
+    "status": "ok",
+    "wall_clock_s": 482.9,
+    "produced": true,
+    "tail": "=== medium ===\n  ok=True task_success=False 482.5s routing={'local': 252, 'gemini': 12, 'nvidia': 24}\nwrote data\\results\\mixed56-workload-varied\\seed20260919-medium.json"
+  },
+  {
+    "seed": 20260919,
+    "regime": "large",
+    "status": "ok",
+    "wall_clock_s": 538.9,
+    "produced": true,
+    "tail": "=== large ===\n  ok=True task_success=False 538.6s routing={'local': 285, 'gemini': 12, 'nvidia': 24}\nwrote data\\results\\mixed56-workload-varied\\seed20260919-large.json"
+  },
+  {
+    "seed": 20260920,
+    "regime": "small",
+    "status": "ok",
+    "wall_clock_s": 450.4,
+    "produced": true,
+    "tail": "=== small ===\n  ok=True task_success=False 450.0s routing={'local': 170, 'gemini': 10, 'nvidia': 19}\nwrote data\\results\\mixed56-workload-varied\\seed20260920-small.json"
+  },
+  {
+    "seed": 20260920,
+    "regime": "medium",
+    "status": "ok",
+    "wall_clock_s": 499.1,
+    "produced": true,
+    "tail": "=== medium ===\n  ok=True task_success=True 498.8s routing={'local': 246, 'gemini': 12, 'nvidia': 24}\nwrote data\\results\\mixed56-workload-varied\\seed20260920-medium.json"
+  },
+  {
+    "seed": 20260920,
+    "regime": "large",
+    "status": "ok",
+    "wall_clock_s": 792.8,
+    "produced": true,
+    "tail": "=== large ===\n  ok=True task_success=False 792.1s routing={'local': 285, 'gemini': 12, 'nvidia': 24}\nwrote data\\results\\mixed56-workload-varied\\seed20260920-large.json"
+  },
+  {
+    "seed": 20260921,
+    "regime": "small",
+    "status": "ok",
+    "wall_clock_s": 569.5,
+    "produced": true,
+    "tail": "=== small ===\n  ok=True task_success=False 568.2s routing={'local': 163, 'gemini': 10, 'nvidia': 12}\nwrote data\\results\\mixed56-workload-varied\\seed20260921-small.json"
+  },
+  {
+    "seed": 20260921,
+    "regime": "medium",
+    "status": "ok",
+    "wall_clock_s": 454.8,
+    "produced": true,
+    "tail": "=== medium ===\n  ok=True task_success=False 454.2s routing={'local': 252, 'gemini': 12, 'nvidia': 24}\nwrote data\\results\\mixed56-workload-varied\\seed20260921-medium.json"
+  },
+  {
+    "seed": 20260921,
+    "regime": "large",
+    "status": "ok",
+    "wall_clock_s": 524.3,
+    "produced": true,
+    "tail": "=== large ===\n  ok=True task_success=False 523.9s routing={'local': 282, 'gemini': 12, 'nvidia': 24}\nwrote data\\results\\mixed56-workload-varied\\seed20260921-large.json"
   }
 ]

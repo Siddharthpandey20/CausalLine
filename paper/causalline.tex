@@ -61,13 +61,16 @@ makes ``never worse than restart in outcome'' a structural property rather
 than an empirical hope.
 
 Across 15 runs of a real 56-agent, three-provider system (50 local
-Llama-3-8B, 2 Gemini, 4 Nemotron) under three attack channels and three
-contamination regimes, \sys{} preserved strictly more correct work than the
-topology-closure baseline in 13 runs, tied in 2, and lost in 0, while
-recording \textbf{zero unsafe preservations, zero contamination escapes, and
-recall $1.0$}. On a deterministic scripted matrix (96 cells $\times$ 30
-repetitions, four detectors including a blind control), \sys{} recorded zero
-unsafe preservations in all 24 of its cells.
+Llama-3-8B, 2 Gemini, 4 Nemotron) under three attack channels and \emph{15
+distinct attack placements}, \sys{} beat the topology-closure baseline 5/5 in
+each of the two heavier contamination regimes, by $+7.0$ and $+15.2$ points
+(sd $1.85$ and $1.54$). It \textbf{loses} in the light regime, where the
+closure is already near-optimal, by $-17.4$ points on average---one run
+surrendering 92 points after verification failed twice. Every run recorded
+\textbf{zero unsafe preservations, zero contamination escapes, and recall
+$1.0$}. On a deterministic scripted matrix (96 cells $\times$ 30 repetitions,
+four detectors including a blind control), \sys{} recorded zero unsafe
+preservations in all 24 of its cells.
 
 We are equally explicit about what this costs. \sys{} is \emph{more expensive
 in tokens than every baseline we compare against}, including full restart:
@@ -434,11 +437,22 @@ contaminated fraction \emph{measured} from each trace rather than configured.
 
 \subsection{Protocol}
 
-Five seeds $\times$ three regimes $=15$ runs, all completed. The architecture,
-provider assignment, payloads, regime definitions, baselines, \sys{}
-configuration, metrics and detector were fixed before the first run and not
-touched afterwards. All four methods are scored on the \emph{same} trace under
-the \emph{same} attack in each run, so the comparison is paired.
+Five seeds $\times$ three regimes $=15$ runs, all completed, and the seed
+selects the attack placement: which records, memory entries and verifiers are
+poisoned, and how many within a per-regime band, drawn deterministically from
+SHA-256(regime, seed). \textbf{All 15 placements are distinct}, so these are 15
+different workloads rather than one workload repeated. The architecture,
+provider assignment, payload text, channels, regime definitions, baselines,
+\sys{} configuration, metrics and detector were fixed before the first run and
+not touched afterwards; a test asserts that the seed reaches the attack and
+nothing else.
+
+All four methods are scored on the \emph{same} trace under the \emph{same}
+attack in each run, so the comparison is paired.
+
+We additionally ran the same 15-cell design with the placement \emph{held
+fixed} within each regime, which isolates model non-determinism from workload
+variation. We report it as a control in Section~\ref{sec:control}.
 
 \section{Results}
 
@@ -452,28 +466,90 @@ the \emph{same} attack in each run, so the comparison is paired.
 regime & $f_{\text{true}}$ & \bzero{} & \bone{} & \btwo{} & \sys{} &
 $\Delta$ vs \btwo{} & sd & win/tie/loss & unsafe \\
 \midrule
-small  & $6.2\%$  & $0.0\%$ & $92.4\%$ & $92.4\%$ & $\mathbf{93.5\%}$ & $+1.10$ & $0.62$ & 4/1/0 & 0 \\
-medium & $54.5\%$ & $0.0\%$ & $40.0\%$ & $39.3\%$ & $\mathbf{45.5\%}$ & $+6.21$ & $0.00$ & 5/0/0 & 0 \\
-large  & $72.4\%$ & $0.0\%$ & $15.2\%$ & $14.5\%$ & $\mathbf{25.0\%}$ & $+10.48$ & $5.86$ & 4/1/0 & 0 \\
-\midrule
-\multicolumn{6}{l}{\textbf{aggregate} (15 runs)} & $\mathbf{+5.93}$ & $5.07$ & \textbf{13/2/0} & \textbf{0} \\
+small  & $6.2$--$9.0\%$  & $0.0\%$ & $89.9\%$ & $89.9\%$ & $72.6\%$ & $\mathbf{-17.38}$ & $41.97$ & 2/2/\textbf{1} & 0 \\
+medium & $51.7$--$57.2\%$ & $0.0\%$ & $38.1\%$ & $37.4\%$ & $\mathbf{44.4\%}$ & $\mathbf{+7.03}$ & $1.85$ & \textbf{5}/0/0 & 0 \\
+large  & $75.2$--$77.2\%$ & $0.0\%$ & $9.2\%$ & $8.6\%$ & $\mathbf{23.7\%}$ & $\mathbf{+15.17}$ & $1.54$ & \textbf{5}/0/0 & 0 \\
 \bottomrule
 \end{tabular}
-\caption{Work preserved, 56-agent testbed, five seeds per regime. $\Delta$ is
-the \emph{paired} per-run difference in percentage points. \sys{} never lost
-to \btwo{} in any run.}
+\caption{Work preserved, 56-agent testbed, five \emph{distinct} attack
+placements per regime. $\Delta$ is the \emph{paired} per-run difference in
+percentage points. We deliberately omit an aggregate row: see the text.}
 \label{tab:main}
 \end{table*}
 
-Table~\ref{tab:main} is the main result. \sys{} preserved more correct work
-than \btwo{} in 13 of 15 runs, tied in 2, lost in 0. The advantage grows with
-the contaminated fraction, which is the direction the method predicts: the
-more a reachability closure over-discards, the more there is to recover.
+Table~\ref{tab:main} is the main result, and it is not uniform. \sys{} wins
+5/5 in the medium and large regimes with standard deviations of $1.85$ and
+$1.54$ points across five genuinely different attack placements. It
+\textbf{loses} in the small regime.
 
-The two ties are informative and not noise. In both, selective recovery failed
-verification and escalated to agent restart, at which point \sys{}'s discard
-set becomes \btwo{}'s by construction. The ladder gives up the gain rather
-than ship an uncertified recovery.
+\paragraph{No aggregate is reported, and that is deliberate.}
+Pooling the fifteen gives $+1.61$ points with a standard deviation of $26.64$.
+That number describes no situation an operator is ever in: it averages three
+regimes whose effects have opposite signs and is dominated by a single run
+that surrendered 92 points. The per-regime rows are the honest summary.
+
+\paragraph{The loss is the most informative row.}
+On seed 20260917 of the small regime, \sys{} preserved $0.0\%$ against
+\btwo{}'s $92.4\%$. Selective replay failed verification, agent restart failed
+verification, and recovery delivered correctly at \texttt{restart\_all}---worth
+nothing in preserved work.
+
+This is the design behaving as specified in the regime where it has least to
+offer. The attack enters late, so the closure is already small and \btwo{}
+keeps $92.4\%$; there is almost nothing for influence analysis to save.
+\sys{} nonetheless pays full attribution cost and then verifies, while \bone{}
+and \btwo{} ship unverified recoveries and are never charged for being
+wrong---in these five runs they happened to be right. When verification fails
+twice the ladder surrenders the whole gain rather than ship an uncertified
+recovery.
+
+The practical reading is a deployment rule: \textbf{where the topology closure
+is already near-optimal, do not use this method.} Section~\ref{sec:econ} gives
+the corresponding cost condition.
+
+\paragraph{Where it works, the effect is tight.}
+The large regime's paired difference spans $+13.1$ to $+17.2$ across five
+placements with contaminated fractions from $75.2\%$ to $77.2\%$---entirely
+above zero, with a spread an order of magnitude smaller than the small
+regime's. The mechanism is legible in the columns: as the poisoned set grows,
+the closure collapses toward discarding everything (\btwo{} keeps
+$5.5\%$--$11.0\%$) while influence-aware recovery still finds about a fifth of
+the trace to keep.
+
+\paragraph{Two caveats.}
+Two of fifteen runs (medium, seeds 20260917 and 20260920) report
+\texttt{payload\_landed: false}: the models ignored the injection, so their
+zero-unsafe counts are arithmetic rather than evidence
+(\cite{tracelevel2026}'s decoupling finding is the same hazard). They are
+included because excluding runs on an outcome would be selection, and flagged
+because they should be weighted differently. Thirteen of fifteen landed.
+
+The medium regime misses its intended $25$--$50\%$ band in all five runs
+($51.7\%$--$57.2\%$). This is a property of the topology rather than the draw:
+any stage-A poisoning reaches the broadcast hub, and everything downstream of
+the hub is roughly half the trace, so a lower fraction is unreachable through
+that channel. Nothing in the placement draw consults the band, and no seed was
+rejected for producing an inconvenient number.
+
+\subsection{Control: the same design with the workload held fixed}
+\label{sec:control}
+
+We also ran all 15 cells with the placement \emph{frozen} within each regime,
+so that the five seeds varied only model sampling. That campaign gives
+$+1.10$, $+6.21$ and $+10.48$ points with 13 wins, 2 ties and no losses.
+
+Its medium regime has a paired-difference standard deviation of exactly
+$0.00$, which is the expected reading and not a defect: given an identical
+workload, \sys{}'s discard set is a deterministic function of the recorded
+influence edges, and all five runs recorded the same edges. The small and
+large regimes deviate only because one run each failed verification and
+escalated.
+
+Comparing the two campaigns is the cleanest statement of why workload
+variation was necessary. The frozen design reports no losses; varying the
+attack placement produced one, in the regime the frozen design had already
+flagged with two ties. \textbf{Repeating a fixed workload measures model
+non-determinism, not workload variation}, and it flattered the method.
 
 \paragraph{Why the medium regime's standard deviation is exactly zero.}
 This number will look like a bug and it is not, so we explain it rather than
@@ -513,13 +589,15 @@ quantity & small & medium & large \\
 \midrule
 unsafe preservations (all methods) & 0 & 0 & 0 \\
 contamination escapes from closure & 0 & 0 & 0 \\
-payload landed                     & 5/5 & 5/5 & 5/5 \\
+payload landed                     & 5/5 & 3/5 & 5/5 \\
 recall                             & 1.0 & 1.0 & 1.0 \\
 final task correct                 & 5/5 & 5/5 & 5/5 \\
 degraded agents                    & 0 & 0 & 0 \\
 \bottomrule
 \end{tabular}
-\caption{Safety, 15 runs. Every attack landed, so no zero here is arithmetic.}
+\caption{Safety, 15 runs. Thirteen of fifteen payloads landed; the two
+medium-regime runs that did not are flagged in the text, and their zeros are
+arithmetic rather than evidence.}
 \label{tab:safety}
 \end{table}
 
@@ -706,13 +784,13 @@ claim, and we report the corrected numbers throughout.
 
 \begin{enumerate}
 \itemsep2pt
-\item \textbf{Three design points, replicated.} The five seeds per regime vary
-model sampling, not the attack placement: the contaminated fraction is
-identical across seeds within a regime, and the medium regime's paired
-difference has standard deviation $0.00$. The effective sample for the
-structural comparison is one workload per regime, confirmed five times. We
-have since implemented seed-dependent placement and verified it produces five
-distinct workloads per regime, but the campaign reported here is the fixed one.
+\item \textbf{Five workloads per regime, not fifty.} The seed varies the attack
+placement and all 15 are distinct, which removes the fixed-workload limitation
+of our control campaign (Section~\ref{sec:control}). Five draws per regime
+still supports descriptive statistics and a sign count, not a distributional
+claim about how often the benefit appears---and the small regime's standard
+deviation of $41.97$ shows that five draws are not many when the outcome is
+bimodal between ``selective succeeded'' and ``escalated to restart''.
 \item \textbf{One topology.} Nothing here says how the gain behaves as hub
 fan-out, stage depth or provider mix change.
 \item \textbf{Oracle detector} in the real-system experiments. We measure
@@ -863,9 +941,15 @@ That exposure is not influence is now established for LLM
 agents~\cite{neurotaint2026,granularity2026}; that the difference is large
 enough to act on is a question about deployed systems, and in ours it is
 $13.1$ points of a 145-event trace in the heaviest regime. \sys{} converts
-that difference into a recovery procedure that preserves more correct work
-than a reachability closure---in 13 of 15 runs, never fewer, with zero unsafe
-preservations and recall $1.0$.
+that difference into a recovery procedure that preserves $+7.0$ and $+15.2$
+points more than a reachability closure in the two heavier regimes, across
+five distinct attack placements each, with zero unsafe preservations and
+recall $1.0$.
+
+It also \emph{loses} in the light regime, and that boundary is as much of the
+result as the wins. Where the closure already keeps $90\%$, there is nothing
+for influence analysis to recover, and the cost of insisting on verification
+is a real expected loss.
 
 The part we claim is narrow and we would rather state it narrowly: not the
 distinction, not counterfactual attribution, but a detector-triggered
