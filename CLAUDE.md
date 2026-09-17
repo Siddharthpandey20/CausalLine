@@ -53,6 +53,10 @@ affected part from the nearest trusted checkpoint.
   regimes, 15/15 completed) on the fixed code, with the safety, economic and
   publication-readiness analysis. **Read §9 Limitation 1 and §12 before quoting
   any number from it**
+- `docs/14-workload-variation-sanity.md` — the seed-dependent attack placement
+  that answers §9 Limitation 1, and a **three-run sanity check of it**. Those
+  three runs are infrastructure validation, **not** a result, and must never be
+  combined with the fifteen
 
 ## Repo layout
 

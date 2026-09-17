@@ -1,10 +1,10 @@
 [
   {
     "seed": 20260917,
-    "regime": "small",
+    "regime": "large",
     "status": "ok",
-    "wall_clock_s": 991.6,
+    "wall_clock_s": 961.5,
     "produced": true,
-    "tail": "=== small ===\n  ok=True task_success=False 991.1s routing={'local': 212, 'gemini': 12, 'nvidia': 16}\nwrote data\\results\\mixed56-workload-varied\\seed20260917-small.json"
+    "tail": "=== large ===\n  ok=True task_success=False 961.2s routing={'local': 288, 'gemini': 12, 'nvidia': 24}\nwrote data\\results\\mixed56-workload-varied\\seed20260917-large.json"
   }
 ]
