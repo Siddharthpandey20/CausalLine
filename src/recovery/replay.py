@@ -424,6 +424,9 @@ def replay(
         workflow=str(original.meta.get("workflow") or "chain"),
         workers=int(original.meta.get("workers") or 6),
         dispatcher=bool(original.meta.get("dispatcher") or False),
+        # The 56-agent graph, when the trace is one. Same rule as `workers`:
+        # the shape is read off the trace, never remembered by a caller.
+        topology=original.meta.get("topology") or None,
     )
     # Recorded at the one point every method passes through, so no caller has
     # to reconstruct "what was discarded" from something narrower.
