@@ -152,3 +152,47 @@ def test_the_nvidia_settings_fingerprint_cannot_carry_a_key():
     for key in keys:
         assert key not in printed
     assert "api_keys_configured" in printed
+
+
+def test_no_settings_repr_can_carry_a_key():
+    """THE HOLE THIS CLOSES ACTUALLY LEAKED, on 17-09-2026.
+
+    `test_the_nvidia_settings_fingerprint_cannot_carry_a_key` above guards the
+    path into a trace header, and that path was fine. The one nobody guarded
+    was the default dataclass `repr`: `print(settings)`, a REPL echo, an
+    f-string in a log line, or an exception whose args include the settings
+    object printed the entire key pool verbatim -- into a terminal transcript,
+    while checking the rate limiter.
+
+    The class docstring said it held "everything the client needs, minus
+    anything it must not print", which was true of every field except the one
+    that mattered. Both settings classes now mark the credential
+    `field(repr=False)`.
+    """
+    from src.common.config import Settings
+    from src.common.nvidia import NVIDIASettings
+
+    keys = ("TEST-NOT-A-REAL-KEY-0000000001", "TEST-NOT-A-REAL-KEY-0000000002")
+    shown = repr(NVIDIASettings(api_keys=keys))
+    for key in keys:
+        assert key not in shown
+    # Still useful for debugging: the non-secret fields are all there.
+    assert "model=" in shown
+
+    single = "TEST-NOT-A-REAL-KEY-0000000003"
+    shown = repr(Settings(api_key=single))
+    assert single not in shown
+    assert "model=" in shown
+
+
+def test_no_settings_repr_carries_the_real_configured_key():
+    """The same assertion against whatever is actually in `.env`."""
+    values = secrets()
+    if not values:
+        pytest.skip("no .env on this machine")
+    from src.common.config import load_settings
+    from src.common.nvidia import load_nvidia_settings
+
+    shown = repr(load_settings()) + repr(load_nvidia_settings())
+    for value in values:
+        assert value not in shown

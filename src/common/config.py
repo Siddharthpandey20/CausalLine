@@ -10,7 +10,7 @@ override a committed default without editing files. .env is gitignored; see
 """
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 DEFAULT_ENV_PATH = ".env"
@@ -39,7 +39,11 @@ class Settings:
     """Everything the LLM client needs. Frozen: a run must not change model
     or temperature halfway through, or the trace stops being reproducible."""
 
-    api_key: str
+    # `repr=False`: the default dataclass repr would print the key on any
+    # `print(settings)`, REPL echo, log line or exception carrying the object.
+    # Leaked once on 17-09-2026 from the NVIDIA settings' identical field; the
+    # same hole is closed here rather than only where it was noticed.
+    api_key: str = field(repr=False)
     model: str = DEFAULT_MODEL
     temperature: float = 0.0
     # Flash-tier models think by default. Thinking tokens are billed and are a

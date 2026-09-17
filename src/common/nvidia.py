@@ -242,7 +242,16 @@ class NVIDIASettings:
     extent a hosted model allows.
     """
 
-    api_keys: tuple[str, ...]
+    # `repr=False` IS THE POINT OF THE DOCSTRING ABOVE, AND IT WAS MISSING.
+    # The class says it holds "nothing it must not print" and then the default
+    # dataclass repr printed every key: `print(settings)`, a REPL echo, an
+    # f-string in a log line, or an exception whose args include the settings
+    # object all leaked the pool verbatim. It happened on 17-09-2026 while
+    # checking this module's rate limiter, into a terminal transcript.
+    #
+    # `redact()` exists a few lines down to keep keys out of provider error
+    # text; this keeps them out of our own.
+    api_keys: tuple[str, ...] = field(repr=False)
     model: str = "nemotron"
     temperature: float = 0.0
     max_output_tokens: int = 2048
