@@ -1,0 +1,709 @@
+% CausalLine: selective recovery after prompt injection in multi-agent LLM systems
+%
+% Compiles with any standard TeX distribution (TeX Live, MiKTeX, Overleaf).
+% Only widely available packages are used; no custom class file is required.
+%
+%   pdflatex causalline && pdflatex causalline
+%
+\documentclass[10pt,twocolumn]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\sys}{\textsc{CausalLine}}
+\newcommand{\bzero}{\textsf{B0}}
+\newcommand{\bone}{\textsf{B1}}
+\newcommand{\btwo}{\textsf{B2}}
+
+\title{\bf Exposure Is Not Influence:\\
+Selective Recovery After Prompt Injection\\
+in Multi-Agent LLM Systems}
+
+\author{%
+Anonymous Submission
+}
+
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Work on prompt injection in multi-agent LLM systems overwhelmingly addresses
+\emph{detection}. We study what happens next. Once an agent is known to be
+compromised, current practice discards that agent's output and everything
+downstream of it. In a 56-agent workflow with a broadcast hub, that is
+$85.5\%$ of the execution trace for a single poisoned record.
+
+We observe that this over-discards because it confuses two different
+relations: a source being \emph{present} in an agent's context (exposure) and
+a source \emph{changing} what the agent produced (influence). \sys{} records
+provenance during execution, establishes influence per (source, event) pair,
+propagates contamination only along influence and derivation edges, replays
+only the affected events, and---critically---\emph{verifies} the recovered run
+before accepting it, escalating to agent restart and then full restart when
+verification fails.
+
+Across 15 runs of a real 56-agent, three-provider system (50 local
+Llama-3-8B, 2 Gemini, 4 Nemotron) under three attack channels and three
+contamination regimes, \sys{} preserved strictly more correct work than the
+topology-closure baseline in 13 runs, tied in 2, and lost in 0, while
+recording \textbf{zero unsafe preservations, zero contamination escapes, and
+recall $1.0$}. On a deterministic scripted matrix (96 cells $\times$ 30
+repetitions, four detectors including a blind control), \sys{} recorded zero
+unsafe preservations in all 24 of its cells.
+
+We are equally explicit about what this costs. \sys{} is \emph{more expensive
+in tokens than every baseline we compare against}, including full restart:
+$1.6\times$--$2.4\times$ the cost of simply re-running the workflow. We
+therefore do not claim it is an optimization. We give the exact condition
+under which it is the right choice---when completed work cannot be
+re-executed, because it has side effects, external cost, or a non-deterministic
+outcome that a restart may not reproduce---and we recommend restart when it
+can. We further report two negative results that shaped the work: the
+falsification of our own ex-ante economic gate, and a provenance defect whose
+correction removed an apparent $+17.2$ point performance win that was, in
+fact, a safety failure.
+\end{abstract}
+
+\section{Introduction}
+
+A multi-agent LLM system is a pipeline of agents that read from tools, memory,
+the web, and each other. Any of those channels can carry an injected
+instruction~\cite{greshake2023,perez2022,liu2024}. A large and growing
+literature studies how to \emph{notice} this.
+
+Far less attention is paid to the step after. Suppose detection works: an
+operator learns at 14:03 that the Researcher agent consumed a poisoned page.
+What should be thrown away?
+
+The answer in practice is: that agent's output, and everything downstream of
+it. This is safe and it is enormously wasteful. It is wasteful because
+\emph{reachability is not causation}. An agent that received a poisoned value
+in its context may never have used it. A hub that broadcasts a roster of
+twelve records to twelve specialists exposes all twelve to a poisoned record,
+while each specialist uses exactly one.
+
+\paragraph{The gap, measured.}
+In our 56-agent testbed the distinction is not subtle. Table~\ref{tab:gap}
+shows the fraction of the execution trace that the topology closure discards
+against the fraction that was actually influenced.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lrrr}
+\toprule
+regime & structural closure & true influence & gap \\
+\midrule
+small  & $7.6\%$  & $6.2\%$  & $1.4$ pts \\
+medium & $60.7\%$ & $54.5\%$ & $6.2$ pts \\
+large  & $85.5\%$ & $72.4\%$ & $13.1$ pts \\
+\bottomrule
+\end{tabular}
+\caption{Exposure versus influence on a 145-event, 56-agent trace. The
+closure is what reachability-based recovery discards; true influence is what
+a canary token shows was actually affected.}
+\label{tab:gap}
+\end{table}
+
+\paragraph{Contributions.}
+\begin{enumerate}
+\itemsep2pt
+\item \textbf{A recovery method, not a detector.} \sys{} takes a detector's
+verdict as input and produces a minimal, verified recovery
+(Section~\ref{sec:design}).
+\item \textbf{A soundness discipline that survives adversarial reporting.}
+Anything not \emph{established} clean is treated as contaminated; a source an
+agent falsely claims not to have used still contaminates unless a
+counterfactual says otherwise (Section~\ref{sec:attribution}).
+\item \textbf{Verification with escalation.} A recovery is never shipped
+unverified. Failure escalates selective $\rightarrow$ agent restart
+$\rightarrow$ full restart (Section~\ref{sec:verify}).
+\item \textbf{Evaluation on a real heterogeneous system}: 56 agents, six
+stages, three inference providers, three attack channels, three contamination
+regimes, 15 runs (Section~\ref{sec:eval}).
+\item \textbf{An honest economic characterisation}, including the finding
+that \sys{} costs more tokens than full restart, and the exact condition under
+which it is nonetheless correct to use (Section~\ref{sec:econ}).
+\item \textbf{Two negative results} we consider as important as the positive
+ones (Section~\ref{sec:negative}).
+\end{enumerate}
+
+\section{Problem Setting}
+
+\subsection{Threat model}
+
+An adversary controls the content of at least one \emph{source}: a web page a
+tool returns, a value stored in shared memory, or a message from one agent to
+another. The adversary cannot modify our code, the trace log, or the recovery
+machinery. We assume an external detector eventually identifies some set of
+malicious sources; \sys{} consumes that verdict and does not produce it. In
+the evaluation we use an oracle detector in the real-system experiments---so
+that what we measure is recovery quality and not detection quality---and four
+detectors of varying strength, including a blind control that flags nothing,
+in the scripted experiments.
+
+\subsection{Vocabulary}
+
+We use these terms precisely throughout.
+
+\begin{description}
+\itemsep1pt
+\item[event] one recorded operation: a model call, a tool call, a tool
+response, a memory read or write, an inter-agent message.
+\item[source] an incoming unit of information, with an identifier.
+\item[exposure] a source was present in an agent's context.
+\item[influence] a source demonstrably changed an event's output.
+\item[contaminated] influenced, directly or transitively, by a malicious
+source.
+\item[unsafe preservation] recovery kept an event that was in fact
+contaminated. This is the dangerous error.
+\end{description}
+
+\subsection{Baselines}
+
+\begin{description}
+\itemsep1pt
+\item[\bzero{} full restart] discard everything, re-run. Preserves $0\%$ by
+construction. Always safe.
+\item[\bone{} agent-level taint] discard every event produced by an agent that
+touched a flagged source, and everything downstream.
+\item[\btwo{} topology closure] discard everything reachable in the call graph
+from where a flagged source entered. This is the strongest baseline and the
+one we compare against throughout.
+\end{description}
+
+\section{Design}
+\label{sec:design}
+
+\sys{} has five stages. Only the first runs during the workflow; the rest run
+after a detector fires.
+
+\subsection{Execution-time provenance}
+
+Every event is logged with its agent, its parents, the identifiers of every
+source in its context (\emph{exposure}, whether or not it was used), and a
+content-addressed reference to what it produced. Prompts and outputs are
+stored so that a counterfactual can be re-issued later.
+
+Two record kinds are written without any model in the loop, because the
+answer is a property of the code path rather than an estimate: a
+\emph{structural} record for operations our own code computes, and a
+\emph{carrier} record for an event whose output is a copy of an earlier
+event's, which inherits that event's verdicts rather than asserting its own.
+
+\paragraph{Ingestion edges.}
+An event that \emph{retrieves} a source stores that source's text in its own
+output. The source does not exist when the event is logged, so it is not in
+that event's exposures, so no verdict is ever written for the pair. We record
+an explicit ingestion edge from each materialised source back to the event
+that materialised it. Section~\ref{sec:negative} describes what happened
+before we did.
+
+\subsection{Influence attribution}
+\label{sec:attribution}
+
+For each (source, event) pair the estimator produces one of: \emph{influenced},
+\emph{clean}, or \emph{unchecked}. Two mechanisms are combined.
+
+\textbf{Self-report} asks the agent which of its inputs changed its output. It
+is cheap and it is not trusted: a self-report \emph{positive} is accepted
+(claiming to have used something is not a claim that buys the agent anything),
+while a self-report \emph{negative} is only a hypothesis.
+
+\textbf{Counterfactual replay} re-issues the event's stored prompt with the
+source redacted and compares outputs. This is evidence, and it is what clears
+a pair.
+
+The asymmetry is the safety property. A \emph{tainted} verdict grows the
+recovery region and is therefore sound to accept on weak evidence; a
+\emph{clean} verdict shrinks it and requires strong evidence. Anything
+unchecked is treated as contaminated.
+
+Leave-one-out is only valid when redaction actually removes the information.
+We check \emph{removability}: if the same fact survives redaction through
+another route, the check is void and the pair stays contaminated.
+
+\subsection{Contamination propagation}
+
+From the flagged sources, contamination walks exactly three relations:
+influence (source $\rightarrow$ event), derivation (event $\rightarrow$ the
+source wrapping its output for a downstream agent), and ingestion (source
+$\rightarrow$ the event that retrieved it).
+
+It never walks parent edges. Parent edges are execution history, not
+causation; walking them transitively reproduces \btwo{} exactly. A method that
+silently reproduces its own baseline has no result left to report, and the
+failure is invisible because the numbers still come out.
+
+\subsection{Recovery planning and selective replay}
+
+The planner computes the invalidation set and the nearest trusted checkpoint
+per agent. Replay re-executes only invalidated events; every other event is
+spliced from its logged output, byte for byte. Two invariants are asserted:
+every spliced event's output matches its original log entry, and no model call
+is issued for an event outside the invalidation set. Flagged sources are
+redacted from re-issued prompts, and a redaction that fails aborts the
+recovery rather than producing a run that reports a removal that did not
+happen.
+
+\subsection{Verification and escalation}
+\label{sec:verify}
+
+A recovered run is checked before it is accepted: the task-level outcome must
+hold, no live memory entry may still point at an invalidated write, and no
+flagged source may remain in a re-issued prompt. On failure, recovery escalates:
+
+\[
+\text{selective} \rightarrow \text{agent restart} \rightarrow \text{full restart}
+\]
+
+Restart is therefore never the primary action and always the guaranteed
+fallback. This matters for the claims we can make: \sys{} cannot be worse than
+restart in \emph{outcome}, only in \emph{cost}.
+
+\section{Implementation}
+
+\sys{} is roughly 9{,}000 lines of Python with no dependencies outside the
+standard library for the core, and is instrumented to log every token it
+spends against the purpose it spent it on. The evaluation harness supports two
+modes that we never mix, because their ground truth is different in kind:
+
+\textbf{Scripted mode} drives the pipeline with a deterministic client whose
+usage rule we wrote, so ground truth is known \emph{by construction} for every
+(source, event) pair. This is the only mode in which a per-pair accuracy
+number is meaningful.
+
+\textbf{Real-LLM mode} runs on hosted and local models. Ground truth is
+\emph{observed}: the injected payload instructs the agent to emit a specific
+wrong value, and that value is a canary. If it appears in an output, that
+output was influenced.
+
+\section{Evaluation}
+\label{sec:eval}
+
+\subsection{The 56-agent testbed}
+
+Prior evaluations in this line of work use pipelines of four or five agents on
+one model. That cannot support a claim about a deployed system. We therefore
+built a 56-agent workflow, summarised in Table~\ref{tab:topology}, spanning
+three inference providers.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{llr}
+\toprule
+stage & role & agents \\
+\midrule
+A & acquisition (each fetches its own record) & 12 \\
+B & normalisation (memory + a block of A)     & 10 \\
+C & \textbf{hub} (fan-in over B, broadcasts)  & 1 \\
+C & specialists (hub roster + one B block)    & 12 \\
+D & verifiers (a block of specialists)        & 10 \\
+E & reviewers (a block of D)                  & 8 \\
+F & synthesis, audit, executor                & 3 \\
+\midrule
+  & \textbf{total} & \textbf{56} \\
+\bottomrule
+\end{tabular}
+\caption{The testbed workflow: six stages, 145 events. Providers: 50 agents
+on local Llama-3-8B, 2 on Gemini-3.8-Flash (the two fan-in points), 4 on
+Nemotron.}
+\label{tab:topology}
+\end{table}
+
+The hub is the reason the topology exists. It reproduces every record it
+receives and every specialist reads that roster, so a poisoned source reaching
+the hub is \emph{exposed} to the entire downstream trace while each specialist
+\emph{uses} exactly one record. If fine-grained attribution cannot beat a
+reachability closure here, it cannot anywhere.
+
+Provider placement is not decoration: the web-channel contamination path runs
+local $\rightarrow$ Gemini $\rightarrow$ Nemotron $\rightarrow$ local, so
+every hop is a different model with its own tokenizer and its own
+instruction-following behaviour.
+
+\subsection{Attack channels}
+
+Three channels, chosen because they propagate differently:
+
+\begin{enumerate}
+\itemsep1pt
+\item \textbf{web/tool}: a note beside a fetched record. Arrives through a
+tool call, so it has an origin event.
+\item \textbf{poisoned memory}: a policy entry a normaliser reads. \emph{A
+memory entry has no call-graph edge back to whoever wrote it}, so this is the
+case where a cross-agent flow exists without a topology edge.
+\item \textbf{inter-agent message}: planted into a verifier's context with no
+derivation link---it is not the output of any event in the run.
+\end{enumerate}
+
+\subsection{Contamination regimes}
+
+Three regimes, defined by where the attack enters, with the resulting
+contaminated fraction \emph{measured} from each trace rather than configured.
+
+\subsection{Protocol}
+
+Five seeds $\times$ three regimes $=15$ runs, all completed. The architecture,
+provider assignment, payloads, regime definitions, baselines, \sys{}
+configuration, metrics and detector were fixed before the first run and not
+touched afterwards. All four methods are scored on the \emph{same} trace under
+the \emph{same} attack in each run, so the comparison is paired.
+
+\section{Results}
+
+\subsection{Preserved work}
+
+\begin{table*}[t]
+\centering
+\small
+\begin{tabular}{lrrrrrrrrr}
+\toprule
+regime & $f_{\text{true}}$ & \bzero{} & \bone{} & \btwo{} & \sys{} &
+$\Delta$ vs \btwo{} & sd & win/tie/loss & unsafe \\
+\midrule
+small  & $6.2\%$  & $0.0\%$ & $92.4\%$ & $92.4\%$ & $\mathbf{93.5\%}$ & $+1.10$ & $0.62$ & 4/1/0 & 0 \\
+medium & $54.5\%$ & $0.0\%$ & $40.0\%$ & $39.3\%$ & $\mathbf{45.5\%}$ & $+6.21$ & $0.00$ & 5/0/0 & 0 \\
+large  & $72.4\%$ & $0.0\%$ & $15.2\%$ & $14.5\%$ & $\mathbf{25.0\%}$ & $+10.48$ & $5.86$ & 4/1/0 & 0 \\
+\midrule
+\multicolumn{6}{l}{\textbf{aggregate} (15 runs)} & $\mathbf{+5.93}$ & $5.07$ & \textbf{13/2/0} & \textbf{0} \\
+\bottomrule
+\end{tabular}
+\caption{Work preserved, 56-agent testbed, five seeds per regime. $\Delta$ is
+the \emph{paired} per-run difference in percentage points. \sys{} never lost
+to \btwo{} in any run.}
+\label{tab:main}
+\end{table*}
+
+Table~\ref{tab:main} is the main result. \sys{} preserved more correct work
+than \btwo{} in 13 of 15 runs, tied in 2, lost in 0. The advantage grows with
+the contaminated fraction, which is the direction the method predicts: the
+more a reachability closure over-discards, the more there is to recover.
+
+The two ties are informative and not noise. In both, selective recovery failed
+verification and escalated to agent restart, at which point \sys{}'s discard
+set becomes \btwo{}'s by construction. The ladder gives up the gain rather
+than ship an uncertified recovery.
+
+\subsection{Safety}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lrrr}
+\toprule
+ & \multicolumn{3}{c}{regime} \\
+\cmidrule(lr){2-4}
+quantity & small & medium & large \\
+\midrule
+unsafe preservations (all methods) & 0 & 0 & 0 \\
+contamination escapes from closure & 0 & 0 & 0 \\
+payload landed                     & 5/5 & 5/5 & 5/5 \\
+recall                             & 1.0 & 1.0 & 1.0 \\
+final task correct                 & 5/5 & 5/5 & 5/5 \\
+degraded agents                    & 0 & 0 & 0 \\
+\bottomrule
+\end{tabular}
+\caption{Safety, 15 runs. Every attack landed, so no zero here is arithmetic.}
+\label{tab:safety}
+\end{table}
+
+Table~\ref{tab:safety} is the result we would retract the paper over. Across
+all 15 runs and all four methods there were zero unsafe preservations.
+Contamination never escaped the structural closure---an invariant the
+comparison against \btwo{} depends on, tested here for the first time on a
+topology with a broadcast hub and a memory channel that has no call-graph edge
+back to its writer.
+
+On the scripted matrix (96 cells, 30 repetitions, four detectors including a
+blind control that flags nothing, and an adversarial self-reporter that lies
+about which source moved its output), \sys{} recorded unsafe preservations in
+\textbf{0 of its 24 cells}.
+
+\subsection{Scripted matrix}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{llrrr}
+\toprule
+scenario & variant & \btwo{} & \bone{} & \sys{} \\
+\midrule
+A web       & influencing   & $15.8\%$ & $21.1\%$ & $\mathbf{38.2\%}$ \\
+A web       & exposed-only  & $15.8\%$ & $21.1\%$ & $\mathbf{90.4\%}$ \\
+B memory    & influencing   & $57.9\%$ & $57.9\%$ & $57.9\%$ \\
+B memory    & exposed-only  & $57.9\%$ & $57.9\%$ & $\mathbf{90.4\%}$ \\
+C message   & influencing   & $15.8\%$ & $52.6\%$ & $\mathbf{57.9\%}$ \\
+C message   & exposed-only  & $15.8\%$ & $52.6\%$ & $\mathbf{91.2\%}$ \\
+\bottomrule
+\end{tabular}
+\caption{Work preserved, scripted mode, oracle detector, 30 repetitions.
+Exposed-only variants plant a flagged source that instructs nothing---the case
+where reachability baselines discard everything for nothing.}
+\label{tab:scripted}
+\end{table}
+
+Table~\ref{tab:scripted} separates the two situations an operator faces. On
+\emph{influencing} runs the payload really did change outputs and there is
+genuinely less to save; \sys{} gains between $0$ and $22$ points. On
+\emph{exposed-only} runs a flagged source was present but unused, and
+reachability baselines discard $42$--$75$ points of work for nothing.
+
+We draw attention to the one cell where \sys{} gains nothing: scenario B
+influencing, where all three methods preserve $57.9\%$. We report it because
+an earlier version of this work reported $63.2\%$ there, and the difference
+was a defect (Section~\ref{sec:negative}).
+
+\section{Economics: When This Is Worth It}
+\label{sec:econ}
+
+We now state the cost plainly, because the honest answer is not flattering and
+a reader should not have to derive it.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lrrrr}
+\toprule
+regime & \btwo{} & \sys{} analysis & \sys{} total & vs \bzero{} \\
+\midrule
+small  & $1{,}238$ & $16{,}291$ & $17{,}374$ & $1.62\times$ \\
+medium & $7{,}755$ & $15{,}766$ & $23{,}605$ & $2.21\times$ \\
+large  & $9{,}272$ & $15{,}810$ & $25{,}082$ & $2.43\times$ \\
+\bottomrule
+\end{tabular}
+\caption{Recovery cost in tokens, mean per run. \bzero{} (full restart) costs
+$10{,}328$--$10{,}755$. \sys{} is more expensive than every baseline in every
+regime.}
+\label{tab:cost}
+\end{table}
+
+\subsection{\sys{} is not a token optimization}
+
+Table~\ref{tab:cost} is unambiguous. \sys{} costs $2.7\times$--$14.0\times$
+\btwo{} and $1.6\times$--$2.4\times$ a full restart. \textbf{If the only thing
+that matters is tokens, and the workflow can simply be re-run, then restart is
+the correct choice and our method is not.} We say so because any paper that
+buries this invites the reviewer to find it.
+
+The dominant term is attribution, not replay: analysis is $63\%$--$94\%$ of
+\sys{}'s cost. Prior measurement on this system found that $68\%$ of
+self-report calls land on events outside the contaminated closure and provably
+cannot change the outcome; they are not skippable in the current design
+because identifying them requires deferring attribution until after detection,
+and deferral changes what the trace records. The overhead is therefore known
+to be reducible in principle and unreduced in practice, which bounds how much
+of Table~\ref{tab:cost} is intrinsic.
+
+\subsection{When it is nonetheless the right choice}
+
+The comparison in Table~\ref{tab:cost} assumes the preserved work is worth
+exactly what it cost in tokens to produce. That assumption fails in three
+common situations, and in those situations restart is not the cheap option but
+the wrong one.
+
+\paragraph{1. Work with side effects cannot be re-executed.}
+An agent that sent a message, wrote to an external store, placed an order or
+called a paid API has changed the world. ``Restart'' does not undo that; it
+does it again. Preserving the clean $25\%$--$94\%$ of such a trace is not an
+optimization, it is the only correct action. Our measurements do not quantify
+this---our testbed's work is replayable by construction, which is what makes
+it measurable---but it is the motivating deployment and the condition is
+checkable statically.
+
+\paragraph{2. Re-execution is not idempotent.}
+LLM outputs are non-deterministic. A restart does not reproduce the original
+run; it produces a different one that may be worse. In our frozen validation a
+full restart \emph{failed the task} in one run where selective recovery
+succeeded. Restart guarantees safety, not quality.
+
+\paragraph{3. Latency and rate limits, not tokens, are the binding resource.}
+In our runs, recovery wall-clock was dominated by external rate limiting, not
+by token count. A method that re-executes fewer agents finishes sooner even
+when it spends more tokens.
+
+\subsection{A decision rule}
+
+Let $N$ be the cost of re-executing the workflow, $A+R$ the cost of analysis
+plus selective replay, $p$ the fraction of work preserved, and $V$ the value
+per unit of preserved work. \sys{} is preferable to restart when
+\[
+p \cdot V \;>\; (A + R) - N .
+\]
+With our measured figures, the large regime requires $p=25.0\%$ of the trace
+to be worth more than $\approx 14{,}750$ tokens, i.e.\ roughly $1.35$
+workflow executions. Purely in tokens that is never satisfied. It is
+satisfied whenever the preserved work is worth more than the tokens that
+produced it---which is exactly the case when it has side effects, external
+cost, or a quality that a re-run may not reproduce.
+
+We consider stating this condition, rather than asserting a universal win, to
+be part of the contribution.
+
+\section{Negative Results}
+\label{sec:negative}
+
+Two results shaped this work and we report them because they are load-bearing.
+
+\subsection{An ex-ante economic gate, falsified}
+
+We built a gate to decide \emph{before} investigating whether investigation
+could pay, of the form $\hat{A}/N + f_{\text{struct}} < 1$. On the 56-agent
+testbed it was wrong in all three regimes, in both directions: it advised
+INVESTIGATE where investigation bought nothing (spending $16{,}676$ tokens to
+reach the same outcome a free restart reaches), and RESTART twice where
+selective recovery preserved work a restart would have destroyed---including
+one case where the restart failed the task and the selective recovery passed
+it. Its estimator was off by $6.7\times$ on one regime.
+
+The cause is that the scaling constant relating estimated to actual analysis
+cost is a property of the client and prompt structure, not of the algorithm;
+we measured values of $0.431$, $0.547$ and $1.781$ on three workloads of the
+same system. We abandoned the gate rather than tune it, and the paper does not
+depend on it.
+
+\subsection{A safety defect that looked like a win}
+
+Our contamination walk traversed influence and derivation edges. It did not
+traverse \emph{ingestion}: the event that retrieves a source stores that
+source's text in its own output, but the source does not exist when the event
+is logged, so it is never in that event's exposures, so no verdict was ever
+written for the pair and the walk never considered it. The event sat outside
+the recovery region \emph{holding the payload}.
+
+The verdict was not wrong; it was absent---which is worse, because every
+consumer looks for a wrong verdict and none looks for a missing one.
+
+Before the fix, the large regime read \sys{} $31.7\%$ preserved against
+\btwo{}'s $14.5\%$: a $+17.2$ point win, with \textbf{5 unsafe
+preservations}. After the fix it read $14.5\%$ with $0$. \emph{The entire
+margin was the defect.} Had we stopped at that run, we would have published a
+safety failure as a performance gain.
+
+The general lesson is that preserved work and unsafe preservation are not
+independent quantities: any mechanism that preserves more is mechanically a
+candidate for preserving something it should not. The two must be read
+together, and a gain accompanied by a non-zero unsafe count is not a gain. The
+fix cost us $4.6$--$5.3$ points across ten scripted cells and one headline
+claim, and we report the corrected numbers throughout.
+
+\section{Limitations}
+
+\begin{enumerate}
+\itemsep2pt
+\item \textbf{Three design points, replicated.} The five seeds per regime vary
+model sampling, not the attack placement: the contaminated fraction is
+identical across seeds within a regime, and the medium regime's paired
+difference has standard deviation $0.00$. The effective sample for the
+structural comparison is one workload per regime, confirmed five times. We
+have since implemented seed-dependent placement and verified it produces five
+distinct workloads per regime, but the campaign reported here is the fixed one.
+\item \textbf{One topology.} Nothing here says how the gain behaves as hub
+fan-out, stage depth or provider mix change.
+\item \textbf{Oracle detector} in the real-system experiments. We measure
+recovery after detection and say nothing about detection.
+\item \textbf{The task is a copy task}, chosen so that capability failures of
+a small local model do not masquerade as recovery failures. Nothing here shows
+recovery works on hard tasks.
+\item \textbf{No significance testing.} Five seeds per regime supports
+descriptive statistics and a sign count, not a $p$-value.
+\item \textbf{Cost is measured in tokens}, not money or latency, and
+attribution is routed to the same model that produced the output; a cheaper
+attribution model would change the economics and is untested.
+\end{enumerate}
+
+\section{Related Work}
+
+Work on indirect prompt injection establishes the threat and its
+channels~\cite{greshake2023,liu2024}, and a substantial literature addresses
+detection and defence at the prompt or model
+level~\cite{perez2022,chen2024}. Our work is downstream of all of it: we
+assume detection and ask what to discard.
+
+Provenance and taint tracking have a long history in systems
+security~\cite{newsome2005,king2003}, where the standard discipline is
+conservative reachability---precisely the \btwo{} baseline. The distinguishing
+difficulty in the LLM setting is that presence in a context window is not
+usage, and usage is not observable from the execution trace alone; it must be
+established by asking the model or by counterfactual re-execution. The
+asymmetric treatment of positive and negative evidence in
+Section~\ref{sec:attribution} is our response to that.
+
+Checkpoint-and-replay is standard in fault-tolerant
+computing~\cite{elnozahy2002}; what differs here is that replay is not
+required to be deterministic. Recovery never depends on a model reproducing a
+prior output---it re-invokes only invalidated events and reuses logged bytes
+everywhere else.
+
+\section{Conclusion}
+
+Exposure is not influence, and in a multi-agent system with any fan-out the
+difference is large enough to matter: $13.1$ points of a 145-event trace in
+our heaviest regime. \sys{} exploits that difference to preserve more correct
+work than a reachability closure---in 13 of 15 runs, never fewer, with zero
+unsafe preservations and recall $1.0$.
+
+It is not cheaper. It costs $1.6\times$--$2.4\times$ a full restart in tokens,
+and where work is freely re-executable we recommend restarting. Its value is
+in the case where completed work cannot simply be redone, and there the
+question is not whether recovery is worth two workflow executions but whether
+the alternative---doing the side effects again---is acceptable at all.
+
+We also report that our own ex-ante economic gate was falsified, and that a
+provenance defect once presented itself to us as a $+17.2$ point improvement
+while in fact preserving five contaminated events. We think a recovery paper
+that cannot show it looked for that failure has not earned the reader's trust
+in its safety numbers.
+
+\begin{thebibliography}{9}
+\small
+\bibitem{greshake2023}
+K.~Greshake et al.
+\newblock Not what you've signed up for: Compromising real-world LLM-integrated
+applications with indirect prompt injection.
+\newblock In {\em AISec}, 2023.
+
+\bibitem{perez2022}
+F.~Perez and I.~Ribeiro.
+\newblock Ignore previous prompt: Attack techniques for language models.
+\newblock In {\em NeurIPS ML Safety Workshop}, 2022.
+
+\bibitem{liu2024}
+Y.~Liu et al.
+\newblock Formalizing and benchmarking prompt injection attacks and defenses.
+\newblock In {\em USENIX Security}, 2024.
+
+\bibitem{chen2024}
+S.~Chen et al.
+\newblock Defending against prompt injection with structured queries.
+\newblock In {\em USENIX Security}, 2024.
+
+\bibitem{newsome2005}
+J.~Newsome and D.~Song.
+\newblock Dynamic taint analysis for automatic detection, analysis, and
+signature generation of exploits on commodity software.
+\newblock In {\em NDSS}, 2005.
+
+\bibitem{king2003}
+S.~T. King and P.~M. Chen.
+\newblock Backtracking intrusions.
+\newblock In {\em SOSP}, 2003.
+
+\bibitem{elnozahy2002}
+E.~N. Elnozahy, L.~Alvisi, Y.-M. Wang, and D.~B. Johnson.
+\newblock A survey of rollback-recovery protocols in message-passing systems.
+\newblock {\em ACM Computing Surveys}, 34(3):375--408, 2002.
+\end{thebibliography}
+
+\end{document}
