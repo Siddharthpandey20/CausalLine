@@ -219,6 +219,30 @@ def _log_call(log: TraceLogger, agent: str, parents: list[str] | None,
     return event
 
 
+def _late_arrival(log: TraceLogger, after: Any, source_id: str) -> Any:
+    """A second, later event in the same agent that genuinely EXPOSES `source`.
+
+    SECOND INSTANCE OF THE SAME BUG, caught by the test that asserts a source
+    can only influence an event it was present in. The `deep` patterns used to
+    append the source to the bookkeeping dict and plant influence on the
+    ALREADY-LOGGED analyst event, whose recorded exposures did not contain it.
+    The trace then said the source was never there while the truth said it had
+    influenced -- an unobservable cause, which no gate could be expected to
+    find and which would have scored as every gate's failure.
+    """
+    fetch = log.log_event(after.agent_id, "tool_response", parents=[after.id],
+                          tool_id="fetch", exposures=[],
+                          output_ref=log.put_content("late", kind="output"))
+    event = log.log_event(after.agent_id, "agent_output", parents=[fetch.id],
+                          exposures=[source_id],
+                          output_ref=log.put_content("late out", kind="output"))
+    _EXPOSURES[event.id] = [source_id]
+    log.log_usage("pipeline", model="sim", prompt_tokens=EVENT_COST - 10,
+                  output_tokens=10, total_tokens=EVENT_COST,
+                  event_id_=event.id, agent_id=after.agent_id)
+    return event
+
+
 def _fetch(log: TraceLogger, agent: str, label: str, malicious: bool,
            parents: list[str] | None = None) -> tuple[Any, Any]:
     """An agent retrieves a source ITSELF, so the entry event is inside it.
@@ -335,6 +359,21 @@ def build(
             raise ValueError(f"unknown topology {topology!r}")
 
         def influence(source: str, event: Any, visible: bool = True) -> None:
+            """Plant a causal edge -- but only where one is physically possible.
+
+            BUG FIXED HERE, AND IT IS NOT COSMETIC. The `all` pattern used to
+            plant `bad -> hub` for EVERY hub, including hubs that never had the
+            planted source in their exposures. A source cannot influence an
+            event it was never present in, and the impossible edge made
+            `true_region` reach a subtree the contamination closure correctly
+            excluded -- so `f_true` (1.000) exceeded `f_structural` (0.502) and
+            the structural bound looked unsound when it was not.
+
+            Found while testing whether the bound is sound, which is exactly
+            the kind of claim a bug like this would have corrupted.
+            """
+            if source not in _EXPOSURES.get(event.id, []):
+                return
             influences.add((source, event.id))
             if visible:
                 spans.add((source, event.id))
@@ -394,13 +433,8 @@ def build(
             # sits further down, behind a non-removable pair no probe can see.
             # H2 was never designed against this.
             if analyst_events:
-                last = analyst_events[-1]
-                _EXPOSURES.setdefault(last.id, []).append(bad_id)
-                log.log_event(
-                    last.agent_id, "tool_response", parents=[last.id],
-                    tool_id="fetch", exposures=[bad_id],
-                    output_ref=log.put_content("late", kind="output"))
-                influence(bad_id, last, visible=False)
+                late = _late_arrival(log, analyst_events[-1], bad_id)
+                influence(bad_id, late, visible=False)
         elif pattern == "deep":
             # A SECOND entry point, far from the hub. The planted source reaches
             # the hub (no influence there) AND the last branch (real influence).
@@ -409,13 +443,8 @@ def build(
             # is genuinely contaminated by a route the hub does not dominate.
             # This is the falsification case for any single-bottleneck probe.
             if analyst_events:
-                last = analyst_events[-1]
-                _EXPOSURES.setdefault(last.id, []).append(bad_id)
-                log.log_event(
-                    last.agent_id, "tool_response", parents=[last.id],
-                    tool_id="fetch", exposures=[bad_id],
-                    output_ref=log.put_content("late", kind="output"))
-                influence(bad_id, last)
+                late = _late_arrival(log, analyst_events[-1], bad_id)
+                influence(bad_id, late)
         else:
             raise ValueError(f"unknown pattern {pattern!r}")
 

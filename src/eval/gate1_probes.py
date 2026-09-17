@@ -93,6 +93,26 @@ def gate_structural(workflow: Workflow, oracle: ProbeOracle) -> bool:
     return (a_hat(workflow) / n + _f_structural(workflow)) <= 1.0
 
 
+def make_cost_only_gate(f_assumed: float) -> Gate:
+    """H_A -- the NULL HYPOTHESIS nobody has tested: ignore `f` entirely.
+
+    Investigate iff `Ahat/N + f_assumed <= 1`, with `f_assumed` a fixed
+    constant rather than anything read off the trace. It uses no topology, no
+    closure, no probe.
+
+    This is the control every previous phase was missing. If it matches
+    G_STRUCT, then the structural closure -- the thing three hypotheses have
+    been built on -- carries no decision-relevant information, and that is a
+    result about the whole line of work rather than about any one gate.
+    """
+
+    def gate(workflow: Workflow, oracle: ProbeOracle) -> bool:
+        n = max(1, workflow.n_restart)
+        return (a_hat(workflow) / n + f_assumed) <= 1.0
+
+    return gate
+
+
 # --- H1: bottleneck probing ---------------------------------------------------
 
 

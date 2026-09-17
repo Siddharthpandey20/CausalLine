@@ -242,5 +242,102 @@ class TestH2IsFalsifiedByComparatorBlindness(unittest.TestCase):
         self.assertEqual(self.w.f_true, 1.0)
         self.assertEqual(len(self.w.true_region()), 3)
 
+
+class TestTheSoundnessProperty(unittest.TestCase):
+    """Both estimates are upper bounds, and that has a sharp consequence.
+
+        f_structural >= f_true   and   A_hat >= A
+        =>  A_hat/N + f_structural <= 1  implies  A/N + f_true <= 1
+
+    So a gate built on them can be wrong in ONE direction only: it can restart
+    when it should have investigated. Its INVESTIGATE decisions are correct.
+    """
+
+    def _family(self, tmp):
+        patterns = ("none", "one", "all", "redundant", "deep", "semantic_one",
+                    "none_blocked", "deep_hidden", "comparator_blind",
+                    "hub_tainted_local")
+        out = []
+        for topology in ("hub", "fanout", "chain", "fanin", "multihub"):
+            for pattern in patterns:
+                for k in (4, 8):
+                    try:
+                        out.append(build(f"{topology}-{pattern}-{k}", topology,
+                                         pattern, k, Path(tmp),
+                                         hubs=2 if topology == "multihub" else 1))
+                    except ValueError:
+                        pass
+        return out
+
+    def test_the_structural_bound_never_understates_the_truth(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            for w in self._family(tmp):
+                with self.subTest(case=w.name):
+                    self.assertGreaterEqual(w.f_structural, w.f_true - 1e-9)
+
+    def test_the_cost_estimate_never_understates_the_investigation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            for w in self._family(tmp):
+                with self.subTest(case=w.name):
+                    spent, _ = full_investigation(w)
+                    self.assertGreaterEqual(a_hat(w), spent - 1e-9)
+
+    def test_a_source_cannot_influence_an_event_it_was_never_in(self) -> None:
+        """The simulator bug this property exposed. The `all` pattern planted
+        `bad -> hub` for every hub, including hubs that never had the planted
+        source in their exposures, which made `f_true` (1.000) exceed
+        `f_structural` (0.502) and the sound bound look unsound."""
+        with tempfile.TemporaryDirectory() as tmp:
+            for w in self._family(tmp):
+                exposures = {e.id: set(e.exposures) for e in w.trace.events}
+                for source, event in w.truth.influences:
+                    with self.subTest(case=w.name, pair=(source, event)):
+                        self.assertIn(source, exposures.get(event, set()))
+
+
+class TestTheTwoTermsAreOneQuantity(unittest.TestCase):
+    """Why every gate in this line behaved the same way.
+
+    `A_hat` counts exposure pairs INSIDE the contamination closure;
+    `f_structural` measures the cost OF that closure. The decision rule adds
+    them as if they were independent evidence. They are not: measured
+    correlation 1.00 in the simulator and 0.9921 across 50 real traces. The
+    rule has roughly one degree of freedom, and a single constant reproduces
+    it exactly.
+    """
+
+    def test_the_two_terms_are_near_perfectly_correlated(self) -> None:
+        import statistics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = [build(f"h-{p}-{k}", "hub", p, k, Path(tmp))
+                  for p in ("none", "one", "all", "redundant")
+                  for k in (4, 8, 16)]
+            from src.eval.gate1_probes import _f_structural
+
+            xs = [a_hat(w) / max(1, w.n_restart) for w in ws]
+            ys = [_f_structural(w) for w in ws]
+            if len(set(xs)) < 2 or len(set(ys)) < 2:
+                self.skipTest("degenerate family: one term has no variance")
+            self.assertGreater(abs(statistics.correlation(xs, ys)), 0.95)
+
+    def test_a_constant_reproduces_the_structural_gate_exactly(self) -> None:
+        """If this ever stops holding, the closure has started carrying
+        decision-relevant information it did not carry here."""
+        from src.eval.gate1_probes import make_cost_only_gate
+
+        constant = make_cost_only_gate(0.50)
+        with tempfile.TemporaryDirectory() as tmp:
+            for topology in ("hub", "fanout", "chain", "fanin"):
+                for pattern in ("none", "one", "all", "redundant"):
+                    for k in (4, 8, 16):
+                        w = build(f"{topology}-{pattern}-{k}", topology,
+                                  pattern, k, Path(tmp))
+                        with self.subTest(case=w.name):
+                            self.assertEqual(
+                                gate_structural(w, ProbeOracle(w)),
+                                constant(w, ProbeOracle(w)),
+                            )
+
 if __name__ == "__main__":
     unittest.main()
