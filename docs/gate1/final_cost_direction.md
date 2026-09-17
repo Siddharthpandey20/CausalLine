@@ -146,6 +146,43 @@ unlock a saving that is **already proven not to affect the outcome**.
 
 ### 6.1 Make the pipeline's provenance records independent of attribution
 
+> **CORRECTED 17-09-2026 — THIS SECTION'S PREMISE IS FALSE. No refactor is
+> needed; execution-time provenance is already attribution-independent.**
+>
+> The "25 vs 18 structural records" below was a measurement error. `method=
+> "structural"` is worn by two different record kinds, and I counted them
+> together:
+>
+> * **structural** (`record_structural`) — read off the code path. Execution
+>   facts. Measured **16 = 16, identical** with and without attribution.
+> * **carrier** (`record_carrier`) — a *pointer to an upstream verdict*, not a
+>   verdict of its own (D-067). Attribution-derived by design, and already
+>   re-resolved at read time by `src/provenance/carriers.py`. These are the
+>   records that differed, and they are supposed to.
+>
+> The "21 vs 3 influence edges" is likewise attribution output by definition.
+>
+> Verified across chain and fan-out topologies, all three channels (web,
+> memory, agent_message), benign and attacked:
+> `tests/test_provenance_independence.py`, and documented in
+> `docs/02-architecture.md`.
+>
+> A second apparent difference — stored prompt/output content — is a **scripted
+> testbed artefact**: `ScriptedClient._answer_self_report` answers truthfully by
+> looking the audited call up in its own `by_prompt` table, so the attributor
+> must be handed the pipeline's client instance. Separating them makes the
+> harness fabricate and degrades recovery on every seed tested. A real model
+> shares an endpoint, not a state table.
+>
+> **Consequence for the rest of this document:** §3's claim that "deferral
+> changes the pipeline's own provenance records" is wrong in its stated
+> mechanism. Deferral changes *carrier* records and *influence edges*, both
+> attribution-derived. Why closure-scoped deferral measured 77.2% against the
+> baseline's 78.9% is therefore **still unexplained** and is the open question,
+> not the settled one.
+
+
+
 Today, installing an attributor changes the structural records the pipeline
 writes (25 vs 18) and the influence edges (21 vs 3). If execution-time recording
 were fixed — the pipeline always writing the same structural facts, with

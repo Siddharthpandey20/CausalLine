@@ -153,3 +153,59 @@ and report it. If it is bad, that measurement is itself a paper finding.
 
 Live in `src/common/`. Agreed in week 1, then frozen. Everything else
 depends on them, so a change here breaks all three people at once.
+
+## Execution-time provenance is independent of attribution
+
+**Execution-time provenance capture is independent of attribution. Attribution
+is a consumer of recorded execution facts and may be run inline or post-hoc.**
+
+Verified across chain and fan-out topologies, all three attack channels (web,
+memory, agent_message), benign and attacked, with attribution installed and
+absent: `tests/test_provenance_independence.py`.
+
+### Execution facts — identical whether or not attribution runs
+
+| field | written by |
+|---|---|
+| event id, kind, agent id, ordering | the pipeline, as it performs the operation |
+| `parents` | the pipeline |
+| `exposures` | the pipeline |
+| `tool_id` | the pipeline |
+| source id, kind, `derived_from`, `origin_event` | the pipeline |
+| **structural** check records (`record_structural`) | the pipeline, read off the code path |
+
+### Attribution-derived — permitted to differ, and expected to
+
+| field | written by | note |
+|---|---|---|
+| influence edges | the attributor / `refine_for_verdict` | the estimator's output |
+| `self_report` check records | the attributor | a claim, not evidence |
+| `counterfactual` check records | the estimator | evidence |
+| `assumed` check records | the fallback | never a clearance |
+| **carrier** check records (`record_carrier`) | the pipeline, but **inheriting an upstream verdict** | see below |
+
+### The one that looks like an execution fact and is not
+
+`record_carrier` writes records with `method="structural"`, but a carrier record
+is **a pointer to an upstream verdict, not a verdict of its own** (D-067). It is
+written during execution and depends on what attribution has concluded so far,
+so it legitimately differs between a run with attribution and a run without.
+`src/provenance/carriers.py` re-resolves these pointers at read time for exactly
+that reason.
+
+**The two kinds are distinguished only by `CARRIER_NOTE` ("carries output of")
+appearing in the record's notes.** Counting them together is what produced the
+false report in `docs/gate1/final_cost_direction.md` §6.1 that the pipeline's
+provenance depends on attribution; split correctly, the code-path structural
+records are identical (16 = 16) and only the carrier records differ.
+
+### A testbed caveat, not an architecture property
+
+In the scripted evaluation the attributor is handed the **same `ScriptedClient`
+instance** as the pipeline, because `ScriptedClient._answer_self_report` answers
+truthfully by looking the audited call up in its own `by_prompt` table. Sharing
+the instance means the attributor's calls advance that client's state, so the
+stored prompt/output *content* differs between the two runs. Giving attribution
+its own client makes the harness fabricate ("I used nothing" about everything)
+and degrades recovery across every seed tested. A real model shares an endpoint,
+not a state table, so this coupling does not exist in production.
