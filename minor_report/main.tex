@@ -53,6 +53,25 @@
 \setlength{\abovecaptionskip}{6pt}
 \setlength{\belowcaptionskip}{6pt}
 
+% --- captions one step smaller than the body ---------------------------------
+% \@makecaption copied from article.cls with \footnotesize added; the label
+% format is untouched. A caption set at body size reads as body text, which
+% blurs the boundary between a table and whatever is stacked above it.
+\makeatletter
+\long\def\@makecaption#1#2{%
+  \vskip\abovecaptionskip
+  \begingroup\footnotesize
+  \sbox\@tempboxa{#1: #2}%
+  \ifdim \wd\@tempboxa >\hsize
+    #1: #2\par
+  \else
+    \global \@minipagefalse
+    \hb@xt@\hsize{\hfil\box\@tempboxa\hfil}%
+  \fi
+  \endgroup
+  \vskip\belowcaptionskip}
+\makeatother
+
 % --- page geometry, set without the geometry package -------------------------
 \setlength{\textwidth}{18.0cm}
 \setlength{\textheight}{24.7cm}
@@ -362,9 +381,9 @@ throughout because none of these are hardware-coupled systems.
 limitation or observation relevant to this project.}
 \label{tab:lit}
 \scriptsize
-\setlength{\tabcolsep}{4pt}
+\setlength{\tabcolsep}{3.5pt}
 \renewcommand{\arraystretch}{1.05}
-\begin{tabular}{L{0.9cm} L{2.7cm} L{2.6cm} L{3.0cm} L{6.0cm} L{1.1cm}}
+\begin{tabular}{L{0.9cm} L{2.7cm} L{2.6cm} L{3.0cm} L{5.9cm} L{1.0cm}}
 \toprule
 \textbf{Ref.} & \textbf{Technique Used} & \textbf{Database Used} &
 \textbf{Accuracy / Measures} & \textbf{Remarks} & \textbf{Working Devices}\\
@@ -642,12 +661,13 @@ asserted.
 trace; the trace contains 145 events and 89 sources in total.}
 \label{tab:topology}
 \footnotesize
+\setlength{\tabcolsep}{3pt}
 \begin{tabular}{llrr}
 \toprule
 \textbf{Stage} & \textbf{Role} & \textbf{Agents} & \textbf{Events}\\
 \midrule
 A & Acquisition (one record each)      & 12 & 48\\
-B & Normalisation (memory + a block of A) & 10 & 30\\
+B & Normalisation (memory + an A block) & 10 & 30\\
 C & Hub (fan-in over B, then broadcast) & 1  & 2\\
 C & Specialists (roster + one B block)  & 12 & 24\\
 D & Verifiers (a block of specialists)  & 10 & 20\\
@@ -786,6 +806,7 @@ result file.
 \caption{Experimental configuration.}
 \label{tab:config}
 \footnotesize
+\setlength{\tabcolsep}{4.5pt}
 \begin{tabular}{ll}
 \toprule
 \textbf{Item} & \textbf{Value}\\
@@ -870,8 +891,8 @@ bound on what any influence-aware method can recover, not a result in itself.
 \caption{Work preserved, 15 runs with 15 distinct attack placements. $\Delta$ is
 the paired per-run difference against \btwo{}, in percentage points.}
 \label{tab:main}
-\footnotesize
-\setlength{\tabcolsep}{3.5pt}
+\scriptsize
+\setlength{\tabcolsep}{2.5pt}
 \begin{tabular}{lrrrrrrr}
 \toprule
 \textbf{Regime} & \textbf{$f$ true} & \bzero{} & \bone{} & \btwo{} &
@@ -928,6 +949,7 @@ in these five runs they happened to be correct.
 \caption{Safety measures over all 15 runs and all four methods.}
 \label{tab:safety}
 \footnotesize
+\setlength{\tabcolsep}{4.5pt}
 \begin{tabular}{lrrr}
 \toprule
 \textbf{Quantity} & \textbf{small} & \textbf{medium} & \textbf{large}\\
@@ -964,6 +986,7 @@ same hazard, and is why landing is reported separately from task success.
 replay; the baselines pay replay only.}
 \label{tab:cost}
 \footnotesize
+\setlength{\tabcolsep}{3pt}
 \begin{tabular}{lrrrr}
 \toprule
 \textbf{Regime} & \textbf{\btwo{}} & \textbf{\sys{} anal.} &

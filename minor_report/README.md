@@ -64,6 +64,32 @@ the bibliography, put `\clearpage` back immediately before
 `\begin{thebibliography}`** — that costs one short page and is the only
 dependency-free flush LaTeX offers.
 
+### Table widths — measured, not guessed
+
+Three tables were set wider than the 8.65 cm column they sit in, so they ran
+over into the neighbouring column and landed on top of whatever was there.
+Measured against Computer Modern metrics, before and after:
+
+| Table | | before | after |
+|---|---|---|---|
+| I | literature | +0.4pt under | 12.1pt under |
+| II | topology | **14.7pt over** | 14.0pt under |
+| III | configuration | 8.0pt under | 14.0pt under |
+| IV | main results | **31.5pt over** | 12.2pt under |
+| V | safety | 8.7pt under | 20.7pt under |
+| VI | cost | **7.7pt over** | 22.3pt under |
+
+Most were fixed with `\tabcolsep` alone. Table IV could not be: eight columns
+whose content alone is 221.6pt of the 246.1pt available leaves under 1.6pt per
+gutter, so it is set in `\scriptsize`. Keep every table at least ~10pt under
+`\columnwidth`; that is the error bar on the estimate, which is
+`diagrams/`-adjacent work done in the session, not a compiled measurement.
+
+Captions are also one step smaller than the body text now (`\@makecaption`
+copied from `article.cls` with `\footnotesize` added, label format untouched).
+A caption at body size reads as another paragraph, which is the other half of
+why two stacked tables looked like one.
+
 If a float drifts further from its text than you like, move its
 `\begin{table}` earlier. Every float is already declared at or before its first
 `\ref`, which is what keeps them close.
