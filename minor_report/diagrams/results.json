@@ -1,0 +1,368 @@
+{
+  "varied": {
+    "small": {
+      "n": 5,
+      "f_min": 0.06206896551724138,
+      "f_max": 0.0896551724137931,
+      "f_mean": 0.07862068965517241,
+      "fstruct_mean": 0.1006896551724138,
+      "b1": 0.8993103448275862,
+      "b2": 0.8993103448275862,
+      "cl": 0.7255172413793104,
+      "diff": -17.37931034482758,
+      "sd": 41.96822307316744,
+      "dmin": -92.41379310344827,
+      "dmax": 2.758620689655178,
+      "win": 2,
+      "tie": 2,
+      "loss": 1,
+      "cl_disc": 39.8,
+      "b2_disc": 14.6,
+      "cl_ana": 16312.4,
+      "cl_rep": 3285.8,
+      "b0_tok": 10693.8,
+      "b2_tok": 1594.8,
+      "pipeline": 10861.2,
+      "wall": 568.6600000000001,
+      "landed": 5,
+      "unsafe": 0,
+      "escapes": 0,
+      "selective": 2,
+      "agent_restart": 3,
+      "full_restart": 1,
+      "gem": 50,
+      "nv": 75,
+      "loc": 876,
+      "gem_tok": 24343,
+      "nv_tok": 18009
+    },
+    "medium": {
+      "n": 5,
+      "f_min": 0.5172413793103449,
+      "f_max": 0.5724137931034483,
+      "f_mean": 0.5558620689655173,
+      "fstruct_mean": 0.6262068965517241,
+      "b1": 0.3806896551724138,
+      "b2": 0.3737931034482759,
+      "cl": 0.44413793103448274,
+      "diff": 7.03448275862069,
+      "sd": 1.850539015861894,
+      "dmin": 4.137931034482762,
+      "dmax": 8.275862068965518,
+      "win": 5,
+      "tie": 0,
+      "loss": 0,
+      "cl_disc": 80.6,
+      "b2_disc": 90.8,
+      "cl_ana": 15796.0,
+      "cl_rep": 7974.8,
+      "b0_tok": 10713.6,
+      "b2_tok": 7974.8,
+      "pipeline": 10950.2,
+      "wall": 558.46,
+      "landed": 3,
+      "unsafe": 0,
+      "escapes": 0,
+      "selective": 5,
+      "agent_restart": 0,
+      "full_restart": 0,
+      "gem": 60,
+      "nv": 120,
+      "loc": 1242,
+      "gem_tok": 28228,
+      "nv_tok": 27963
+    },
+    "large": {
+      "n": 5,
+      "f_min": 0.7517241379310344,
+      "f_max": 0.7724137931034483,
+      "f_mean": 0.7627586206896552,
+      "fstruct_mean": 0.9144827586206896,
+      "b1": 0.09241379310344827,
+      "b2": 0.08551724137931034,
+      "cl": 0.23724137931034486,
+      "diff": 15.17241379310345,
+      "sd": 1.5421158465515794,
+      "dmin": 13.10344827586207,
+      "dmax": 17.24137931034483,
+      "win": 5,
+      "tie": 0,
+      "loss": 0,
+      "cl_disc": 110.6,
+      "b2_disc": 132.6,
+      "cl_ana": 15910.8,
+      "cl_rep": 9771.8,
+      "b0_tok": 10336.8,
+      "b2_tok": 9771.8,
+      "pipeline": 10848.4,
+      "wall": 670.0600000000001,
+      "landed": 5,
+      "unsafe": 0,
+      "escapes": 0,
+      "selective": 5,
+      "agent_restart": 0,
+      "full_restart": 0,
+      "gem": 60,
+      "nv": 120,
+      "loc": 1422,
+      "gem_tok": 27734,
+      "nv_tok": 27352
+    }
+  },
+  "fixed": {
+    "small": {
+      "n": 5,
+      "f_min": 0.06206896551724138,
+      "f_max": 0.06206896551724138,
+      "f_mean": 0.06206896551724138,
+      "fstruct_mean": 0.07586206896551724,
+      "b1": 0.9241379310344827,
+      "b2": 0.9241379310344827,
+      "cl": 0.9351724137931035,
+      "diff": 1.1034482758620712,
+      "sd": 0.6168463386206329,
+      "dmin": 0.0,
+      "dmax": 1.379310344827589,
+      "win": 4,
+      "tie": 1,
+      "loss": 0,
+      "cl_disc": 9.4,
+      "b2_disc": 11.0,
+      "cl_ana": 16290.6,
+      "cl_rep": 1083.6,
+      "b0_tok": 10754.8,
+      "b2_tok": 1238.4,
+      "pipeline": 10806.0,
+      "wall": 762.46,
+      "landed": 5,
+      "unsafe": 0,
+      "escapes": 0,
+      "selective": 4,
+      "agent_restart": 1,
+      "full_restart": 0,
+      "gem": 46,
+      "nv": 60,
+      "loc": 799,
+      "gem_tok": 23713,
+      "nv_tok": 15005
+    },
+    "medium": {
+      "n": 5,
+      "f_min": 0.5448275862068965,
+      "f_max": 0.5448275862068965,
+      "f_mean": 0.5448275862068965,
+      "fstruct_mean": 0.6068965517241379,
+      "b1": 0.4,
+      "b2": 0.3931034482758621,
+      "cl": 0.45517241379310347,
+      "diff": 6.206896551724139,
+      "sd": 0.0,
+      "dmin": 6.206896551724139,
+      "dmax": 6.206896551724139,
+      "win": 5,
+      "tie": 0,
+      "loss": 0,
+      "cl_disc": 79.0,
+      "b2_disc": 88.0,
+      "cl_ana": 15766.0,
+      "cl_rep": 7839.0,
+      "b0_tok": 10695.0,
+      "b2_tok": 7755.4,
+      "pipeline": 10932.4,
+      "wall": 766.3799999999999,
+      "landed": 5,
+      "unsafe": 0,
+      "escapes": 0,
+      "selective": 5,
+      "agent_restart": 0,
+      "full_restart": 0,
+      "gem": 60,
+      "nv": 120,
+      "loc": 1230,
+      "gem_tok": 28585,
+      "nv_tok": 27870
+    },
+    "large": {
+      "n": 5,
+      "f_min": 0.7241379310344828,
+      "f_max": 0.7241379310344828,
+      "f_mean": 0.7241379310344828,
+      "fstruct_mean": 0.8551724137931036,
+      "b1": 0.15172413793103448,
+      "b2": 0.14482758620689656,
+      "cl": 0.24965517241379312,
+      "diff": 10.482758620689655,
+      "sd": 5.860040216896,
+      "dmin": 0.0,
+      "dmax": 13.103448275862068,
+      "win": 4,
+      "tie": 1,
+      "loss": 0,
+      "cl_disc": 108.8,
+      "b2_disc": 124.0,
+      "cl_ana": 15810.0,
+      "cl_rep": 9272.0,
+      "b0_tok": 10327.8,
+      "b2_tok": 9272.0,
+      "pipeline": 10982.8,
+      "wall": 1233.08,
+      "landed": 5,
+      "unsafe": 0,
+      "escapes": 0,
+      "selective": 4,
+      "agent_restart": 1,
+      "full_restart": 0,
+      "gem": 62,
+      "nv": 124,
+      "loc": 1423,
+      "gem_tok": 28683,
+      "nv_tok": 28094
+    }
+  },
+  "scripted": {
+    "A-influencing": {
+      "B0 full restart": {
+        "mean": 0.0,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "B1 agent taint": {
+        "mean": 0.2105263157894737,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "B2 topology closure": {
+        "mean": 0.15789473684210525,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "CausalLine": {
+        "mean": 0.38245614035087716,
+        "ci": 0.033813676007720804,
+        "unsafe": 0.0
+      }
+    },
+    "A-exposed_only": {
+      "B0 full restart": {
+        "mean": 0.0,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "B1 agent taint": {
+        "mean": 0.2105263157894737,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "B2 topology closure": {
+        "mean": 0.15789473684210525,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "CausalLine": {
+        "mean": 0.9035087719298246,
+        "ci": 0.04897983377037611,
+        "unsafe": 0.0
+      }
+    },
+    "B-influencing": {
+      "B0 full restart": {
+        "mean": 0.0,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "B1 agent taint": {
+        "mean": 0.5789473684210527,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "B2 topology closure": {
+        "mean": 0.5789473684210527,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "CausalLine": {
+        "mean": 0.5789473684210527,
+        "ci": 0.0,
+        "unsafe": 0.0
+      }
+    },
+    "B-exposed_only": {
+      "B0 full restart": {
+        "mean": 0.0,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "B1 agent taint": {
+        "mean": 0.5789473684210527,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "B2 topology closure": {
+        "mean": 0.5789473684210527,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "CausalLine": {
+        "mean": 0.9035087719298246,
+        "ci": 0.03142566418944427,
+        "unsafe": 0.0
+      }
+    },
+    "C-influencing": {
+      "B0 full restart": {
+        "mean": 0.0,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "B1 agent taint": {
+        "mean": 0.5263157894736842,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "B2 topology closure": {
+        "mean": 0.15789473684210525,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "CausalLine": {
+        "mean": 0.5789473684210527,
+        "ci": 0.0,
+        "unsafe": 0.0
+      }
+    },
+    "C-exposed_only": {
+      "B0 full restart": {
+        "mean": 0.0,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "B1 agent taint": {
+        "mean": 0.5263157894736842,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "B2 topology closure": {
+        "mean": 0.15789473684210525,
+        "ci": 0.0,
+        "unsafe": 0.0
+      },
+      "CausalLine": {
+        "mean": 0.9122807017543859,
+        "ci": 0.03195092058190736,
+        "unsafe": 0.0
+      }
+    }
+  },
+  "scripted_meta": {
+    "cells": 96,
+    "reps": 30,
+    "detectors": [
+      "blind",
+      "heuristic",
+      "oracle",
+      "pessimistic"
+    ],
+    "cl_unsafe_cells": 0,
+    "cl_cells": 24
+  }
+}

@@ -1,0 +1,145 @@
+% References for the CausalLine minor-project report.
+%
+% Every entry below is either (a) a venue-published paper whose bibliographic
+% details are well established, or (b) an arXiv preprint whose identifier,
+% title, authors and date were checked against arxiv.org before being added.
+%
+% DOIs are deliberately omitted rather than guessed: an unverified DOI is worse
+% than none, and the arXiv identifier already resolves each preprint uniquely.
+
+% ---------------------------------------------------------------- attack ----
+
+@inproceedings{greshake2023,
+  author    = {K. Greshake and S. Abdelnabi and S. Mishra and C. Endres and
+               T. Holz and M. Fritz},
+  title     = {Not What You've Signed Up For: Compromising Real-World
+               {LLM}-Integrated Applications with Indirect Prompt Injection},
+  booktitle = {Proc. 16th ACM Workshop on Artificial Intelligence and Security
+               (AISec)},
+  pages     = {79--90},
+  year      = {2023}
+}
+
+@inproceedings{perez2022,
+  author    = {F. Perez and I. Ribeiro},
+  title     = {Ignore Previous Prompt: Attack Techniques for Language Models},
+  booktitle = {NeurIPS Workshop on ML Safety},
+  year      = {2022}
+}
+
+@inproceedings{liu2024,
+  author    = {Y. Liu and Y. Jia and R. Geng and J. Jia and N. Z. Gong},
+  title     = {Formalizing and Benchmarking Prompt Injection Attacks and
+               Defenses},
+  booktitle = {Proc. 33rd USENIX Security Symposium},
+  year      = {2024}
+}
+
+@inproceedings{chen2024,
+  author    = {S. Chen and J. Piet and C. Sitawarin and D. Wagner},
+  title     = {{StruQ}: Defending Against Prompt Injection with Structured
+               Queries},
+  booktitle = {Proc. 33rd USENIX Security Symposium},
+  year      = {2024}
+}
+
+% ------------------------------------------- taint and influence for LLMs ----
+
+@article{neurotaint2026,
+  author  = {Y. Cai and W. Tang and C. Wen and S. Qin},
+  title   = {Ghost in the Agent: Redefining Information Flow Tracking for
+             {LLM} Agents},
+  journal = {arXiv preprint arXiv:2604.23374},
+  year    = {2026}
+}
+
+@article{granularity2026,
+  author  = {L. Fan and Z. Li and Y. Tian and Y. Wang and R. Li and X. Wang},
+  title   = {The Granularity Mismatch in Agent Security: Argument-Level
+             Provenance Solves Enforcement and Isolates the {LLM} Reasoning
+             Bottleneck},
+  journal = {arXiv preprint arXiv:2605.11039},
+  year    = {2026}
+}
+
+% ------------------------------------------- counterfactual attribution ----
+
+@article{car2026,
+  author  = {J. Shah},
+  title   = {Causal Agent Replay: Counterfactual Attribution for {LLM}-Agent
+             Failures},
+  journal = {arXiv preprint arXiv:2606.08275},
+  year    = {2026}
+}
+
+@article{causalflow2026,
+  author  = {A. Bonagiri and D. Borkar and G. J. Anderias and S. Rafatirad and
+             H. Homayoun},
+  title   = {{CausalFlow}: Causal Attribution and Counterfactual Repair for
+             {LLM} Agent Failures},
+  journal = {arXiv preprint arXiv:2605.25338},
+  year    = {2026}
+}
+
+% ------------------------------------------------ contamination and traces ----
+
+@article{tracelevel2026,
+  author  = {A. Mazhar and H. Suri and S. Galhotra},
+  title   = {Trace-Level Analysis of Information Contamination in Multi-Agent
+             Systems},
+  journal = {arXiv preprint arXiv:2604.27586},
+  year    = {2026}
+}
+
+@article{dover2026,
+  author  = {M. Ma and J. Zhang and F. Yang and Y. Kang and Q. Lin and
+             S. Rajmohan and D. Zhang},
+  title   = {{DoVer}: Intervention-Driven Auto Debugging for {LLM} Multi-Agent
+             Systems},
+  journal = {arXiv preprint arXiv:2512.06749},
+  year    = {2026}
+}
+
+@article{zeroreplay2026,
+  author  = {D. H. Kang and H. Cha and D. Weon},
+  title   = {Knowledge-Based Zero-Replay Debugging of Multi-Agent {LLM} Traces},
+  journal = {arXiv preprint arXiv:2606.14805},
+  year    = {2026}
+}
+
+@article{trustsurvey2026,
+  author  = {Y. Wang and J. Zhang and Z. Wu and others},
+  title   = {From Agent Traces to Trust: A Survey of Evidence Tracing and
+             Execution Provenance in {LLM} Agents},
+  journal = {arXiv preprint arXiv:2606.04990},
+  year    = {2026}
+}
+
+% ------------------------------------------------ classical systems work ----
+
+@inproceedings{newsome2005,
+  author    = {J. Newsome and D. Song},
+  title     = {Dynamic Taint Analysis for Automatic Detection, Analysis, and
+               Signature Generation of Exploits on Commodity Software},
+  booktitle = {Proc. Network and Distributed System Security Symposium (NDSS)},
+  year      = {2005}
+}
+
+@inproceedings{king2003,
+  author    = {S. T. King and P. M. Chen},
+  title     = {Backtracking Intrusions},
+  booktitle = {Proc. 19th ACM Symposium on Operating Systems Principles (SOSP)},
+  pages     = {223--236},
+  year      = {2003}
+}
+
+@article{elnozahy2002,
+  author  = {E. N. Elnozahy and L. Alvisi and Y.-M. Wang and D. B. Johnson},
+  title   = {A Survey of Rollback-Recovery Protocols in Message-Passing
+             Systems},
+  journal = {ACM Computing Surveys},
+  volume  = {34},
+  number  = {3},
+  pages   = {375--408},
+  year    = {2002}
+}
