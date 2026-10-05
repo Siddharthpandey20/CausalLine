@@ -27,18 +27,31 @@
 % text height, and at least 0.2 of every page reserved for text) cannot place
 % this document's larger tables. A float that can never be placed is deferred,
 % and every later float of the same class queues behind it, so the whole set
-% spills past the bibliography. These settings widen the windows; the
-% \clearpage before the references is the backstop.
-\setcounter{topnumber}{3}           % top floats per column
-\setcounter{bottomnumber}{2}
-\setcounter{totalnumber}{5}
-\setcounter{dbltopnumber}{3}        % top floats per page, full width
-\renewcommand{\topfraction}{0.9}
-\renewcommand{\bottomfraction}{0.6}
-\renewcommand{\textfraction}{0.06}  % minimum text on a mixed page
+% spills past the bibliography. These settings widen the windows enough
+% that every float in the document is placeable where it is declared.
+\setcounter{topnumber}{2}           % top floats per column
+\setcounter{bottomnumber}{1}
+\setcounter{totalnumber}{3}
+\setcounter{dbltopnumber}{2}        % top floats per page, full width
+\renewcommand{\topfraction}{0.85}
+\renewcommand{\bottomfraction}{0.5}
+\renewcommand{\textfraction}{0.1}   % minimum text on a mixed page
 \renewcommand{\floatpagefraction}{0.6}
-\renewcommand{\dbltopfraction}{0.9}
+\renewcommand{\dbltopfraction}{0.85}
 \renewcommand{\dblfloatpagefraction}{0.6}
+
+% Section VI puts six floats inside 130 lines of source, so two of them share a
+% column routinely. The class leaves 12pt between stacked floats and 0pt below
+% a caption, so the gap separating two tables was barely wider than the gap
+% inside one, and the pair read as a single block. What matters is the ratio:
+% 24pt between floats against 6pt from a caption to the table it belongs to.
+\setlength{\floatsep}{24pt plus 6pt minus 3pt}
+\setlength{\textfloatsep}{22pt plus 6pt minus 4pt}
+\setlength{\intextsep}{20pt plus 5pt minus 3pt}
+\setlength{\dblfloatsep}{24pt plus 6pt minus 3pt}
+\setlength{\dbltextfloatsep}{24pt plus 6pt minus 4pt}
+\setlength{\abovecaptionskip}{6pt}
+\setlength{\belowcaptionskip}{6pt}
 
 % --- page geometry, set without the geometry package -------------------------
 \setlength{\textwidth}{18.0cm}
@@ -1126,12 +1139,14 @@ are produced from \texttt{diagrams/topology.json} and
 trace and from the committed result files respectively.
 
 %==============================================================================
-\clearpage
+% Short enough that splitting it across a column break looks like an
+% accident, so it is held together.
+\begingroup\samepage
 \section*{Acknowledgment}
 
 The authors thank the project supervisor for guidance on experimental design,
 and in particular for the insistence that negative results and corrections be
-reported rather than removed.
+reported rather than removed.\par\endgroup
 
 %==============================================================================
 % References are listed inline rather than through BibTeX, so the document

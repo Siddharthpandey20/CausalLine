@@ -48,10 +48,25 @@ three are load-bearing:
 3. the literature table set in `\scriptsize`, which brings it to about 0.66 of
    the text height.
 
-`\clearpage` before the Acknowledgment is the backstop: anything still queued is
-flushed there rather than after the bibliography. If a float moves further from
-its text than you like, move its `\begin{table}` earlier — every float is
-already declared at or before its first `\ref`, which is what keeps them close.
+A fourth setting handles a separate complaint — two stacked tables reading as
+one. Section VI declares six floats inside 130 lines of source, so a column
+routinely holds two. The class leaves 12pt between floats and 0pt below a
+caption, which makes the gap *between* two tables barely wider than the gap
+*inside* one. The preamble sets `\floatsep` to 24pt against a 6pt
+`\belowcaptionskip`; the ratio is what the eye reads, not the absolute size.
+
+There was briefly a `\clearpage` before the Acknowledgment as a backstop. It was
+removed: in two-column mode it ends the current column and leaves the other one
+blank, which cost a half-empty page and pushed the Acknowledgment onto the next
+one. Every float now measures at most 0.66 of a page and every float allows
+`p`, so none should be deferred that far. **If a float ever does reappear after
+the bibliography, put `\clearpage` back immediately before
+`\begin{thebibliography}`** — that costs one short page and is the only
+dependency-free flush LaTeX offers.
+
+If a float drifts further from its text than you like, move its
+`\begin{table}` earlier. Every float is already declared at or before its first
+`\ref`, which is what keeps them close.
 
 > **Not compiled here.** No TeX distribution was available on the machine where
 > this was written, so the document was validated structurally — balanced
