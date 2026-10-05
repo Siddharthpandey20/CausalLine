@@ -22,6 +22,24 @@
 \usepackage{booktabs}
 \usepackage{array}
 
+% --- float placement ---------------------------------------------------------
+% The defaults (at most two top floats, a top float no taller than 0.7 of the
+% text height, and at least 0.2 of every page reserved for text) cannot place
+% this document's larger tables. A float that can never be placed is deferred,
+% and every later float of the same class queues behind it, so the whole set
+% spills past the bibliography. These settings widen the windows; the
+% \clearpage before the references is the backstop.
+\setcounter{topnumber}{3}           % top floats per column
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{5}
+\setcounter{dbltopnumber}{3}        % top floats per page, full width
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.6}
+\renewcommand{\textfraction}{0.06}  % minimum text on a mixed page
+\renewcommand{\floatpagefraction}{0.6}
+\renewcommand{\dbltopfraction}{0.9}
+\renewcommand{\dblfloatpagefraction}{0.6}
+
 % --- page geometry, set without the geometry package -------------------------
 \setlength{\textwidth}{18.0cm}
 \setlength{\textheight}{24.7cm}
@@ -52,7 +70,7 @@
 % --- a hand-rolled algorithm float, so no algorithm package is needed --------
 \newcounter{algocount}
 \newenvironment{algo}[1]{%
-  \begin{figure}[t]%
+  \begin{figure}[!tbp]%
   \refstepcounter{algocount}%
   \hrule height 0.9pt \vspace{2pt}%
   \noindent\textbf{Algorithm \thealgocount:} #1\par
@@ -80,10 +98,17 @@
 After Prompt Injection in Multi-Agent LLM Systems}}
 
 \author{
-Minor Project Group\\
-\normalsize Department of Computer Science and Engineering\\
-\normalsize Mid-Term Evaluation, B.Tech.\\
-\normalsize Project repository: \texttt{github.com/Siddharthpandey20/CausalLine}
+\textbf{Siddharth}$^{*}$, 
+\textbf{Rajgire Akhil Reddy}$^{*}$,
+\textbf{Utkarsh Gupta}$^{*}$,
+\textbf{Dr. Avantika Singh}$^{*}$\\[2mm]
+Department of Computer Science and Engineering\\
+Dr. Shyama Prasad Mukherjee International Institute of Information Technology, Naya Raipur, India\\
+\texttt{siddharth24102@iiitnr.edu.in}\\[2mm]
+Department of Data Science and Artificial Intelligence\\
+Dr. Shyama Prasad Mukherjee International Institute of Information Technology, Naya Raipur, India\\
+\texttt{\{rajgire24102,utkarsh24102,avantika\}@iiitnr.edu.in}\\[2mm]
+$^{*}$These authors contributed equally to this work.
 }
 
 \date{}
@@ -318,14 +343,15 @@ Table~\ref{tab:lit} compares the most directly relevant work. In the
 against a named dataset or benchmark; \textit{Working Devices} is "N/A"
 throughout because none of these are hardware-coupled systems.
 
-\begin{table*}[t]
+\begin{table*}[!tp]
 \centering
 \caption{Comparative analysis of related work. The final column states the
 limitation or observation relevant to this project.}
 \label{tab:lit}
-\footnotesize
+\scriptsize
 \setlength{\tabcolsep}{4pt}
-\begin{tabular}{L{0.9cm} L{2.6cm} L{2.4cm} L{2.9cm} L{5.4cm} L{1.0cm}}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{L{0.9cm} L{2.7cm} L{2.6cm} L{3.0cm} L{6.0cm} L{1.1cm}}
 \toprule
 \textbf{Ref.} & \textbf{Technique Used} & \textbf{Database Used} &
 \textbf{Accuracy / Measures} & \textbf{Remarks} & \textbf{Working Devices}\\
@@ -487,7 +513,7 @@ violating~\eqref{eq:safety}, and verify the recovered run before accepting it.
 
 \subsection{Overall architecture}
 
-\begin{figure*}[t]
+\begin{figure*}[!tp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_architecture.pdf}
 \caption{The implemented recovery pipeline. Stage~1 runs during the workflow
@@ -564,7 +590,7 @@ empirical observation.
 \subsection{The 56-agent evaluation testbed}
 \label{sec:testbed}
 
-\begin{figure*}[t]
+\begin{figure*}[!tp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_agent_workflow.pdf}
 \caption{Stage-level view of the implemented workflow. Numbers on the arrows
@@ -577,7 +603,7 @@ the entry.}
 \label{fig:workflow}
 \end{figure*}
 
-\begin{figure*}[t]
+\begin{figure*}[!tp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_agent_trace.pdf}
 \caption{Agent invocation graph of all 56 agents, derived from a recorded
@@ -597,7 +623,7 @@ and~\ref{fig:trace}. Both figures are generated from
 reading the resulting trace, so the edges shown are recorded rather than
 asserted.
 
-\begin{table}[t]
+\begin{table}[!tbp]
 \centering
 \caption{Implemented workflow. Agent and event counts are read from an executed
 trace; the trace contains 145 events and 89 sources in total.}
@@ -742,7 +768,7 @@ result file.
 
 \subsection{Configuration and protocol}
 
-\begin{table}[t]
+\begin{table}[!tbp]
 \centering
 \caption{Experimental configuration.}
 \label{tab:config}
@@ -804,7 +830,7 @@ the accepted run.
 
 \subsection{Exposure versus influence}
 
-\begin{figure}[t]
+\begin{figure}[!tbp]
 \centering
 \includegraphics[width=\columnwidth]{figures/fig_exposure_influence.pdf}
 \caption{The quantity the method exploits, measured on the testbed. The orange
@@ -826,7 +852,7 @@ bound on what any influence-aware method can recover, not a result in itself.
 
 \subsection{Main result}
 
-\begin{table}[t]
+\begin{table}[!tbp]
 \centering
 \caption{Work preserved, 15 runs with 15 distinct attack placements. $\Delta$ is
 the paired per-run difference against \btwo{}, in percentage points.}
@@ -845,7 +871,7 @@ large  & 75.2--77.2\% & 0.0\% & 9.2\%  & 8.6\%  & \textbf{23.7\%} & $+15.17$ & \
 \end{tabular}
 \end{table}
 
-\begin{figure}[t]
+\begin{figure}[!tbp]
 \centering
 \includegraphics[width=\columnwidth]{figures/fig_preserved.pdf}
 \caption{Work preserved by each method, averaged over five distinct attack
@@ -884,7 +910,7 @@ in these five runs they happened to be correct.
 
 \subsection{Safety}
 
-\begin{table}[t]
+\begin{table}[!tbp]
 \centering
 \caption{Safety measures over all 15 runs and all four methods.}
 \label{tab:safety}
@@ -919,7 +945,7 @@ same hazard, and is why landing is reported separately from task success.
 
 \subsection{Economic analysis}
 
-\begin{table}[t]
+\begin{table}[!tbp]
 \centering
 \caption{Mean recovery cost per run, in tokens. \sys{} pays analysis plus
 replay; the baselines pay replay only.}
@@ -937,7 +963,7 @@ large  & 9\,772 & 15\,911 & 25\,683 & $2.5\times$\\
 \end{tabular}
 \end{table}
 
-\begin{figure}[t]
+\begin{figure}[!tbp]
 \centering
 \includegraphics[width=\columnwidth]{figures/fig_cost.pdf}
 \caption{What the additional tokens buy. The bar is the paired difference in
@@ -1075,7 +1101,7 @@ two items are prerequisites.
 Every table and figure in Section~\ref{sec:exp} is regenerated from committed
 result files by the following commands, run from the repository root.
 
-\begin{table}[h]
+\begin{table}[!htbp]
 \centering
 \footnotesize
 \begin{tabular}{ll}
@@ -1100,6 +1126,7 @@ are produced from \texttt{diagrams/topology.json} and
 trace and from the committed result files respectively.
 
 %==============================================================================
+\clearpage
 \section*{Acknowledgment}
 
 The authors thank the project supervisor for guidance on experimental design,
