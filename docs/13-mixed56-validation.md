@@ -1,5 +1,12 @@
 # The 56-agent validation: 5 seeds x 3 regimes, on the fixed code
 
+> **CORRECTION (05-11-2026).** Where this document reports a regime mean that
+> includes an escalated run -- small (+1.10, one `agent_restart` of five) and
+> large (+10.48, sd 5.86, one `agent_restart` of five) -- the mean mixes a
+> measured value with a design constant. Selective-only: small **+1.38** (n=4),
+> large **+13.10** (n=4). Both escalations were verifiably unnecessary. See
+> [`16-six-investigations.md`](16-six-investigations.md) sections 1 and 3.
+
 > **SUPERSEDED AS THE PRIMARY RESULT (18-09-2026).** This campaign repeats a
 > *fixed* workload five times per regime, so it measures model
 > non-determinism rather than workload variation -- the limitation its own

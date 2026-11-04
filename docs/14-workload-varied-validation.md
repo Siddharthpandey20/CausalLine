@@ -1,5 +1,18 @@
 # The workload-varied validation: 15 runs, 15 different workloads
 
+> **CORRECTION (05-11-2026) -- read this before quoting the small regime.**
+> This document's headline says CausalLine "loses in small" (paired -17.38
+> against B2, sd 41.97 on n=5). That figure averages one *escalation* with four
+> ordinary runs. Split by the scope recovery actually delivered at: selective
+> **+2.76** (n=2), `agent_restart` 0.00 (n=2, which is the baseline's own value
+> by arithmetic), `restart_all` **-92.41** (n=1, which is 0% preserved by
+> definition). The win/tie/loss count for small is **2/2/1, not a loss**, and
+> selective recovery wins in every regime of both corpora. The escalation was
+> also verifiably unnecessary -- the recovered trace at selective scope already
+> carried no contamination. See
+> [`16-six-investigations.md`](16-six-investigations.md) sections 1 and 3. No
+> measurement in this document changes; the statistic taken from it does.
+
 > **This supersedes `docs/13-mixed56-validation.md` as the primary result.**
 > That campaign remains valid and is kept: it repeats a *fixed* workload five
 > times per regime and therefore measures model non-determinism, which is a

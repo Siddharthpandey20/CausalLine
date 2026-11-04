@@ -60,8 +60,16 @@ a figure from any document not named below.
   any number from it**
 - `docs/14-workload-varied-validation.md` — **the primary result**: 15 runs on
   15 distinct attack placements, which is what `13` could not do. Wins 5/5 in
-  medium and large, **loses in small**; 0 unsafe, 0 escapes. `13` is retained
-  as the fixed-workload control that isolates model non-determinism
+  medium and large; 0 unsafe, 0 escapes. `13` is retained as the fixed-workload
+  control that isolates model non-determinism
+- `docs/16-six-investigations.md` — **read before quoting `14`'s small regime or
+  any cross-method `work_preserved` comparison.** `14`'s "loses in small" is one
+  escalation averaged with four ordinary runs (selective is **+2.76**, W/T/L
+  2/2/1); and the scripted ordering "B1 63.2% > CausalLine 51.6%" inverts to
+  **CausalLine 77.4% > B1 65.8%** once cells where no method recovered are
+  excluded. Also: all 6 verification failures diagnosed, the detector band
+  (71.0%–19.3%), and the 100-seed deferred-self-report result (−39% tokens,
+  0 unsafe, but a real pair-recall cost — still not the default)
 
 ## Repo layout
 

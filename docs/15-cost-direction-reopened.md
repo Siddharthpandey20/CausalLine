@@ -16,7 +16,8 @@ we are entitled to say.
 | new LLM runs | **0** |
 | scripted matrices run | **180** (30 seeds x 3 arms x 2 randomness regimes) |
 | what moved | the *interpretation* of a −3.6 point figure, not any code |
-| raw results | `data/runs/seedsweep/sweep-30.json`, `sweep-30.txt` |
+| raw results | `data/results/seedsweep/sweep-30.json`, `sweep-30.txt` (committed 05-11-2026; previously local-only under `data/runs/`) |
+| replicated at 100 seeds | `data/results/seedsweep/sweep-100.json` — see [`16-six-investigations.md`](16-six-investigations.md) section 6. The interval narrowed as predicted and the verdict held |
 
 ---
 

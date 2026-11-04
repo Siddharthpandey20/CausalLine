@@ -1,0 +1,76 @@
+100 seeds x 3 arms x 2 regime(s) = 600 matrices
+
+  as-shipped randomness (arms unpaired)
+    shipped: 5/100 seeds (86s)
+    shipped: 10/100 seeds (168s)
+    shipped: 15/100 seeds (238s)
+    shipped: 20/100 seeds (325s)
+    shipped: 25/100 seeds (414s)
+    shipped: 30/100 seeds (513s)
+    shipped: 35/100 seeds (604s)
+    shipped: 40/100 seeds (699s)
+    shipped: 45/100 seeds (837s)
+    shipped: 50/100 seeds (953s)
+    shipped: 55/100 seeds (1079s)
+    shipped: 60/100 seeds (1221s)
+    shipped: 65/100 seeds (1307s)
+    shipped: 70/100 seeds (1406s)
+    shipped: 75/100 seeds (1485s)
+    shipped: 80/100 seeds (1563s)
+    shipped: 85/100 seeds (1645s)
+    shipped: 90/100 seeds (1714s)
+    shipped: 95/100 seeds (1782s)
+    shipped: 100/100 seeds (1850s)
+  paired randomness (common random numbers)
+    paired: 5/100 seeds (67s)
+    paired: 10/100 seeds (137s)
+    paired: 15/100 seeds (205s)
+    paired: 20/100 seeds (274s)
+    paired: 25/100 seeds (342s)
+    paired: 30/100 seeds (411s)
+    paired: 35/100 seeds (480s)
+    paired: 40/100 seeds (547s)
+    paired: 45/100 seeds (615s)
+    paired: 50/100 seeds (685s)
+    paired: 55/100 seeds (755s)
+    paired: 60/100 seeds (824s)
+    paired: 65/100 seeds (892s)
+    paired: 70/100 seeds (961s)
+    paired: 75/100 seeds (1028s)
+    paired: 80/100 seeds (1097s)
+    paired: 85/100 seeds (1167s)
+    paired: 90/100 seeds (1236s)
+    paired: 95/100 seeds (1305s)
+    paired: 100/100 seeds (1374s)
+
+==============================================================================
+AS SHIPPED  --  100 seeds x 6 cells
+==============================================================================
+  hybrid           69.9% (sd 4.07 pts)  analysis   4620  total  10175  unsafe   0  pairFN  29/2929  task 600/600
+  lazy             70.1% (sd 5.12 pts)  analysis   2633  total   6190  unsafe   0  pairFN  24/892   task 600/600
+  targeted_only    69.3% (sd 0.00 pts)  analysis   1500  total   3900  unsafe   0  pairFN 100/700   task 600/600
+
+  paired per-seed differences
+  comparison                             mean      sd   95% lo   95% hi   CI~0  W/T/L
+  ----------------------------------------------------------------------------------
+  lazy - hybrid (pts)                    0.26    6.48    -1.01     1.53   yes  46/24/30
+  targeted_only - hybrid (pts)          -0.57    4.07    -1.37     0.23   yes  30/22/48
+  lazy - hybrid (tok)                -3985.00  511.16 -4085.19 -3884.81    NO  0/0/100
+  targeted_only - hybrid (tok)       -6275.00  302.97 -6334.38 -6215.62    NO  0/0/100
+
+==============================================================================
+PAIRED  --  100 seeds x 6 cells
+==============================================================================
+  hybrid           70.1% (sd 4.48 pts)  analysis   4607  total  10142  unsafe   0  pairFN  19/3010  task 600/600
+  lazy             70.3% (sd 3.56 pts)  analysis   2655  total   6226  unsafe   0  pairFN  25/884   task 600/600
+  targeted_only    69.3% (sd 0.00 pts)  analysis   1500  total   3900  unsafe   0  pairFN 100/700   task 600/600
+
+  paired per-seed differences
+  comparison                             mean      sd   95% lo   95% hi   CI~0  W/T/L
+  ----------------------------------------------------------------------------------
+  lazy - hybrid (pts)                    0.21    5.25    -0.82     1.24   yes  39/22/39
+  targeted_only - hybrid (pts)          -0.81    4.48    -1.69     0.07   yes  25/17/58
+  lazy - hybrid (tok)                -3916.00  475.40 -4009.18 -3822.82    NO  0/0/100
+  targeted_only - hybrid (tok)       -6242.00  265.22 -6293.98 -6190.02    NO  0/0/100
+
+written to data/runs/seedsweep/sweep-100.json

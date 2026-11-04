@@ -20,6 +20,7 @@ wrong*.
 | what the project is and why | [`00-idea.md`](00-idea.md), then the root [`README.md`](../README.md) |
 | the current architecture | [`02-architecture.md`](02-architecture.md) |
 | **the primary experimental result** | [`14-workload-varied-validation.md`](14-workload-varied-validation.md) |
+| **which statistic that result supports** | [`16-six-investigations.md`](16-six-investigations.md) sections 3-5 |
 | **what we may and may not claim** | [`10-remediation.md`](10-remediation.md) §9 |
 | what the system does not do | [`06-limitations.md`](06-limitations.md) |
 | why a design is the way it is | [`05-decisions.md`](05-decisions.md) (D-001..D-094) |
@@ -41,7 +42,9 @@ wrong*.
 | [`10-remediation.md`](10-remediation.md) | the phase-gated remediation pass; **§9 is the current claims list** |
 | [`12-issue20-correction.md`](12-issue20-correction.md) | the ingestion-edge defect and every figure it moved |
 | [`13-mixed56-validation.md`](13-mixed56-validation.md) | the fixed-workload control: 5 seeds x 3 regimes, isolates model non-determinism |
-| [`14-workload-varied-validation.md`](14-workload-varied-validation.md) | **the primary result**: 15 runs, 15 distinct attack placements |
+| [`14-workload-varied-validation.md`](14-workload-varied-validation.md) | **the primary result**: 15 runs, 15 distinct attack placements. **Read `16` section 3 before quoting its small regime** |
+| [`15-cost-direction-reopened.md`](15-cost-direction-reopened.md) | the cost direction reopened: why the closure-scoped mechanism was rejected, and the retraction of the 3.6-point figure |
+| [`16-six-investigations.md`](16-six-investigations.md) | **six investigations into what is actually wrong**: the verification failures diagnosed, restart vs splice, the small-regime recalculation, a safety-constrained comparison, the detector band, and the 100-seed cost result. Supersedes `14` on how its small regime reads and `07`/`08`/`10` on how `work_preserved` is compared |
 
 ## Superseded on their numbers, kept for the record
 
@@ -50,7 +53,7 @@ Correct measurements of the system as it then stood. Quote the replacement.
 | Document | Superseded by, and on what |
 |---|---|
 | [`07-completion-report.md`](07-completion-report.md) | `08` generally; `12` on every CausalLine `work_preserved` figure |
-| [`08-final-report.md`](08-final-report.md) | `10` on the numbers it re-measures; `12` on `work_preserved` |
+| [`08-final-report.md`](08-final-report.md) | `10` on the numbers it re-measures; `12` on `work_preserved` ; **`16` section 4 on how `work_preserved` may be compared across methods** |
 | [`11-phase5-report.md`](11-phase5-report.md) | `12` on `work_preserved`. **Also see `15` on its "3.6 points" figure** |
 | [`real_mixed_model_60_agent_experiment.md`](real_mixed_model_60_agent_experiment.md) | `13` on its results sections 6–12. §1–5 (architecture, Phase 0 API findings, fault log) are current and referenced by code |
 
