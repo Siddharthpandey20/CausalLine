@@ -23,6 +23,11 @@ affected part from the nearest trusted checkpoint.
 
 ## Read before working
 
+**`docs/README.md` is the index.** It lists every document in `docs/` with its
+status — current, superseded-on-its-numbers, or a falsified line kept on
+purpose — and it is the only place that mapping exists. Read it before trusting
+a figure from any document not named below.
+
 - `docs/00-idea.md` — the original full project description
 - `docs/01-scope.md` — what is in scope this month, who owns what
 - `docs/02-architecture.md` — components and how they connect
@@ -61,6 +66,8 @@ affected part from the nearest trusted checkpoint.
 ## Repo layout
 
 ```
+startup_check.py  does this machine have what it needs? PASS/WARN/FAIL, no keys
+COLLEGE_SETUP.md  running on another machine, local Ollama first
 src/common/       shared models, config, LLM clients (Gemini, NVIDIA), prompts
 src/tracing/      event logging, call graph, event graph, checkpoints
 src/provenance/   source IDs, influence edges, counterfactual checking
@@ -68,6 +75,7 @@ src/provenance/   source IDs, influence edges, counterfactual checking
 src/recovery/     contaminated region, recovery planner, selective replay
 src/eval/         attack injection, baselines, metrics, economics, run harness
                   + real-LLM mode: llm_scenarios, real_llm, real_campaign
+                  + college_runner: one front end, two modes, local-only capable
 src/risk/         attack-probability model (per-channel pa)
 data/             traces, results, generated suites (gitignored except samples)
 paper/            LaTeX / drafts
@@ -129,3 +137,10 @@ one, never print one, never write one into a trace, a result file or a commit.
 `GEMINI_API_KEY` for the original live pipeline; `NVIDIA_API_KEY_1..3` for the
 real-LLM mode. All NVIDIA traffic goes through `src/common/nvidia.py` — do not
 add an API call anywhere else.
+
+The local backend needs **no key**: `OLLAMA_HOST`/`OLLAMA_ENDPOINT`,
+`OLLAMA_MODEL`, `OLLAMA_NUM_CTX`, `OLLAMA_TIMEOUT_S`,
+`OLLAMA_MAX_OUTPUT_TOKENS` and `OLLAMA_MAX_ATTEMPTS` are read by
+`LocalLlamaSettings.from_env()`, so another machine points at its own install
+without editing code. A missing key must never prevent local-only execution —
+`college_runner --local-only` builds the local client alone.

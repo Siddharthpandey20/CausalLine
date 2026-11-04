@@ -37,6 +37,7 @@ import subprocess
 import sys
 import threading
 import time
+import os
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -44,8 +45,17 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-DEFAULT_MODEL = "llama3"
+def _ollama_base() -> str:
+    """Honour Ollama's own environment variables, as `LocalLlamaSettings` does."""
+    host = (os.environ.get("OLLAMA_ENDPOINT", "")
+            or os.environ.get("OLLAMA_HOST", "")).strip()
+    if not host:
+        return "http://localhost:11434"
+    return host if "://" in host else "http://" + host
+
+
+OLLAMA_URL = _ollama_base() + "/api/generate"
+DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "").strip() or "llama3"
 RESULTS_DIR = Path("data/results/local_llama")
 
 # A prompt shaped like the ones the pipeline actually sends: a short task plus a

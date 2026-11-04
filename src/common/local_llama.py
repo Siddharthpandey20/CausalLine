@@ -46,6 +46,7 @@ number from it is quoted.
 
 import argparse
 import json
+import os
 import sys
 import time
 import urllib.error
@@ -90,6 +91,44 @@ class LocalLlamaSettings:
     # the report says so rather than claiming byte-identical replay (Phase 6).
     seed: int | None = 0
     num_ctx: int = 4096
+
+    @classmethod
+    def from_env(cls, **overrides: Any) -> "LocalLlamaSettings":
+        """Settings from the environment, so another machine needs no code edit.
+
+        The defaults above are this machine's. A college machine may run Ollama
+        on another host or port, or have pulled a different tag, and until now
+        the only way to say so was to edit this file. Keyword overrides win over
+        the environment, which wins over the defaults.
+
+        `OLLAMA_HOST` is Ollama's own variable name and is accepted bare
+        (`gpu-box:11434`) as well as with a scheme, because that is how Ollama
+        itself documents it.
+        """
+        def get(name: str, cast: Any, default: Any) -> Any:
+            raw = os.environ.get(name, "")
+            if raw.strip() == "":
+                return default
+            try:
+                return cast(raw.strip())
+            except (TypeError, ValueError):
+                return default
+
+        endpoint = get("OLLAMA_ENDPOINT", str, "") or get("OLLAMA_HOST", str, "")
+        if endpoint and "://" not in endpoint:
+            endpoint = "http://" + endpoint
+        values: dict[str, Any] = {
+            "endpoint": endpoint or DEFAULT_ENDPOINT,
+            "model": get("OLLAMA_MODEL", str, DEFAULT_MODEL),
+            "num_ctx": get("OLLAMA_NUM_CTX", int, 4096),
+            "timeout_s": get("OLLAMA_TIMEOUT_S", float, DEFAULT_TIMEOUT_S),
+            "max_output_tokens": get("OLLAMA_MAX_OUTPUT_TOKENS", int,
+                                     DEFAULT_MAX_TOKENS),
+            "max_attempts": get("OLLAMA_MAX_ATTEMPTS", int,
+                                DEFAULT_MAX_ATTEMPTS),
+        }
+        values.update(overrides)
+        return cls(**values)
 
     def fingerprint(self) -> dict[str, Any]:
         return {

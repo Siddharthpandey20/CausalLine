@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -112,12 +113,31 @@ def build_ledgers(gemini_cap: int = 120,
 
 
 def build_router(topology: Topology,
-                 ledgers: dict[str, BudgetLedger] | None = None) -> RoutedClient:
-    """One router over local LLaMA, Gemini and NVIDIA."""
+                 ledgers: dict[str, BudgetLedger] | None = None,
+                 local_only: bool = False) -> RoutedClient:
+    """One router over local LLaMA, Gemini and NVIDIA.
+
+    `local_only` builds the local client alone and routes every agent to it.
+    It exists because `gemini_client`/`nvidia_client` construct their settings
+    eagerly and raise without a key, so a machine with no keys could not
+    previously build a router at all -- not even to run the pipeline entirely
+    on its own Ollama. The topology's provider assignment is ignored in that
+    mode and the fingerprint records one provider, so a local-only run is
+    identifiable and never pooled with a three-provider one.
+    """
     load_env()
     ledgers = ledgers if ledgers is not None else build_ledgers()
-    local = LocalLlamaClient(LocalLlamaSettings(model=LOCAL_MODEL,
-                                               max_output_tokens=300))
+    # `LOCAL_MODEL` is the tag these results were produced with and stays the
+    # default. `OLLAMA_MODEL`/`OLLAMA_HOST` let another machine point at its own
+    # install without editing this file; whatever is actually used is written
+    # into the trace header by the client's own fingerprint, so a run on a
+    # different tag is identifiable rather than quietly pooled with ours.
+    model = os.environ.get("OLLAMA_MODEL", "").strip() or LOCAL_MODEL
+    local = LocalLlamaClient(
+        LocalLlamaSettings.from_env(model=model, max_output_tokens=300))
+    if local_only:
+        return RoutedClient(clients={"local": local}, routing={},
+                            default="local")
     return RoutedClient(
         clients={
             "local": local,
@@ -178,7 +198,9 @@ def smoke(workdir: Path) -> dict[str, Any]:
 
 def run_regime(regime: str, workdir: Path, seed: int,
                ledgers: dict[str, BudgetLedger],
-               vary_placement: bool = False) -> dict[str, Any]:
+               vary_placement: bool = False,
+               topology: Topology | None = None,
+               local_only: bool = False) -> dict[str, Any]:
     """One contamination regime, end to end, through the shared harness.
 
     `vary_placement=False` reproduces the FROZEN placement that the completed
@@ -192,8 +214,12 @@ def run_regime(regime: str, workdir: Path, seed: int,
     """
     from src.eval.real_llm import run_generated
 
-    topo = Topology()
-    router = build_router(topo, ledgers)
+    # `Topology()` is the published 56-agent shape and stays the default, so
+    # the unflagged command keeps reproducing the published experiment. A
+    # caller passing its own shape is `college_runner`'s production_network
+    # mode, which is the same pipeline at a different size.
+    topo = topology or Topology()
+    router = build_router(topo, ledgers, local_only=local_only)
     scenario = MixedScenario.build(
         regime, topology=topo, seed=seed if vary_placement else None)
     problems = scenario.validate()
@@ -212,6 +238,8 @@ def run_regime(regime: str, workdir: Path, seed: int,
         "vary_placement": bool(vary_placement),
         "scenario": scenario.to_dict(),
         "agents": topo.agent_count,
+        "topology": topo.to_dict(),
+        "local_only": bool(local_only),
         "routing": dict(router.per_provider_calls),
         "degraded": list(router.degraded),
         "ledgers": {k: v.to_dict() for k, v in ledgers.items()},

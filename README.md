@@ -18,8 +18,24 @@ git clone <this repo> && cd CausalLine
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install pytest
 
-python -m pytest tests/              # 327 passed, 7 skipped
+python startup_check.py --local-only # does this machine have what it needs?
+python -m pytest tests/              # the suite
 python -m src.eval.experiment        # the full method comparison, ~1 min
+```
+
+`startup_check.py` reports PASS/WARN/FAIL on ten things — Python version,
+dependencies, Ollama, the local model, hardware, writable directories, the
+offline evaluation itself — and every FAIL names the command that fixes it. It
+never prints an API key. **Setting this repository up on a new machine:
+[`COLLEGE_SETUP.md`](COLLEGE_SETUP.md).**
+
+**Running the real-model evaluation with no API key at all** — 50 of the 56
+agents already run on a local Ollama, and `--local-only` puts the other six
+there too:
+
+```bash
+ollama serve && ollama pull llama3
+python -m src.eval.college_runner --mode baseline56 --local-only --smoke
 ```
 
 **With one API key — the real-LLM mode.** A free key from
@@ -370,12 +386,14 @@ python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install pytest
 
-python -m pytest tests/            # 327 passed, 7 skipped
+python -m pytest tests/            # 623 passed, 1 skipped
 ```
 
-The 7 skips are the Lasso fallback tests, which need numpy. With the analysis
-extra installed the suite is **333 passed, 1 skipped**. Both are enforced by CI
-in separate jobs, so an unguarded third-party import in the core fails the build.
+624 tests. The one skip is a Gate-1 simulation family with no variance in one
+term, not a missing dependency. Without numpy the Lasso fallback tests in
+`src/provenance/budget_attribution.py` skip as well. Both configurations are
+enforced by CI in separate jobs, so an unguarded third-party import in the
+core fails the build.
 
 ```bash
 pip install -r requirements.txt          # numpy, matplotlib

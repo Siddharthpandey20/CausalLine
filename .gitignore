@@ -24,3 +24,6 @@ data/results/real-llm*.json
 
 # Build artefact from `pip install -e .`
 *.egg-info/
+
+# pytest cache
+.pytest_cache/
