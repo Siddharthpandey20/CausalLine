@@ -2,9 +2,15 @@
 
 **Influence-aware selective recovery after prompt injection in multi-agent LLM systems**
 
-Repository: `github.com/Siddharthpandey20/CausalLine`, branch `feat/phase-gated-remediation`
-(latest commit `66d25e4`, "Minor-project mid-term evaluation report", 05-10-2026)
+Repository: `github.com/Siddharthpandey20/CausalLine`, branch `main`
 Prepared for a supervisory discussion with a visiting professor, 23-10-2026.
+
+> Written on `feat/phase-gated-remediation`, which was consolidated into `main`
+> on 04-11-2026 — `main` now holds every commit from every branch. Two things
+> here have since been superseded: §5.5's "−3.6 pts on the chain workflow" and
+> the per-workload restriction that follows from it are **not reproducible**
+> across 30 seeds (`docs/15-cost-direction-reopened.md`), and §10.2's "Outcome
+> B" rests on that same figure. Every safety number is unchanged.
 
 ---
 

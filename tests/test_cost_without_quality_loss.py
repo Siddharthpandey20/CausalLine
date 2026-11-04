@@ -85,13 +85,20 @@ class TestTheCheaperVariantMatchesTheBaseline(unittest.TestCase):
 
 
 class TestTheKnownQualityLossIsStillRecorded(unittest.TestCase):
-    """The same variant is NOT outcome-identical on the scripted chain matrix.
+    """What the single-seed chain matrix shows, and what it does not.
 
-    It preserves recall (0 pair false negatives) and safety (0 unsafe) but
-    recovers less work. That is a workload-dependent result and adopting the
-    variant globally would trade recovery quality for tokens, which the
-    constraint forbids. Recorded here so the fan-out result above is never
-    read as a general licence.
+    This class used to assert that the deferred variant "recovers less work"
+    on the chain matrix, as a property. It is not a property: replicated over
+    30 seeds the paired difference is +0.32 pts, 95% CI [-1.97, +2.61], with a
+    per-seed standard deviation of 6.4 points
+    (`docs/15-cost-direction-reopened.md`). The -3.6 that closed the cost
+    direction was one draw from that distribution.
+
+    So the work-preserved assertion is gone, and what remains are the two
+    things the replication confirmed on all 180 matrices: the deferral keeps
+    recall and safety, and `targeted_only` does not. Deleting a test because
+    its subject turned out to be noise is the correct response to the evidence;
+    keeping it would make the suite enforce a retracted claim.
     """
 
     def setUp(self):
@@ -129,15 +136,21 @@ class TestTheKnownQualityLossIsStillRecorded(unittest.TestCase):
         self.assertLessEqual(lazy.get("unsafe_preservations", 0),
                              hybrid.get("unsafe_preservations", 0))
 
-    def test_but_it_recovers_less_work_there(self) -> None:
-        """The reason it cannot be adopted globally."""
+    def test_the_token_saving_is_real_on_this_matrix_too(self) -> None:
+        """What replaces the retracted work-preserved assertion.
+
+        The saving is the part that reproduced: -39% of analysis+recovery, 30
+        of 30 seeds, confidence interval nowhere near zero. Unlike the quality
+        difference, this is far larger than the matrix's own noise.
+        """
         rows = self._attacked()
         lazy, hybrid = rows.get("lazy"), rows.get("hybrid")
         if not isinstance(lazy, dict) or not isinstance(hybrid, dict):
             self.skipTest("measurement shape changed")
-        self.assertLess(lazy.get("work_preserved", 1.0),
-                        hybrid.get("work_preserved", 0.0),
-                        "the chain-matrix quality loss has gone; re-check")
+        self.assertLess(lazy.get("analysis_tokens", 10 ** 9),
+                        hybrid.get("analysis_tokens", 0),
+                        "the deferral no longer saves analysis tokens, which "
+                        "is its only remaining claim")
 
 
 class TestTheBaselineRemainsTheDefault(unittest.TestCase):

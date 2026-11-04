@@ -1,5 +1,16 @@
 # 11 — Phase 5 Report: the located bugs, the adopted proposal, the declined one
 
+> **CORRECTION (04-11-2026).** The chain-matrix figure below -- that the
+> deferred self-report "recovers 3.6 points less work" -- is **not
+> reproducible**. Replicated over 30 seeds the paired difference is
+> +0.32 pts, 95% CI [-1.97, +2.61], with a per-seed standard deviation of
+> 6.4 points; the -3.6 lies outside that interval. It was measured once, at
+> one seed, on six cells, with the two arms drawing from a shared RNG stream
+> that makes them unpaired. See `docs/15-cost-direction-reopened.md`.
+> The token saving is unaffected and still holds (-39%, 30/30 seeds), as is
+> every safety number (0 unsafe, all 180 matrices).
+
+
 > **CORRECTION (17-09-2026).** Every CausalLine `work_preserved` figure below is superseded by `docs/12-issue20-correction.md`, which lists the exact cells and replacements (10 of 96 scripted cells, all CausalLine, -4.6 to -5.3 points). No baseline number, recovery-success rate or unsafe-preservation count changes. The originals are left in place deliberately: they were correct measurements of a system with a provenance defect, and the defect is part of the record.
 
 

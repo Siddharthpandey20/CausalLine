@@ -1,5 +1,16 @@
 # Same recovery, lower cost — what actually qualifies
 
+> **CORRECTION (04-11-2026).** The chain-matrix figure below -- that the
+> deferred self-report "recovers 3.6 points less work" -- is **not
+> reproducible**. Replicated over 30 seeds the paired difference is
+> +0.32 pts, 95% CI [-1.97, +2.61], with a per-seed standard deviation of
+> 6.4 points; the -3.6 lies outside that interval. It was measured once, at
+> one seed, on six cells, with the two arms drawing from a shared RNG stream
+> that makes them unpaired. See `docs/15-cost-direction-reopened.md`.
+> The token saving is unaffected and still holds (-39%, 30/30 seeds), as is
+> every safety number (0 unsafe, all 180 matrices).
+
+
 **Result: one mechanism qualifies on one workload, and it must be validated per
 workload rather than adopted globally.**
 
