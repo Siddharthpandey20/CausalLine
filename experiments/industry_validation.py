@@ -690,11 +690,32 @@ def cmd_run(args: argparse.Namespace) -> int:
             run_placement(config, run, arch_key, level, seed, progress,
                           ledger, done)
         except AllProvidersFailed as exc:
+            # Every provider refused. Pausing is correct: continuing would
+            # just collect the same refusal 60 more times.
             paused = str(exc)
             break
         except KeyboardInterrupt:
             paused = "interrupted by the operator"
             break
+        except SystemExit:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            # A fault in ONE placement's original run must not end an
+            # overnight campaign. It is recorded, the placement is left
+            # incomplete -- never silently skipped -- and the run continues.
+            # The final report counts units, so the gap shows up as
+            # INCOMPLETE rather than passing unnoticed.
+            run.append(run.errors, {
+                "placement": f"{arch_key}--{level}--{seed}",
+                "stage": "placement",
+                "error": f"{type(exc).__name__}: {exc}",
+                "traceback": traceback.format_exc()[-2000:]})
+            print(f"\n  [placement failed] {arch_key}/{level}/{seed}: "
+                  f"{type(exc).__name__}: {str(exc)[:160]}\n"
+                  f"  recorded in logs/errors.jsonl; continuing with the next "
+                  f"placement.", flush=True)
+            progress.call_cursor = flush_calls(run, ledger,
+                                               progress.call_cursor)
 
     summary = aggregate(run, config, ledger, paused)
     run.write_atomic(run.root / "reports" / "summary.json", summary)

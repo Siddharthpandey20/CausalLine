@@ -226,6 +226,50 @@ class TestCircuitBreakerAndQuotaAwareness(unittest.TestCase):
         self.assertEqual(rec.actual_provider, "local")
         self.assertIn("daily cap", rec.fallback_reason)
 
+    def test_a_soft_call_cap_stops_routing_and_falls_back(self) -> None:
+        """`max_calls` is the knob the campaign uses to cap Gemini.
+
+        It is a SOFT cap: on reaching it the provider is refused and the work
+        continues on the chain, with each fallback recorded. If it ever hard
+        failed instead, the campaign would stop at the cap rather than finish
+        on local.
+        """
+        gem = Fake("gemini")
+        loc = Fake("local")
+        r = router({"gemini": gem, "local": loc}, {"a": "gemini"})
+        r.states["gemini"].limits.max_calls = 3
+        r.active_agent = "a"
+        for _ in range(3):
+            self.assertTrue(r.generate("p").text.startswith("gemini:"))
+        # The fourth must not reach Gemini, must still succeed, and must be
+        # recorded as a fallback naming the cap.
+        out = r.generate("p")
+        self.assertTrue(out.text.startswith("local:"))
+        self.assertEqual(gem.calls, 3, "a call was made past the soft cap")
+        rec = r.ledger.records[-1]
+        self.assertTrue(rec.fallback_occurred)
+        self.assertEqual(rec.assigned_provider, "gemini")
+        self.assertEqual(rec.actual_provider, "local")
+        self.assertIn("call budget", rec.fallback_reason)
+        self.assertEqual(r.states["gemini"].refusals, 1)
+
+    def test_the_cap_is_read_from_configuration(self) -> None:
+        limits = ProviderLimits.from_dict(
+            "gemini", {"max_calls": 350, "rpd": 1500, "attempts": 3})
+        self.assertEqual(limits.max_calls, 350)
+        self.assertEqual(limits.rpd, 1500)
+
+    def test_a_token_budget_also_stops_routing(self) -> None:
+        gem = Fake("gemini")
+        r = router({"gemini": gem, "local": Fake("local")}, {"a": "gemini"})
+        r.states["gemini"].limits.max_tokens = 200   # 110 tokens per call
+        r.active_agent = "a"
+        r.generate("p")
+        r.generate("p")
+        r.generate("p")
+        self.assertEqual(gem.calls, 2, "a call was made past the token budget")
+        self.assertIn("token budget", r.ledger.records[-1].fallback_reason)
+
     def test_the_rpm_limiter_blocks_rather_than_overruns(self) -> None:
         state = ProviderState(limits=ProviderLimits(name="x", rpm=2))
         now = [0.0]
