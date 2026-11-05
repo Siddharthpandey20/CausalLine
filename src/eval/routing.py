@@ -624,6 +624,20 @@ class FallbackRouter:
     def announce(self, agent_id: str, kind: str) -> None:
         self.active_agent = agent_id
 
+    @property
+    def total_tokens(self) -> int:
+        """Every token this router spent, failed attempts included.
+
+        `run_pipeline` reads this off the client at the end of a run, as it
+        does for every other client in the project.
+        """
+        return sum(st.total_tokens for st in self.states.values())
+
+    @property
+    def throttled_s(self) -> float:
+        return sum(a.delay_before_s for r in self.ledger.records
+                   for a in r.attempts)
+
     def fingerprint(self) -> dict[str, Any]:
         """No key, no key length, nothing derived from a key."""
         return {

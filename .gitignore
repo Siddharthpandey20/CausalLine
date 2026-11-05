@@ -27,3 +27,12 @@ data/results/real-llm*.json
 
 # pytest cache
 .pytest_cache/
+
+# Industry-validation runs. A real campaign's artifacts are MEANT to be
+# committed from the machine that produced them -- the mission requires results
+# to live in the repository -- so only rehearsal runs are ignored here:
+# anything marked `-stub`, and the two fixed ids the tests and dry runs use.
+artifacts/industry_validation/*-stub/
+artifacts/industry_validation/DRYRUN*/
+artifacts/industry_validation/RESUMETEST/
+artifacts/industry_validation/LATEST

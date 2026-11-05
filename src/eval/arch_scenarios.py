@@ -36,6 +36,7 @@ Recovery decisions see neither.
 from __future__ import annotations
 
 import random
+import zlib
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -102,7 +103,14 @@ class ArchScenario:
         if level not in LEVELS:
             raise ValueError(f"unknown contamination level {level!r}")
         shape = REGIME_SHAPE[level]
-        rng = random.Random((seed << 8) ^ hash(spec.name) & 0xFFFF)
+        # A STABLE architecture hash. `hash(str)` is randomised per process
+        # (PYTHONHASHSEED), so seeding with it drew a DIFFERENT placement in
+        # every process: the same (architecture, level, seed) produced
+        # different contamination, which makes paired comparison and resume
+        # impossible and was observed flipping architecture D's original task
+        # outcome between two runs of the same diagnostic.
+        tag = zlib.crc32(spec.name.encode("utf-8"))
+        rng = random.Random((seed << 16) ^ tag)
 
         # Document readers, memory keys and hand-off consumers come from the
         # architecture's own agents, so a placement is always realisable.

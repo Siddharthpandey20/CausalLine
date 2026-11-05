@@ -1,0 +1,68 @@
+{
+  "architectures": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G"
+  ],
+  "levels": [
+    "small",
+    "medium",
+    "large"
+  ],
+  "trials": 3,
+  "seeds": [
+    20260917,
+    20260918,
+    20260919,
+    20260920,
+    20260921
+  ],
+  "methods": [
+    "B0",
+    "B1",
+    "B2",
+    "CausalLine",
+    "IREC"
+  ],
+  "detector": "oracle",
+  "stub": false,
+  "provider_shares": {
+    "local": 10,
+    "gemini": 8,
+    "nvidia": 2
+  },
+  "fallback_chain": [
+    "local",
+    "nvidia",
+    "gemini"
+  ],
+  "providers": {
+    "gemini": {
+      "rpm": 10,
+      "rpd": 1500,
+      "tpm": 250000,
+      "attempts": 3,
+      "max_usd": 5.0,
+      "source": "CONFIGURE ME: read the real limits for this project in AI Studio before launching"
+    },
+    "nvidia": {
+      "rpm": 40,
+      "rpd": 10000,
+      "attempts": 3,
+      "max_usd": null,
+      "source": "CONFIGURE ME: check the account's actual limits"
+    },
+    "local": {
+      "rpm": null,
+      "rpd": null,
+      "attempts": 2,
+      "source": "local inference; no provider quota"
+    }
+  },
+  "max_total_usd": 10.0,
+  "ollama_model": "llama3:latest"
+}
