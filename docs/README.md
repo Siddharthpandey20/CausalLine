@@ -46,6 +46,24 @@ wrong*.
 | [`15-cost-direction-reopened.md`](15-cost-direction-reopened.md) | the cost direction reopened: why the closure-scoped mechanism was rejected, and the retraction of the 3.6-point figure |
 | [`16-six-investigations.md`](16-six-investigations.md) | **six investigations into what is actually wrong**: the verification failures diagnosed, restart vs splice, the small-regime recalculation, a safety-constrained comparison, the detector band, and the 100-seed cost result. Supersedes `14` on how its small regime reads and `07`/`08`/`10` on how `work_preserved` is compared |
 
+## research/ — the IREC line, under validation
+
+A cost-reduction direction investigated in November 2026: remove attribution as
+a separate stage and let the recovery replay perform the counterfactual
+(**IREC**, Interventional Replay with Early Cutoff). **Verdict: CONDITIONAL
+GO.** Integrated behind a flag on branch `feat/irec`, off by default; current
+CausalLine remains the production strategy.
+
+| Document | What it is |
+|---|---|
+| [`research/IREC_FINAL_DECISION.md`](research/IREC_FINAL_DECISION.md) | **start here.** The GO/NO-GO, the acceptance criteria one by one, the economic verdict against both targets, and the three conditions on promoting the default |
+| [`research/IREC_LIVE_VALIDATION.md`](research/IREC_LIVE_VALIDATION.md) | the 15-placement real-model campaign: 0 unsafe, 100% recall, 15/15 verified, R = 0.76 / 0.63 / 0.95, and the nondeterminism measurement that replaces assumption A3 |
+| [`research/IREC_COST_ACCOUNTING.md`](research/IREC_COST_ACCOUNTING.md) | **two accounting defects, fixed and measured.** Baselines replayed on the wrong fixtures in long workflows (task success 6/18 → 18/18); escalated runs charged only their last replay (1.63× understated). **Read before quoting any cost figure from `07`–`14`** |
+| [`research/IREC_SAFETY_AND_NOVELTY.md`](research/IREC_SAFETY_AND_NOVELTY.md) | the exact-equality safety argument, the complete-mediation census, the side-effect audit, the bound's scope limits, and what is actually new |
+| [`research/FINAL_COST_OPTIMIZATION_RESEARCH.md`](research/FINAL_COST_OPTIMIZATION_RESEARCH.md) | the original research report that proposed IREC. Its §6 ratios are **offline predictions**; the live measurements supersede them |
+| [`research/RELATED_WORK_AND_SOURCES.md`](research/RELATED_WORK_AND_SOURCES.md) | the literature inventory behind the novelty assessment |
+| `research/prototype/` | the isolated harness. Nothing in `src/` imports it |
+
 ## Superseded on their numbers, kept for the record
 
 Correct measurements of the system as it then stood. Quote the replacement.
