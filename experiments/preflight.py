@@ -361,12 +361,22 @@ def check_quota(report: Report, config: dict) -> None:
     for provider, weight in shares.items():
         calls = total * weight / width
         limits = (config.get("providers") or {}).get(provider) or {}
+        # A configured soft cap bounds what this provider can ever be asked
+        # for, so the share-based estimate must not be used past it. Without
+        # this the check blocks on a number the cap makes unreachable.
+        cap_calls = limits.get("max_calls")
+        capped = cap_calls is not None and calls > cap_calls
+        if capped:
+            calls = float(cap_calls)
         rpd = limits.get("rpd")
         tokens = calls * 197                     # measured tokens per call
         rate_in, rate_out = PRICES.get(provider, (0.0, 0.0))
         usd = (tokens * 0.9 / 1e6) * rate_in + (tokens * 0.1 / 1e6) * rate_out
         detail = (f"{calls:,.0f} calls, {tokens:,.0f} tokens, "
                   f"about ${usd:.2f}")
+        if capped:
+            detail += (f"; SOFT-CAPPED at {cap_calls}, the rest falls back "
+                       f"to {' then '.join(config.get('fallback_chain') or ['local'])}")
         if rpd:
             days = calls / rpd
             detail += f"; {days:.1f} day(s) of the configured {rpd} RPD"

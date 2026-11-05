@@ -37,8 +37,7 @@
   },
   "fallback_chain": [
     "local",
-    "nvidia",
-    "gemini"
+    "nvidia"
   ],
   "providers": {
     "gemini": {
@@ -46,23 +45,24 @@
       "rpd": 1500,
       "tpm": 250000,
       "attempts": 3,
-      "max_usd": 5.0,
-      "source": "CONFIGURE ME: read the real limits for this project in AI Studio before launching"
+      "max_calls": 350,
+      "max_usd": 1.0,
+      "source": "free tier; SOFT CAP of 350 calls set for this run. On reaching it the provider is refused and every later invocation falls back, each fallback recorded."
     },
     "nvidia": {
       "rpm": 40,
       "rpd": 10000,
-      "attempts": 3,
+      "attempts": 2,
       "max_usd": null,
-      "source": "CONFIGURE ME: check the account's actual limits"
+      "source": "optional secondary fallback; account credits"
     },
     "local": {
       "rpm": null,
       "rpd": null,
       "attempts": 2,
-      "source": "local inference; no provider quota"
+      "source": "local inference on the RTX 3050 6GB; no provider quota"
     }
   },
-  "max_total_usd": 10.0,
+  "max_total_usd": 5.0,
   "ollama_model": "llama3:latest"
 }
