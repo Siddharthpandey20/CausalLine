@@ -19,7 +19,7 @@ tests, nothing in `src/` importing it at module level. 641 passed, 1 skipped.
 **Why GO and not NO-GO.** Every correctness and safety criterion was met on
 every one of the 15 live placements, the minimum economic requirement was met
 or tied in every run, and the cost reduction against current CausalLine is
-**0.216×** — a 78% reduction that comes entirely from deleting a stage the
+**0.223×** — a 78% reduction that comes entirely from deleting a stage the
 evidence shows was not merely redundant but *wrong* on at least one pair.
 
 **Why CONDITIONAL and not GO.** Three things are not yet established, and one
@@ -123,8 +123,14 @@ unreachable there for any sound black-box method under exact output semantics.
 It is reported per regime; the pooled 0.838 does not hide it.
 
 **Against current CausalLine, which is the question that matters for this
-project:** IREC is **0.216×** — 67,638 tokens against 312,706 over the same 13
-landed placements. CausalLine is 3.88× the cheaper baseline; IREC is 0.84×.
+project:** IREC is **0.223×** — 67,544 tokens against 302,550 over the same 13
+landed placements. CausalLine is 3.75× the cheaper baseline; IREC is 0.84×.
+
+> **CORRECTION (05-11-2026).** These read 0.216x, 67,638 and 312,706 before the
+> consolidated campaign. The CausalLine total was inflated by an analysis script
+> that double-counted the final replay attempt of each escalated run; see
+> `IREC_COST_ACCOUNTING.md` §3. The error flattered IREC and is corrected here.
+> `IREC_CAMPAIGN56.md` is the authority on all four methods' costs.
 
 ---
 

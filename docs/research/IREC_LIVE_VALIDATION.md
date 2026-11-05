@@ -13,7 +13,7 @@ assumption.**
 **Headline: all 15 placements, zero unsafe preservations, 100% recall, 15/15
 task success, 15/15 verification pass, zero escalations, zero control-flow
 divergences.** Cost `R = C_IREC / min(C_B0, C_B2)` is **0.76 / 0.63 / 0.95** in
-small / medium / large; **0.838 pooled**; and **0.216 against current
+small / medium / large; **0.838 pooled**; and **0.223 against current
 CausalLine**.
 
 ---
@@ -210,7 +210,7 @@ been, it would be additive (`IREC_COST_ACCOUNTING.md` §5).
 
 | regime | n | IREC | B0 | B2 | CausalLine | **R** | 0.8× target |
 |---|---:|---:|---:|---:|---:|---:|---|
-| small | 5 | 1,206 | 10,694 | 1,595 | 22,608 | **0.76** | **met** |
+| small | 5 | 1,206 | 10,694 | 1,595 | 20,577 | **0.76** | **met** |
 | medium | 3 | 5,006 | 10,678 | 7,952 | 23,751 | **0.63** | **met** |
 | large | 5 | 9,318 | 10,337 | 9,772 | 25,683 | **0.95** | **missed** |
 
@@ -221,9 +221,9 @@ been, it would be additive (`IREC_COST_ACCOUNTING.md` §5).
 | IREC | **67,638** | **0.838** |
 | B2 topology closure | 80,689 | 1.00 |
 | B0 full restart | 137,186 | 1.70 |
-| CausalLine (corrected) | 312,706 | 3.88 |
+| CausalLine (corrected) | 302,550 | 3.75 |
 
-**IREC costs 0.216× current CausalLine** — a 78% reduction — and the whole of
+**IREC costs 0.223× current CausalLine** — a 78% reduction — and the whole of
 that comes from deleting the attribution stage, which was 16,006 tokens per run
 and about two thirds of CausalLine's cost.
 

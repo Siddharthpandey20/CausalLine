@@ -1,0 +1,2235 @@
+[
+ {
+  "seed": 20260917,
+  "regime": "large",
+  "file": "seed20260917-large.json",
+  "events": 145,
+  "payload_landed": true,
+  "truth_events": 95,
+  "b2_closure": 137,
+  "flagged": [
+   "S10",
+   "S13",
+   "S16",
+   "S19",
+   "S2",
+   "S22",
+   "S25",
+   "S28",
+   "S33",
+   "S43",
+   "S47",
+   "S49",
+   "S5",
+   "S51",
+   "S53",
+   "S72",
+   "S77"
+  ],
+  "wall_clock_s": 42.8,
+  "failure": null,
+  "routing": {
+   "local": 47,
+   "gemini": 2,
+   "nvidia": 4
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 682,
+    "output_tokens": 186,
+    "total_tokens": 868,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 118
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 4,
+    "prompt_tokens": 842,
+    "output_tokens": 35,
+    "total_tokens": 877,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 4
+    },
+    "remaining_today": 796
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "implementation": "src/recovery/irec.py (integrated)",
+  "spliced": 2,
+  "reexecuted": 53,
+  "cutoff_kept": 5,
+  "changed": 48,
+  "irec_replay_tokens": 10014,
+  "irec_analysis_tokens": 0,
+  "irec_total_tokens": 10014,
+  "irec_fallback": null,
+  "irec_fallback_tokens": 0,
+  "discarded_num": 102,
+  "work_preserved_num": 43,
+  "work_preserved_den": 145,
+  "unsafe_num": 0,
+  "unsafe_den": 95,
+  "recall_num": 95,
+  "recall_den": 95,
+  "escapes_num": 0,
+  "escapes_den": 95,
+  "survived_bytes": [],
+  "task_success": true,
+  "verify_ok": true,
+  "verify_reasons": [],
+  "divergence": null,
+  "notes": [
+   "IREC: spliced 2, re-executed 53 (cutoff kept 5, replaced 48)",
+   "verify PASS"
+  ],
+  "methods": {
+   "B0": {
+    "replay": 10368,
+    "analysis": 0,
+    "total": 10368,
+    "work_preserved": 0.0,
+    "unsafe": 0,
+    "task": true
+   },
+   "B1": {
+    "replay": 10014,
+    "analysis": 0,
+    "total": 10014,
+    "work_preserved": 0.06206896551724138,
+    "unsafe": 0,
+    "task": true
+   },
+   "B2": {
+    "replay": 10014,
+    "analysis": 0,
+    "total": 10014,
+    "work_preserved": 0.05517241379310345,
+    "unsafe": 0,
+    "task": true
+   },
+   "CausalLine": {
+    "replay_recorded": 10014,
+    "replay_corrected": 10014,
+    "attempts": [
+     [
+      "attempt 1",
+      10014
+     ]
+    ],
+    "analysis": 16311,
+    "total": 26325,
+    "work_preserved": 0.22758620689655173,
+    "unsafe": 0,
+    "task": true,
+    "delivered_scope": "selective",
+    "verification_failures": 0
+   }
+  },
+  "original_task_success": false
+ },
+ {
+  "seed": 20260917,
+  "regime": "medium",
+  "file": "seed20260917-medium.json",
+  "events": 145,
+  "payload_landed": false,
+  "truth_events": 0,
+  "b2_closure": 95,
+  "flagged": [
+   "S14",
+   "S23",
+   "S4",
+   "S9"
+  ],
+  "wall_clock_s": 3.0,
+  "failure": null,
+  "routing": {
+   "local": 4
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": 120
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": 800
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "implementation": "src/recovery/irec.py (integrated)",
+  "spliced": 51,
+  "reexecuted": 4,
+  "cutoff_kept": 4,
+  "changed": 0,
+  "irec_replay_tokens": 671,
+  "irec_analysis_tokens": 0,
+  "irec_total_tokens": 671,
+  "irec_fallback": null,
+  "irec_fallback_tokens": 0,
+  "discarded_num": 0,
+  "work_preserved_num": 145,
+  "work_preserved_den": 145,
+  "unsafe_num": 0,
+  "unsafe_den": 0,
+  "recall_num": 0,
+  "recall_den": 0,
+  "escapes_num": 0,
+  "escapes_den": 0,
+  "survived_bytes": [],
+  "task_success": true,
+  "verify_ok": true,
+  "verify_reasons": [],
+  "divergence": null,
+  "notes": [
+   "IREC: spliced 51, re-executed 4 (cutoff kept 4, replaced 0)",
+   "verify PASS"
+  ],
+  "methods": {
+   "B0": {
+    "replay": 10845,
+    "analysis": 0,
+    "total": 10845,
+    "work_preserved": 0.0,
+    "unsafe": 0,
+    "task": false
+   },
+   "B1": {
+    "replay": 8199,
+    "analysis": 0,
+    "total": 8199,
+    "work_preserved": 0.35172413793103446,
+    "unsafe": 0,
+    "task": true
+   },
+   "B2": {
+    "replay": 8199,
+    "analysis": 0,
+    "total": 8199,
+    "work_preserved": 0.3448275862068966,
+    "unsafe": 0,
+    "task": true
+   },
+   "CausalLine": {
+    "replay_recorded": 8199,
+    "replay_corrected": 8199,
+    "attempts": [
+     [
+      "attempt 1",
+      8199
+     ]
+    ],
+    "analysis": 15797,
+    "total": 23996,
+    "work_preserved": 0.42758620689655175,
+    "unsafe": 0,
+    "task": true,
+    "delivered_scope": "selective",
+    "verification_failures": 0
+   }
+  },
+  "original_task_success": true
+ },
+ {
+  "seed": 20260917,
+  "regime": "small",
+  "file": "seed20260917-small.json",
+  "events": 145,
+  "payload_landed": true,
+  "truth_events": 9,
+  "b2_closure": 11,
+  "flagged": [
+   "S63"
+  ],
+  "wall_clock_s": 7.7,
+  "failure": null,
+  "routing": {
+   "local": 3,
+   "gemini": 1
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 1,
+    "prompt_tokens": 326,
+    "output_tokens": 93,
+    "total_tokens": 419,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 1
+    },
+    "remaining_today": 119
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": 800
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "implementation": "src/recovery/irec.py (integrated)",
+  "spliced": 51,
+  "reexecuted": 4,
+  "cutoff_kept": 0,
+  "changed": 4,
+  "irec_replay_tokens": 991,
+  "irec_analysis_tokens": 0,
+  "irec_total_tokens": 991,
+  "irec_fallback": null,
+  "irec_fallback_tokens": 0,
+  "discarded_num": 9,
+  "work_preserved_num": 136,
+  "work_preserved_den": 145,
+  "unsafe_num": 0,
+  "unsafe_den": 9,
+  "recall_num": 9,
+  "recall_den": 9,
+  "escapes_num": 0,
+  "escapes_den": 9,
+  "survived_bytes": [],
+  "task_success": true,
+  "verify_ok": true,
+  "verify_reasons": [],
+  "divergence": null,
+  "notes": [
+   "IREC: spliced 51, re-executed 4 (cutoff kept 0, replaced 4)",
+   "verify PASS"
+  ],
+  "methods": {
+   "B0": {
+    "replay": 10687,
+    "analysis": 0,
+    "total": 10687,
+    "work_preserved": 0.0,
+    "unsafe": 0,
+    "task": true
+   },
+   "B1": {
+    "replay": 1310,
+    "analysis": 0,
+    "total": 1310,
+    "work_preserved": 0.9241379310344827,
+    "unsafe": 0,
+    "task": true
+   },
+   "B2": {
+    "replay": 1310,
+    "analysis": 0,
+    "total": 1310,
+    "work_preserved": 0.9241379310344827,
+    "unsafe": 0,
+    "task": true
+   },
+   "CausalLine": {
+    "replay_recorded": 10687,
+    "replay_corrected": 13106,
+    "attempts": [
+     [
+      "attempt 1",
+      1100
+     ],
+     [
+      "attempt 2",
+      1319
+     ],
+     [
+      "attempt 3",
+      10687
+     ]
+    ],
+    "analysis": 16269,
+    "total": 29375,
+    "work_preserved": 0.0,
+    "unsafe": 0,
+    "task": true,
+    "delivered_scope": "restart_all",
+    "verification_failures": 2
+   }
+  },
+  "original_task_success": false
+ },
+ {
+  "seed": 20260918,
+  "regime": "large",
+  "file": "seed20260918-large.json",
+  "events": 145,
+  "payload_landed": true,
+  "truth_events": 98,
+  "b2_closure": 129,
+  "flagged": [
+   "S11",
+   "S14",
+   "S17",
+   "S2",
+   "S22",
+   "S29",
+   "S33",
+   "S35",
+   "S41",
+   "S45",
+   "S47",
+   "S49",
+   "S5",
+   "S51",
+   "S68",
+   "S72",
+   "S75",
+   "S8"
+  ],
+  "wall_clock_s": 42.9,
+  "failure": null,
+  "routing": {
+   "local": 45,
+   "gemini": 2,
+   "nvidia": 4
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 682,
+    "output_tokens": 186,
+    "total_tokens": 868,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 118
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 4,
+    "prompt_tokens": 842,
+    "output_tokens": 35,
+    "total_tokens": 877,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 4
+    },
+    "remaining_today": 796
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "implementation": "src/recovery/irec.py (integrated)",
+  "spliced": 4,
+  "reexecuted": 51,
+  "cutoff_kept": 1,
+  "changed": 50,
+  "irec_replay_tokens": 9574,
+  "irec_analysis_tokens": 0,
+  "irec_total_tokens": 9574,
+  "irec_fallback": null,
+  "irec_fallback_tokens": 0,
+  "discarded_num": 108,
+  "work_preserved_num": 37,
+  "work_preserved_den": 145,
+  "unsafe_num": 0,
+  "unsafe_den": 98,
+  "recall_num": 98,
+  "recall_den": 98,
+  "escapes_num": 0,
+  "escapes_den": 98,
+  "survived_bytes": [],
+  "task_success": true,
+  "verify_ok": true,
+  "verify_reasons": [],
+  "divergence": null,
+  "notes": [
+   "IREC: spliced 4, re-executed 51 (cutoff kept 1, replaced 50)",
+   "verify PASS"
+  ],
+  "methods": {
+   "B0": {
+    "replay": 10288,
+    "analysis": 0,
+    "total": 10288,
+    "work_preserved": 0.0,
+    "unsafe": 0,
+    "task": true
+   },
+   "B1": {
+    "replay": 9574,
+    "analysis": 0,
+    "total": 9574,
+    "work_preserved": 0.11724137931034483,
+    "unsafe": 0,
+    "task": true
+   },
+   "B2": {
+    "replay": 9574,
+    "analysis": 0,
+    "total": 9574,
+    "work_preserved": 0.1103448275862069,
+    "unsafe": 0,
+    "task": true
+   },
+   "CausalLine": {
+    "replay_recorded": 9574,
+    "replay_corrected": 9574,
+    "attempts": [
+     [
+      "attempt 1",
+      9574
+     ]
+    ],
+    "analysis": 15806,
+    "total": 25380,
+    "work_preserved": 0.2413793103448276,
+    "unsafe": 0,
+    "task": true,
+    "delivered_scope": "selective",
+    "verification_failures": 0
+   }
+  },
+  "original_task_success": false
+ },
+ {
+  "seed": 20260918,
+  "regime": "medium",
+  "file": "seed20260918-medium.json",
+  "events": 145,
+  "payload_landed": true,
+  "truth_events": 17,
+  "b2_closure": 81,
+  "flagged": [
+   "S16",
+   "S23"
+  ],
+  "wall_clock_s": 23.9,
+  "failure": null,
+  "routing": {
+   "local": 16,
+   "gemini": 2,
+   "nvidia": 2
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 682,
+    "output_tokens": 186,
+    "total_tokens": 868,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 118
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 518,
+    "output_tokens": 11,
+    "total_tokens": 529,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 798
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "implementation": "src/recovery/irec.py (integrated)",
+  "spliced": 35,
+  "reexecuted": 20,
+  "cutoff_kept": 12,
+  "changed": 8,
+  "irec_replay_tokens": 4724,
+  "irec_analysis_tokens": 0,
+  "irec_total_tokens": 4724,
+  "irec_fallback": null,
+  "irec_fallback_tokens": 0,
+  "discarded_num": 17,
+  "work_preserved_num": 128,
+  "work_preserved_den": 145,
+  "unsafe_num": 0,
+  "unsafe_den": 17,
+  "recall_num": 17,
+  "recall_den": 17,
+  "escapes_num": 0,
+  "escapes_den": 17,
+  "survived_bytes": [],
+  "task_success": true,
+  "verify_ok": true,
+  "verify_reasons": [],
+  "divergence": null,
+  "notes": [
+   "IREC: spliced 35, re-executed 20 (cutoff kept 12, replaced 8)",
+   "verify PASS"
+  ],
+  "methods": {
+   "B0": {
+    "replay": 10689,
+    "analysis": 0,
+    "total": 10689,
+    "work_preserved": 0.0,
+    "unsafe": 0,
+    "task": true
+   },
+   "B1": {
+    "replay": 7469,
+    "analysis": 0,
+    "total": 7469,
+    "work_preserved": 0.4482758620689655,
+    "unsafe": 0,
+    "task": true
+   },
+   "B2": {
+    "replay": 7469,
+    "analysis": 0,
+    "total": 7469,
+    "work_preserved": 0.4413793103448276,
+    "unsafe": 0,
+    "task": true
+   },
+   "CausalLine": {
+    "replay_recorded": 7469,
+    "replay_corrected": 7469,
+    "attempts": [
+     [
+      "attempt 1",
+      7469
+     ]
+    ],
+    "analysis": 15811,
+    "total": 23280,
+    "work_preserved": 0.4827586206896552,
+    "unsafe": 0,
+    "task": true,
+    "delivered_scope": "selective",
+    "verification_failures": 0
+   }
+  },
+  "original_task_success": false
+ },
+ {
+  "seed": 20260918,
+  "regime": "small",
+  "file": "seed20260918-small.json",
+  "events": 145,
+  "payload_landed": true,
+  "truth_events": 13,
+  "b2_closure": 17,
+  "flagged": [
+   "S59",
+   "S61"
+  ],
+  "wall_clock_s": 9.1,
+  "failure": null,
+  "routing": {
+   "local": 5,
+   "gemini": 1
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 1,
+    "prompt_tokens": 326,
+    "output_tokens": 93,
+    "total_tokens": 419,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 1
+    },
+    "remaining_today": 119
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": 800
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "implementation": "src/recovery/irec.py (integrated)",
+  "spliced": 49,
+  "reexecuted": 6,
+  "cutoff_kept": 0,
+  "changed": 6,
+  "irec_replay_tokens": 1359,
+  "irec_analysis_tokens": 0,
+  "irec_total_tokens": 1359,
+  "irec_fallback": null,
+  "irec_fallback_tokens": 0,
+  "discarded_num": 13,
+  "work_preserved_num": 132,
+  "work_preserved_den": 145,
+  "unsafe_num": 0,
+  "unsafe_den": 13,
+  "recall_num": 13,
+  "recall_den": 13,
+  "escapes_num": 0,
+  "escapes_den": 13,
+  "survived_bytes": [],
+  "task_success": true,
+  "verify_ok": true,
+  "verify_reasons": [],
+  "divergence": null,
+  "notes": [
+   "IREC: spliced 49, re-executed 6 (cutoff kept 0, replaced 6)",
+   "verify PASS"
+  ],
+  "methods": {
+   "B0": {
+    "replay": 10667,
+    "analysis": 0,
+    "total": 10667,
+    "work_preserved": 0.0,
+    "unsafe": 0,
+    "task": true
+   },
+   "B1": {
+    "replay": 1802,
+    "analysis": 0,
+    "total": 1802,
+    "work_preserved": 0.8827586206896552,
+    "unsafe": 0,
+    "task": true
+   },
+   "B2": {
+    "replay": 1802,
+    "analysis": 0,
+    "total": 1802,
+    "work_preserved": 0.8827586206896552,
+    "unsafe": 0,
+    "task": true
+   },
+   "CausalLine": {
+    "replay_recorded": 1359,
+    "replay_corrected": 1359,
+    "attempts": [
+     [
+      "attempt 1",
+      1359
+     ]
+    ],
+    "analysis": 16016,
+    "total": 17375,
+    "work_preserved": 0.9103448275862069,
+    "unsafe": 0,
+    "task": true,
+    "delivered_scope": "selective",
+    "verification_failures": 0
+   }
+  },
+  "original_task_success": false
+ },
+ {
+  "seed": 20260919,
+  "regime": "large",
+  "file": "seed20260919-large.json",
+  "events": 145,
+  "payload_landed": true,
+  "truth_events": 84,
+  "b2_closure": 134,
+  "flagged": [
+   "S10",
+   "S13",
+   "S16",
+   "S19",
+   "S2",
+   "S24",
+   "S27",
+   "S30",
+   "S33",
+   "S37",
+   "S39",
+   "S41",
+   "S47",
+   "S49",
+   "S51",
+   "S53",
+   "S7",
+   "S71",
+   "S73"
+  ],
+  "wall_clock_s": 39.4,
+  "failure": null,
+  "routing": {
+   "local": 43,
+   "gemini": 2,
+   "nvidia": 4
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 682,
+    "output_tokens": 186,
+    "total_tokens": 868,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 118
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 4,
+    "prompt_tokens": 842,
+    "output_tokens": 35,
+    "total_tokens": 877,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 4
+    },
+    "remaining_today": 796
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "implementation": "src/recovery/irec.py (integrated)",
+  "spliced": 6,
+  "reexecuted": 49,
+  "cutoff_kept": 8,
+  "changed": 41,
+  "irec_replay_tokens": 9280,
+  "irec_analysis_tokens": 0,
+  "irec_total_tokens": 9280,
+  "irec_fallback": null,
+  "irec_fallback_tokens": 0,
+  "discarded_num": 90,
+  "work_preserved_num": 55,
+  "work_preserved_den": 145,
+  "unsafe_num": 0,
+  "unsafe_den": 84,
+  "recall_num": 84,
+  "recall_den": 84,
+  "escapes_num": 0,
+  "escapes_den": 84,
+  "survived_bytes": [],
+  "task_success": true,
+  "verify_ok": true,
+  "verify_reasons": [],
+  "divergence": null,
+  "notes": [
+   "IREC: spliced 6, re-executed 49 (cutoff kept 8, replaced 41)",
+   "verify PASS"
+  ],
+  "methods": {
+   "B0": {
+    "replay": 10284,
+    "analysis": 0,
+    "total": 10284,
+    "work_preserved": 0.0,
+    "unsafe": 0,
+    "task": true
+   },
+   "B1": {
+    "replay": 9762,
+    "analysis": 0,
+    "total": 9762,
+    "work_preserved": 0.08275862068965517,
+    "unsafe": 0,
+    "task": true
+   },
+   "B2": {
+    "replay": 9762,
+    "analysis": 0,
+    "total": 9762,
+    "work_preserved": 0.07586206896551724,
+    "unsafe": 0,
+    "task": true
+   },
+   "CausalLine": {
+    "replay_recorded": 9762,
+    "replay_corrected": 9762,
+    "attempts": [
+     [
+      "attempt 1",
+      9762
+     ]
+    ],
+    "analysis": 15801,
+    "total": 25563,
+    "work_preserved": 0.22758620689655173,
+    "unsafe": 0,
+    "task": true,
+    "delivered_scope": "selective",
+    "verification_failures": 0
+   }
+  },
+  "original_task_success": false
+ },
+ {
+  "seed": 20260919,
+  "regime": "medium",
+  "file": "seed20260919-medium.json",
+  "events": 145,
+  "payload_landed": true,
+  "truth_events": 17,
+  "b2_closure": 95,
+  "flagged": [
+   "S14",
+   "S17",
+   "S4",
+   "S7"
+  ],
+  "wall_clock_s": 22.3,
+  "failure": null,
+  "routing": {
+   "local": 18,
+   "gemini": 2,
+   "nvidia": 2
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 682,
+    "output_tokens": 186,
+    "total_tokens": 868,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 118
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 518,
+    "output_tokens": 11,
+    "total_tokens": 529,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 798
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "implementation": "src/recovery/irec.py (integrated)",
+  "spliced": 33,
+  "reexecuted": 22,
+  "cutoff_kept": 14,
+  "changed": 8,
+  "irec_replay_tokens": 5145,
+  "irec_analysis_tokens": 0,
+  "irec_total_tokens": 5145,
+  "irec_fallback": null,
+  "irec_fallback_tokens": 0,
+  "discarded_num": 17,
+  "work_preserved_num": 128,
+  "work_preserved_den": 145,
+  "unsafe_num": 0,
+  "unsafe_den": 17,
+  "recall_num": 17,
+  "recall_den": 17,
+  "escapes_num": 0,
+  "escapes_den": 17,
+  "survived_bytes": [],
+  "task_success": true,
+  "verify_ok": true,
+  "verify_reasons": [],
+  "divergence": null,
+  "notes": [
+   "IREC: spliced 33, re-executed 22 (cutoff kept 14, replaced 8)",
+   "verify PASS"
+  ],
+  "methods": {
+   "B0": {
+    "replay": 10672,
+    "analysis": 0,
+    "total": 10672,
+    "work_preserved": 0.0,
+    "unsafe": 0,
+    "task": true
+   },
+   "B1": {
+    "replay": 8195,
+    "analysis": 0,
+    "total": 8195,
+    "work_preserved": 0.35172413793103446,
+    "unsafe": 0,
+    "task": true
+   },
+   "B2": {
+    "replay": 8195,
+    "analysis": 0,
+    "total": 8195,
+    "work_preserved": 0.3448275862068966,
+    "unsafe": 0,
+    "task": true
+   },
+   "CausalLine": {
+    "replay_recorded": 8195,
+    "replay_corrected": 8195,
+    "attempts": [
+     [
+      "attempt 1",
+      8195
+     ]
+    ],
+    "analysis": 15793,
+    "total": 23988,
+    "work_preserved": 0.42758620689655175,
+    "unsafe": 0,
+    "task": true,
+    "delivered_scope": "selective",
+    "verification_failures": 0
+   }
+  },
+  "original_task_success": false
+ },
+ {
+  "seed": 20260919,
+  "regime": "small",
+  "file": "seed20260919-small.json",
+  "events": 145,
+  "payload_landed": true,
+  "truth_events": 13,
+  "b2_closure": 17,
+  "flagged": [
+   "S59",
+   "S64"
+  ],
+  "wall_clock_s": 9.3,
+  "failure": null,
+  "routing": {
+   "local": 5,
+   "gemini": 1
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 1,
+    "prompt_tokens": 326,
+    "output_tokens": 93,
+    "total_tokens": 419,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 1
+    },
+    "remaining_today": 119
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": 800
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "implementation": "src/recovery/irec.py (integrated)",
+  "spliced": 49,
+  "reexecuted": 6,
+  "cutoff_kept": 0,
+  "changed": 6,
+  "irec_replay_tokens": 1341,
+  "irec_analysis_tokens": 0,
+  "irec_total_tokens": 1341,
+  "irec_fallback": null,
+  "irec_fallback_tokens": 0,
+  "discarded_num": 13,
+  "work_preserved_num": 132,
+  "work_preserved_den": 145,
+  "unsafe_num": 0,
+  "unsafe_den": 13,
+  "recall_num": 13,
+  "recall_den": 13,
+  "escapes_num": 0,
+  "escapes_den": 13,
+  "survived_bytes": [],
+  "task_success": true,
+  "verify_ok": true,
+  "verify_reasons": [],
+  "divergence": null,
+  "notes": [
+   "IREC: spliced 49, re-executed 6 (cutoff kept 0, replaced 6)",
+   "verify PASS"
+  ],
+  "methods": {
+   "B0": {
+    "replay": 10667,
+    "analysis": 0,
+    "total": 10667,
+    "work_preserved": 0.0,
+    "unsafe": 0,
+    "task": true
+   },
+   "B1": {
+    "replay": 1825,
+    "analysis": 0,
+    "total": 1825,
+    "work_preserved": 0.8827586206896552,
+    "unsafe": 0,
+    "task": true
+   },
+   "B2": {
+    "replay": 1825,
+    "analysis": 0,
+    "total": 1825,
+    "work_preserved": 0.8827586206896552,
+    "unsafe": 0,
+    "task": true
+   },
+   "CausalLine": {
+    "replay_recorded": 1341,
+    "replay_corrected": 1341,
+    "attempts": [
+     [
+      "attempt 1",
+      1341
+     ]
+    ],
+    "analysis": 16261,
+    "total": 17602,
+    "work_preserved": 0.9103448275862069,
+    "unsafe": 0,
+    "task": true,
+    "delivered_scope": "selective",
+    "verification_failures": 0
+   }
+  },
+  "original_task_success": false
+ },
+ {
+  "seed": 20260920,
+  "regime": "large",
+  "file": "seed20260920-large.json",
+  "events": 145,
+  "payload_landed": true,
+  "truth_events": 73,
+  "b2_closure": 133,
+  "flagged": [
+   "S12",
+   "S15",
+   "S18",
+   "S23",
+   "S26",
+   "S29",
+   "S32",
+   "S34",
+   "S36",
+   "S4",
+   "S40",
+   "S44",
+   "S52",
+   "S73",
+   "S9"
+  ],
+  "wall_clock_s": 36.7,
+  "failure": null,
+  "routing": {
+   "local": 39,
+   "gemini": 2,
+   "nvidia": 4
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 682,
+    "output_tokens": 186,
+    "total_tokens": 868,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 118
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 4,
+    "prompt_tokens": 842,
+    "output_tokens": 35,
+    "total_tokens": 877,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 4
+    },
+    "remaining_today": 796
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "implementation": "src/recovery/irec.py (integrated)",
+  "spliced": 10,
+  "reexecuted": 45,
+  "cutoff_kept": 9,
+  "changed": 36,
+  "irec_replay_tokens": 8727,
+  "irec_analysis_tokens": 0,
+  "irec_total_tokens": 8727,
+  "irec_fallback": null,
+  "irec_fallback_tokens": 0,
+  "discarded_num": 78,
+  "work_preserved_num": 67,
+  "work_preserved_den": 145,
+  "unsafe_num": 0,
+  "unsafe_den": 73,
+  "recall_num": 73,
+  "recall_den": 73,
+  "escapes_num": 0,
+  "escapes_den": 73,
+  "survived_bytes": [],
+  "task_success": true,
+  "verify_ok": true,
+  "verify_reasons": [],
+  "divergence": null,
+  "notes": [
+   "IREC: spliced 10, re-executed 45 (cutoff kept 9, replaced 36)",
+   "verify PASS"
+  ],
+  "methods": {
+   "B0": {
+    "replay": 10403,
+    "analysis": 0,
+    "total": 10403,
+    "work_preserved": 0.0,
+    "unsafe": 0,
+    "task": true
+   },
+   "B1": {
+    "replay": 9873,
+    "analysis": 0,
+    "total": 9873,
+    "work_preserved": 0.0896551724137931,
+    "unsafe": 0,
+    "task": true
+   },
+   "B2": {
+    "replay": 9873,
+    "analysis": 0,
+    "total": 9873,
+    "work_preserved": 0.08275862068965517,
+    "unsafe": 0,
+    "task": true
+   },
+   "CausalLine": {
+    "replay_recorded": 9873,
+    "replay_corrected": 9873,
+    "attempts": [
+     [
+      "attempt 1",
+      9873
+     ]
+    ],
+    "analysis": 15826,
+    "total": 25699,
+    "work_preserved": 0.2413793103448276,
+    "unsafe": 0,
+    "task": true,
+    "delivered_scope": "selective",
+    "verification_failures": 0
+   }
+  },
+  "original_task_success": false
+ },
+ {
+  "seed": 20260920,
+  "regime": "medium",
+  "file": "seed20260920-medium.json",
+  "events": 145,
+  "payload_landed": false,
+  "truth_events": 0,
+  "b2_closure": 88,
+  "flagged": [
+   "S12",
+   "S19",
+   "S26"
+  ],
+  "wall_clock_s": 2.0,
+  "failure": null,
+  "routing": {
+   "local": 3
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": 120
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": 800
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "implementation": "src/recovery/irec.py (integrated)",
+  "spliced": 52,
+  "reexecuted": 3,
+  "cutoff_kept": 3,
+  "changed": 0,
+  "irec_replay_tokens": 507,
+  "irec_analysis_tokens": 0,
+  "irec_total_tokens": 507,
+  "irec_fallback": null,
+  "irec_fallback_tokens": 0,
+  "discarded_num": 0,
+  "work_preserved_num": 145,
+  "work_preserved_den": 145,
+  "unsafe_num": 0,
+  "unsafe_den": 0,
+  "recall_num": 0,
+  "recall_den": 0,
+  "escapes_num": 0,
+  "escapes_den": 0,
+  "survived_bytes": [],
+  "task_success": true,
+  "verify_ok": true,
+  "verify_reasons": [],
+  "divergence": null,
+  "notes": [
+   "IREC: spliced 52, re-executed 3 (cutoff kept 3, replaced 0)",
+   "verify PASS"
+  ],
+  "methods": {
+   "B0": {
+    "replay": 10690,
+    "analysis": 0,
+    "total": 10690,
+    "work_preserved": 0.0,
+    "unsafe": 0,
+    "task": false
+   },
+   "B1": {
+    "replay": 7819,
+    "analysis": 0,
+    "total": 7819,
+    "work_preserved": 0.4,
+    "unsafe": 0,
+    "task": true
+   },
+   "B2": {
+    "replay": 7819,
+    "analysis": 0,
+    "total": 7819,
+    "work_preserved": 0.3931034482758621,
+    "unsafe": 0,
+    "task": true
+   },
+   "CausalLine": {
+    "replay_recorded": 7819,
+    "replay_corrected": 7819,
+    "attempts": [
+     [
+      "attempt 1",
+      7819
+     ]
+    ],
+    "analysis": 15785,
+    "total": 23604,
+    "work_preserved": 0.45517241379310347,
+    "unsafe": 0,
+    "task": true,
+    "delivered_scope": "selective",
+    "verification_failures": 0
+   }
+  },
+  "original_task_success": true
+ },
+ {
+  "seed": 20260920,
+  "regime": "small",
+  "file": "seed20260920-small.json",
+  "events": 145,
+  "payload_landed": true,
+  "truth_events": 13,
+  "b2_closure": 17,
+  "flagged": [
+   "S58",
+   "S64"
+  ],
+  "wall_clock_s": 9.4,
+  "failure": null,
+  "routing": {
+   "nvidia": 1,
+   "local": 4,
+   "gemini": 1
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 1,
+    "prompt_tokens": 326,
+    "output_tokens": 93,
+    "total_tokens": 419,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 1
+    },
+    "remaining_today": 119
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 1,
+    "prompt_tokens": 152,
+    "output_tokens": 15,
+    "total_tokens": 167,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 1
+    },
+    "remaining_today": 799
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "implementation": "src/recovery/irec.py (integrated)",
+  "spliced": 49,
+  "reexecuted": 6,
+  "cutoff_kept": 0,
+  "changed": 6,
+  "irec_replay_tokens": 1352,
+  "irec_analysis_tokens": 0,
+  "irec_total_tokens": 1352,
+  "irec_fallback": null,
+  "irec_fallback_tokens": 0,
+  "discarded_num": 13,
+  "work_preserved_num": 132,
+  "work_preserved_den": 145,
+  "unsafe_num": 0,
+  "unsafe_den": 13,
+  "recall_num": 13,
+  "recall_den": 13,
+  "escapes_num": 0,
+  "escapes_den": 13,
+  "survived_bytes": [],
+  "task_success": true,
+  "verify_ok": true,
+  "verify_reasons": [],
+  "divergence": null,
+  "notes": [
+   "IREC: spliced 49, re-executed 6 (cutoff kept 0, replaced 6)",
+   "verify PASS"
+  ],
+  "methods": {
+   "B0": {
+    "replay": 10666,
+    "analysis": 0,
+    "total": 10666,
+    "work_preserved": 0.0,
+    "unsafe": 0,
+    "task": true
+   },
+   "B1": {
+    "replay": 1835,
+    "analysis": 0,
+    "total": 1835,
+    "work_preserved": 0.8827586206896552,
+    "unsafe": 0,
+    "task": true
+   },
+   "B2": {
+    "replay": 1830,
+    "analysis": 0,
+    "total": 1830,
+    "work_preserved": 0.8827586206896552,
+    "unsafe": 0,
+    "task": false
+   },
+   "CausalLine": {
+    "replay_recorded": 1835,
+    "replay_corrected": 3214,
+    "attempts": [
+     [
+      "attempt 1",
+      1379
+     ],
+     [
+      "attempt 2",
+      1835
+     ]
+    ],
+    "analysis": 16758,
+    "total": 19972,
+    "work_preserved": 0.8827586206896552,
+    "unsafe": 0,
+    "task": true,
+    "delivered_scope": "agent_restart",
+    "verification_failures": 1
+   }
+  },
+  "original_task_success": false
+ },
+ {
+  "seed": 20260921,
+  "regime": "large",
+  "file": "seed20260921-large.json",
+  "events": 145,
+  "payload_landed": true,
+  "truth_events": 83,
+  "b2_closure": 130,
+  "flagged": [
+   "S10",
+   "S13",
+   "S18",
+   "S21",
+   "S24",
+   "S29",
+   "S32",
+   "S34",
+   "S38",
+   "S4",
+   "S44",
+   "S46",
+   "S48",
+   "S52",
+   "S7",
+   "S72",
+   "S74"
+  ],
+  "wall_clock_s": 39.3,
+  "failure": null,
+  "routing": {
+   "local": 41,
+   "gemini": 2,
+   "nvidia": 4
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 682,
+    "output_tokens": 186,
+    "total_tokens": 868,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 118
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 4,
+    "prompt_tokens": 842,
+    "output_tokens": 35,
+    "total_tokens": 877,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 4
+    },
+    "remaining_today": 796
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "implementation": "src/recovery/irec.py (integrated)",
+  "spliced": 8,
+  "reexecuted": 47,
+  "cutoff_kept": 7,
+  "changed": 40,
+  "irec_replay_tokens": 8996,
+  "irec_analysis_tokens": 0,
+  "irec_total_tokens": 8996,
+  "irec_fallback": null,
+  "irec_fallback_tokens": 0,
+  "discarded_num": 87,
+  "work_preserved_num": 58,
+  "work_preserved_den": 145,
+  "unsafe_num": 0,
+  "unsafe_den": 83,
+  "recall_num": 83,
+  "recall_den": 83,
+  "escapes_num": 0,
+  "escapes_den": 83,
+  "survived_bytes": [],
+  "task_success": true,
+  "verify_ok": true,
+  "verify_reasons": [],
+  "divergence": null,
+  "notes": [
+   "IREC: spliced 8, re-executed 47 (cutoff kept 7, replaced 40)",
+   "verify PASS"
+  ],
+  "methods": {
+   "B0": {
+    "replay": 10341,
+    "analysis": 0,
+    "total": 10341,
+    "work_preserved": 0.0,
+    "unsafe": 0,
+    "task": true
+   },
+   "B1": {
+    "replay": 9636,
+    "analysis": 0,
+    "total": 9636,
+    "work_preserved": 0.1103448275862069,
+    "unsafe": 0,
+    "task": true
+   },
+   "B2": {
+    "replay": 9636,
+    "analysis": 0,
+    "total": 9636,
+    "work_preserved": 0.10344827586206896,
+    "unsafe": 0,
+    "task": true
+   },
+   "CausalLine": {
+    "replay_recorded": 9636,
+    "replay_corrected": 9636,
+    "attempts": [
+     [
+      "attempt 1",
+      9636
+     ]
+    ],
+    "analysis": 15810,
+    "total": 25446,
+    "work_preserved": 0.2482758620689655,
+    "unsafe": 0,
+    "task": true,
+    "delivered_scope": "selective",
+    "verification_failures": 0
+   }
+  },
+  "original_task_success": false
+ },
+ {
+  "seed": 20260921,
+  "regime": "medium",
+  "file": "seed20260921-medium.json",
+  "events": 145,
+  "payload_landed": true,
+  "truth_events": 17,
+  "b2_closure": 95,
+  "flagged": [
+   "S14",
+   "S19",
+   "S4",
+   "S9"
+  ],
+  "wall_clock_s": 20.9,
+  "failure": null,
+  "routing": {
+   "local": 18,
+   "gemini": 2,
+   "nvidia": 2
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 682,
+    "output_tokens": 186,
+    "total_tokens": 868,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 118
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 518,
+    "output_tokens": 11,
+    "total_tokens": 529,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 798
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "implementation": "src/recovery/irec.py (integrated)",
+  "spliced": 33,
+  "reexecuted": 22,
+  "cutoff_kept": 14,
+  "changed": 8,
+  "irec_replay_tokens": 5056,
+  "irec_analysis_tokens": 0,
+  "irec_total_tokens": 5056,
+  "irec_fallback": null,
+  "irec_fallback_tokens": 0,
+  "discarded_num": 17,
+  "work_preserved_num": 128,
+  "work_preserved_den": 145,
+  "unsafe_num": 0,
+  "unsafe_den": 17,
+  "recall_num": 17,
+  "recall_den": 17,
+  "escapes_num": 0,
+  "escapes_den": 17,
+  "survived_bytes": [],
+  "task_success": true,
+  "verify_ok": true,
+  "verify_reasons": [],
+  "divergence": null,
+  "notes": [
+   "IREC: spliced 33, re-executed 22 (cutoff kept 14, replaced 8)",
+   "verify PASS"
+  ],
+  "methods": {
+   "B0": {
+    "replay": 10672,
+    "analysis": 0,
+    "total": 10672,
+    "work_preserved": 0.0,
+    "unsafe": 0,
+    "task": true
+   },
+   "B1": {
+    "replay": 8192,
+    "analysis": 0,
+    "total": 8192,
+    "work_preserved": 0.35172413793103446,
+    "unsafe": 0,
+    "task": true
+   },
+   "B2": {
+    "replay": 8192,
+    "analysis": 0,
+    "total": 8192,
+    "work_preserved": 0.3448275862068966,
+    "unsafe": 0,
+    "task": true
+   },
+   "CausalLine": {
+    "replay_recorded": 8192,
+    "replay_corrected": 8192,
+    "attempts": [
+     [
+      "attempt 1",
+      8192
+     ]
+    ],
+    "analysis": 15794,
+    "total": 23986,
+    "work_preserved": 0.42758620689655175,
+    "unsafe": 0,
+    "task": true,
+    "delivered_scope": "selective",
+    "verification_failures": 0
+   }
+  },
+  "original_task_success": false
+ },
+ {
+  "seed": 20260921,
+  "regime": "small",
+  "file": "seed20260921-small.json",
+  "events": 145,
+  "payload_landed": true,
+  "truth_events": 9,
+  "b2_closure": 11,
+  "flagged": [
+   "S66"
+  ],
+  "wall_clock_s": 6.4,
+  "failure": null,
+  "routing": {
+   "local": 3,
+   "gemini": 1
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 1,
+    "prompt_tokens": 326,
+    "output_tokens": 93,
+    "total_tokens": 419,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 1
+    },
+    "remaining_today": 119
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": 800
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "implementation": "src/recovery/irec.py (integrated)",
+  "spliced": 51,
+  "reexecuted": 4,
+  "cutoff_kept": 0,
+  "changed": 4,
+  "irec_replay_tokens": 985,
+  "irec_analysis_tokens": 0,
+  "irec_total_tokens": 985,
+  "irec_fallback": null,
+  "irec_fallback_tokens": 0,
+  "discarded_num": 9,
+  "work_preserved_num": 136,
+  "work_preserved_den": 145,
+  "unsafe_num": 0,
+  "unsafe_den": 9,
+  "recall_num": 9,
+  "recall_den": 9,
+  "escapes_num": 0,
+  "escapes_den": 9,
+  "survived_bytes": [],
+  "task_success": true,
+  "verify_ok": true,
+  "verify_reasons": [],
+  "divergence": null,
+  "notes": [
+   "IREC: spliced 51, re-executed 4 (cutoff kept 0, replaced 4)",
+   "verify PASS"
+  ],
+  "methods": {
+   "B0": {
+    "replay": 10782,
+    "analysis": 0,
+    "total": 10782,
+    "work_preserved": 0.0,
+    "unsafe": 0,
+    "task": true
+   },
+   "B1": {
+    "replay": 1207,
+    "analysis": 0,
+    "total": 1207,
+    "work_preserved": 0.9241379310344827,
+    "unsafe": 0,
+    "task": true
+   },
+   "B2": {
+    "replay": 1207,
+    "analysis": 0,
+    "total": 1207,
+    "work_preserved": 0.9241379310344827,
+    "unsafe": 0,
+    "task": true
+   },
+   "CausalLine": {
+    "replay_recorded": 1207,
+    "replay_corrected": 2301,
+    "attempts": [
+     [
+      "attempt 1",
+      1094
+     ],
+     [
+      "attempt 2",
+      1207
+     ]
+    ],
+    "analysis": 16258,
+    "total": 18559,
+    "work_preserved": 0.9241379310344827,
+    "unsafe": 0,
+    "task": true,
+    "delivered_scope": "agent_restart",
+    "verification_failures": 1
+   }
+  },
+  "original_task_success": false
+ }
+]

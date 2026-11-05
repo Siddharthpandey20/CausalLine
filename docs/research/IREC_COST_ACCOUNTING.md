@@ -150,12 +150,21 @@ Corpus-wide effect on mean CausalLine replay tokens per run:
 
 | corpus | reported | corrected | ratio |
 |---|---:|---:|---:|
-| primary (15 runs) | 7,011 | **8,014** | 1.143× |
+| primary (15 runs) | 7,011 | **7,337** | 1.047× |
 | control (15 runs) | 6,065 | **6,764** | 1.115× |
 
 So CausalLine's real-model total cost per primary run moves from
-16,006 + 7,011 = 23,017 to **16,006 + 8,014 = 24,020**, which against B0's
-10,581 is **2.27× B0**, not 2.18×.
+16,006 + 7,011 = 23,017 to **16,006 + 7,337 = 23,343**, which against B0's
+10,581 is **2.21× B0**, not 2.18×.
+
+> **CORRECTION (05-11-2026).** This row first read 8,014 and 1.143x, and the
+> sentence above it 24,020 and 2.27x. Those came from an analysis script that
+> added the *recorded* `replay_tokens` to the escalation traces -- but the
+> recorded figure IS the final attempt, so the final attempt was counted twice.
+> The per-run table in §3 and the pooled 1.63x over the five escalated runs are
+> unaffected: they sum the attempt traces and never add the recorded figure on
+> top. Only the corpus-wide primary ratio was wrong, and it was wrong in the
+> direction that flattered IREC.
 
 ---
 

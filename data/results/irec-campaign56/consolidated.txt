@@ -1,0 +1,92 @@
+==============================================================================================================================
+CONSOLIDATED 56-AGENT VALIDATION -- 15 paired placements, four methods on the SAME original traces
+==============================================================================================================================
+
+[1] PER PLACEMENT -- total recovery cost in tokens, fully accounted
+seed      regime   land      B0      B1      B2 CL recorded CL corrected    IREC R vs min IREC/CL       CL scope
+20260917  small       Y   10687    1310    1310       26956        29375     991     0.76   0.034    restart_all
+20260918  small       Y   10667    1802    1802       17375        17375    1359     0.75   0.078      selective
+20260919  small       Y   10667    1825    1825       17602        17602    1341     0.73   0.076      selective
+20260920  small       Y   10666    1835    1830       18593        19972    1352     0.74   0.068  agent_restart
+20260921  small       Y   10782    1207    1207       17465        18559     985     0.82   0.053  agent_restart
+20260917  medium      n   10845    8199    8199       23996        23996     671     0.08   0.028      selective
+20260918  medium      Y   10689    7469    7469       23280        23280    4724     0.63   0.203      selective
+20260919  medium      Y   10672    8195    8195       23988        23988    5145     0.63   0.214      selective
+20260920  medium      n   10690    7819    7819       23604        23604     507     0.06   0.021      selective
+20260921  medium      Y   10672    8192    8192       23986        23986    5056     0.62   0.211      selective
+20260917  large       Y   10368   10014   10014       26325        26325   10014     1.00   0.380      selective
+20260918  large       Y   10288    9574    9574       25380        25380    9574     1.00   0.377      selective
+20260919  large       Y   10284    9762    9762       25563        25563    9280     0.95   0.363      selective
+20260920  large       Y   10403    9873    9873       25699        25699    8727     0.88   0.340      selective
+20260921  large       Y   10341    9636    9636       25446        25446    8996     0.93   0.354      selective
+
+[2] SAFETY AND CORRECTNESS -- counts, denominators, rates
+method                  unsafe preservations       escapes   task success   verification    work preserved
+B0 full restart                 0/541 = 0.0%         0/541          13/15   not verified     0/2175 = 0.0%
+B1 agent taint                  0/541 = 0.0%         0/541          15/15   not verified  995/2175 = 45.7%
+B2 topology closure             0/541 = 0.0%         0/541          14/15   not verified  985/2175 = 45.3%
+CausalLine                      0/541 = 0.0%         0/541          15/15      12/15 sel 1020/2175 = 46.9%
+IREC                            0/541 = 0.0%         0/541          15/15     15/15 PASS 1602/2175 = 73.7%
+
+  recall (observed truth, canary + code-path records): IREC 541/541
+  CausalLine verification failures: 4 over 15 runs; escalated runs: 3
+  IREC escalations / fallbacks: 0 (fallback tokens 0)
+  IREC control-flow divergences: 0; D-068 byte re-check survivors: 0
+
+[3] BY CONTAMINATION REGIME (landed placements only)
+
+  --- small  n=5 ----------------------------------------------------------------------
+    method                  mean tokens    work preserved    unsafe   task
+    B0 full restart               10694             0.0%      0/57     5/5
+    B1 agent taint                 1596            89.9%      0/57     5/5
+    B2 topology closure            1595            89.9%      0/57     4/5
+    CausalLine (corrected)        20577            72.6%      0/57     5/5
+    IREC                           1206            92.1%      0/57     5/5
+    R = IREC/min(B0,B2): mean 0.760  95% CI [0.719, 0.801]  n=5  target 0.8 MET
+    IREC mechanism: spliced 49.8, re-executed 5.2, cutoff kept 0.0 (yield 0%)
+
+  --- medium  n=3 ----------------------------------------------------------------------
+    method                  mean tokens    work preserved    unsafe   task
+    B0 full restart               10678             0.0%      0/51     3/3
+    B1 agent taint                 7952            38.4%      0/51     3/3
+    B2 topology closure            7952            37.7%      0/51     3/3
+    CausalLine (corrected)        23751            44.6%      0/51     3/3
+    IREC                           4975            88.3%      0/51     3/3
+    R = IREC/min(B0,B2): mean 0.626  95% CI [0.606, 0.645]  n=3  target 0.8 MET
+    IREC mechanism: spliced 33.7, re-executed 21.3, cutoff kept 13.3 (yield 63%)
+
+  --- large  n=5 ----------------------------------------------------------------------
+    method                  mean tokens    work preserved    unsafe   task
+    B0 full restart               10337             0.0%      0/433    5/5
+    B1 agent taint                 9772             9.2%      0/433    5/5
+    B2 topology closure            9772             8.6%      0/433    5/5
+    CausalLine (corrected)        25683            23.7%      0/433    5/5
+    IREC                           9318            35.9%      0/433    5/5
+    R = IREC/min(B0,B2): mean 0.954  95% CI [0.893, 1.014]  n=5  target 0.8 MISSED
+    IREC mechanism: spliced 6.0, re-executed 49.0, cutoff kept 6.0 (yield 12%)
+
+[4] PAIRED COMPARISONS, pooled over landed placements (Student t, 95%)
+  n = 13 landed placements of 15
+  comparison                                        mean     95% lo     95% hi  excludes 0     W/T/L
+  IREC - B0, tokens                              -5357.1    -7705.5    -3008.6         YES    13/0/0
+  IREC - B2, tokens                              -1011.2    -1712.2     -310.1         YES    11/2/0
+  IREC - CausalLine, tokens                     -18077.4   -20076.0   -16078.8         YES    13/0/0
+
+  IREC - B2, work preserved (pts)                  +23.0      +10.8      +35.2         YES    0/0/13
+  IREC - CausalLine, work preserved (pts)          +22.3       +5.6      +38.9         YES    0/2/11
+  (negative = IREC lower; W counts runs where IREC is lower)
+
+[5] POOLED TOTALS over the landed placements
+  B0 137186, B2 80689, CausalLine 302550 (recorded 297658, +4892 from defect B), IREC 67544
+  R pooled = 0.837   IREC/CausalLine = 0.223   CausalLine/min = 3.75
+
+  the 2 non-landed placements, separate (safety zeros are arithmetic):
+    20260917 medium: IREC 671, B2 8199, R 0.08, work preserved 145/145, cutoff 4/4
+    20260920 medium: IREC 507, B2 7819, R 0.06, work preserved 145/145, cutoff 3/3
+
+[6] CAMPAIGN COST
+  IREC model calls: 342
+  by provider: {'local': 294, 'gemini': 21, 'nvidia': 27}
+  IREC tokens: 68722
+  wall clock: 5.3 min
+  degraded providers: none
