@@ -1454,6 +1454,18 @@ def run_pipeline(
                 return MixedPipeline(
                     log, client, tools, topology=topology, **common
                 ).run()
+            if workflow.startswith("arch:"):
+                # One of the seven industry architectures, named after the
+                # colon. The shape comes from `src/tracing/architectures.py`
+                # and is reconstructible from the trace header, which is what
+                # `replay()` needs: the same requirement `topology` meets for
+                # "mixed".
+                from src.tracing.archpipeline import ArchPipeline
+
+                return ArchPipeline(
+                    log, client, tools, arch=workflow.split(":", 1)[1],
+                    topology=topology, **common
+                ).run()
             return GeminiPipeline(log, client, tools, **common).run()
 
 

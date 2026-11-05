@@ -142,7 +142,7 @@ def _arch_b() -> ArchitectureSpec:
         aid = f"subsup{s}"
         agents.append(_a(aid, f"sub-supervisor for team {s}; re-delegates "
                          f"within its team", "subsupervisor", n, heavy=True,
-                         reads=("manager",)))
+                         reads=("manager",), writes=f"crew/brief{s}"))
         order.append(aid)
 
     for s in range(1, 5):                      # team leads
@@ -159,6 +159,7 @@ def _arch_b() -> ArchitectureSpec:
             docs = ((s - 1) * 11 + w,) if w <= 3 else ()
             agents.append(_a(aid, f"team {s} worker {w}", "worker", n,
                              kind="fetch" if docs else "think", docs=docs,
+                             memory=(f"crew/brief{s}",),
                              reads=(f"tlead{s}",)))
             order.append(aid)
 
@@ -181,6 +182,13 @@ def _arch_b() -> ArchitectureSpec:
                          heavy=True, reads=mine))
         order.append(aid)
 
+    n += 1
+    agents.append(_a("chief", "accepts or returns the consolidated report on "
+                     "behalf of the manager", "report", n, kind="join",
+                     heavy=True,
+                     reads=tuple(f"report{i}" for i in range(1, 4))))
+    order.append("chief")
+
     return ArchitectureSpec(
         name="B-hierarchical-supervisor",
         source_id="S2",
@@ -195,6 +203,11 @@ def _arch_b() -> ArchitectureSpec:
             "`gate` with loop=2: one delegation pass and one validation pass.",
             "S2 does not say how `manager_llm` and a custom `manager_agent` "
             "interact when both are set; only one manager agent is modelled.",
+            "S2 does not describe shared state. The per-team delegation brief "
+            "a sub-supervisor writes and its workers read is OUR addition, so "
+            "that this architecture can be attacked through poisoned memory "
+            "like the others; it is the natural reading of a manager that "
+            "'allocates tasks by role and capability'.",
             "Three-level delegation (manager -> sub-supervisor -> team lead -> "
             "worker) follows S7's suggestion of grouping similar agents under "
             "supervisors, which S2 alone does not specify.",
@@ -219,7 +232,7 @@ def _arch_c() -> ArchitectureSpec:
         aid = f"arch{i}"
         agents.append(_a(aid, f"designs interfaces for half {i} of the "
                          f"change", "architect", n, heavy=True,
-                         reads=("planner",)))
+                         reads=("planner",), writes=f"spec/criteria{i}"))
         order.append(aid)
 
     # 20 independent lanes. S3 maps one developer task per piece of work, in
@@ -239,6 +252,7 @@ def _arch_c() -> ArchitectureSpec:
         rev = f"rev{i:02d}"
         agents.append(_a(rev, f"reviews piece {i} against its acceptance "
                          f"criteria and runs its tests", "review", n,
+                         memory=(f"spec/criteria{(i - 1) % 2 + 1}",),
                          reads=(dev,)))
         order.append(rev)
 
@@ -285,6 +299,10 @@ def _arch_c() -> ArchitectureSpec:
         notes=(
             "S3's developer tasks are created by dynamic task mapping, one per "
             "piece; 20 pieces is our choice of scale.",
+            "S3 says the planner writes a prompt AND acceptance criteria per "
+            "piece, and the reviewer checks its piece against them. The "
+            "criteria are therefore shared state the reviewers read, which is "
+            "this architecture's poisoned-memory surface.",
             "S3 does not give the exact reviewer wiring. Per-piece pairing is "
             "the diagram's implication and is recorded here as our reading.",
             "The deterministic test and lint tasks are real Airflow tasks in "
@@ -308,7 +326,8 @@ def _arch_d() -> ArchitectureSpec:
         aid = f"triage{i}"
         agents.append(_a(aid, f"triages intake stream {i} and hands off to a "
                          f"specialist", "triage", n, kind="handoff",
-                         docs=(i,), emits=(f"c{i}_1",)))
+                         docs=(i,), emits=(f"c{i}_1",),
+                         writes="session/history" if i == 1 else None))
         order.append(aid)
 
     # Eight chains of seven. Each agent hands the conversation to exactly ONE
@@ -326,6 +345,7 @@ def _arch_d() -> ArchitectureSpec:
             agents.append(_a(
                 aid, f"{role} specialist on chain {c}; owns the reply after "
                      f"the handoff", "chain", n, kind="handoff",
+                memory=("session/history",) if step == 1 else (),
                 heavy=(role in ("compliance", "closure")),
                 docs=(3 + c,) if step == 1 and c <= 9 else (),
                 reads=(previous,), emits=(nxt,) if nxt else ()))
@@ -344,6 +364,10 @@ def _arch_d() -> ArchitectureSpec:
             "S4's phrase is 'delegated ownership', not 'decentralized'. The "
             "receiving specialist owns the next response; the sender does not "
             "retain it.",
+            "S4 says the delegated agent receives the conversation history, "
+            "so a shared session history is grounded; it is what each chain "
+            "head reads, and it is this architecture's poisoned-memory "
+            "surface.",
             "S4 does not specify how control RETURNS after a handoff. Modelled "
             "as not returning: a chain runs forward only, and later chains "
             "pick up from an earlier chain's closure agent.",
@@ -486,6 +510,12 @@ def _arch_f() -> ArchitectureSpec:
                          kind="join", heavy=True, reads=mine))
         order.append(aid)
 
+    n += 1
+    agents.append(_a("final", "assembles the DOCX report from every section",
+                     "report", n, kind="join", heavy=True,
+                     reads=tuple(f"reporter{i}" for i in range(1, 9))))
+    order.append("final")
+
     return ArchitectureSpec(
         name="F-enterprise-process",
         source_id="S6",
@@ -583,6 +613,12 @@ def _arch_g() -> ArchitectureSpec:
                          f"reconciles agent state", "state", n, kind="join",
                          heavy=True, reads=mine))
         order.append(aid)
+
+    n += 1
+    agents.append(_a("summary", "returns the orchestrated answer from every "
+                     "history shard", "state", n, kind="join", heavy=True,
+                     reads=tuple(f"history{i}" for i in range(1, 5))))
+    order.append("summary")
 
     return ArchitectureSpec(
         name="G-registry-hybrid",
