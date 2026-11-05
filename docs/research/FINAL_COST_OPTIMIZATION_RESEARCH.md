@@ -87,6 +87,13 @@ comparator clearance, and the exact-ground-truth evaluation against B2.
 **Recommendation:** implement IREC behind a flag, and run the §9.3 measurement before
 changing any default or any paper claim.
 
+> **Status, 05-11-2026: the §9.3 measurement has been run and IREC is integrated
+> behind a flag on `feat/irec`.** All 15 placements: 0 unsafe, 100% recall, 15/15
+> task success, 15/15 verification pass, 0 escalations. R = 0.76 / 0.63 / 0.95 per
+> regime and 0.216x current CausalLine. Verdict **CONDITIONAL GO**. Read
+> [`IREC_FINAL_DECISION.md`](IREC_FINAL_DECISION.md) first; the numbers in the
+> table below are offline predictions and the live ones supersede them.
+
 ---
 
 ## 2. The existing system, as measured (not as documented)
@@ -148,6 +155,13 @@ Three things in these rows were not visible in the existing reports.
     negatives".
 
 ### 2.4 Two accounting defects found while reproducing
+
+**Both are now fixed and measured -- see `IREC_COST_ACCOUNTING.md`.**
+Defect 1 moved baseline task success on long cells from 6/18 to 18/18
+and B2's cost by +10.3% under proportional pricing. Defect 2 understated
+escalated runs by up to 2.83x on the scripted matrix and 1.63x pooled over
+the five escalated real-model runs, which puts CausalLine at 2.27x B0 per
+primary run rather than 2.18x.
 
 They affect the comparison, not safety.
 
@@ -549,7 +563,34 @@ The prototype runs under the repository's Python 3.11 code through an import shi
 - Batch-invariant kernels made 1,000 temperature-0 completions identical (Thinking
   Machines, secondary reports).
 
-### 9.3 Not established: the minimal measurement required
+### 9.3 Established on 2026-11-05 -- the measurement was run
+
+**Items 1 and 2 are done.** See `IREC_LIVE_VALIDATION.md`: all 15 primary
+placements against the real providers, 0 unsafe preservations, 100% recall,
+15/15 task success, 15/15 verification pass, 0 escalations, 68,816 tokens.
+
+- **A3 is now a measurement: 96.7% (87/90)** reproduction on a byte-identical
+  prompt -- but 82 of those 90 observations are one local 8B model on CPU, and
+  all 3 failures were that model. Not yet a statement about hosted models.
+- **R per regime: 0.76 / 0.63 / 0.95** (small / medium / large), 0.838 pooled
+  over the 13 landed placements, **0.216x current CausalLine**. The per-regime
+  predictions below held; the pooled 0.71 was optimistic because it pooled the
+  two non-landed placements.
+- **Item 2's fear did not materialise.** This report projected IREC at 2.64x
+  unverified B2 if charged the same verification ladder in the small regime.
+  IREC's task check passed on all 15 placements, including the 13 whose original
+  run failed it, so the ladder was never entered.
+- **Item 3, the typed-interface ablation, remains unrun.**
+
+Two things this report could not have seen, both in `IREC_LIVE_VALIDATION.md`:
+the two mechanisms are separable and **the scripted matrix cannot test the
+cutoff at all** (`unchanged` is 0 in all 24 cells); and the fidelity gate
+reproduces **165/165** prompts for free, which is the direct evidence for A1 and
+for complete mediation.
+
+The decision is **CONDITIONAL GO** -- `IREC_FINAL_DECISION.md`.
+
+### 9.3.1 The original text of this section, for the record
 
 1. **Live cutoff yield (A3).** For each of the 15 primary placements, run IREC once
    against the same models: an estimated ≤ 1 B2 replay per run, about 120k tokens total,

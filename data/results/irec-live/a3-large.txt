@@ -1,0 +1,5 @@
+seed      regime  mode           spliced re-exec  unchg  chg  yield   tokens unsafe  recall  task  wall s
+20260920  large   a3_determinism       0      55     43   12    78%    10953     49     33%  FAIL     508
+
+  budget: 55 model calls, 10428 prompt + 525 output = 10953 tokens
+  calls by provider: {'local': 49, 'gemini': 2, 'nvidia': 4}

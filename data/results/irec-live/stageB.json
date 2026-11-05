@@ -1,0 +1,6890 @@
+[
+ {
+  "seed": 20260917,
+  "regime": "large",
+  "mode": "irec_live",
+  "local_only": false,
+  "file": "seed20260917-large.json",
+  "events": 145,
+  "model_events": 55,
+  "flagged": [
+   "S10",
+   "S13",
+   "S16",
+   "S19",
+   "S2",
+   "S22",
+   "S25",
+   "S28",
+   "S33",
+   "S43",
+   "S47",
+   "S49",
+   "S5",
+   "S51",
+   "S53",
+   "S72",
+   "S77"
+  ],
+  "flagged_true": [
+   "S10",
+   "S13",
+   "S16",
+   "S19",
+   "S2",
+   "S22",
+   "S25",
+   "S28",
+   "S33",
+   "S43",
+   "S47",
+   "S49",
+   "S5",
+   "S51",
+   "S53",
+   "S72",
+   "S77"
+  ],
+  "payload_landed": true,
+  "events_with_token": [
+   "e0003",
+   "e0007",
+   "e0015",
+   "e0019",
+   "e0023",
+   "e0031",
+   "e0050",
+   "e0053",
+   "e0056",
+   "e0059",
+   "e0062",
+   "e0065",
+   "e0068",
+   "e0071",
+   "e0074",
+   "e0077",
+   "e0079",
+   "e0081",
+   "e0087",
+   "e0089",
+   "e0091",
+   "e0093",
+   "e0095",
+   "e0097",
+   "e0099",
+   "e0101",
+   "e0103",
+   "e0105",
+   "e0107",
+   "e0109",
+   "e0111",
+   "e0113",
+   "e0115",
+   "e0117",
+   "e0119",
+   "e0121",
+   "e0123",
+   "e0125",
+   "e0127",
+   "e0129",
+   "e0131",
+   "e0133",
+   "e0135",
+   "e0137",
+   "e0139",
+   "e0141",
+   "e0143"
+  ],
+  "truth_events": 95,
+  "b2_closure": 137,
+  "b0_set": 145,
+  "spliced": 2,
+  "reexecuted": 53,
+  "unchanged": 5,
+  "changed": 48,
+  "cutoff_yield": 0.09433962264150944,
+  "calls": 53,
+  "prompt_tokens": 9422,
+  "output_tokens": 592,
+  "replay_tokens": 10014,
+  "divergence": null,
+  "failure": null,
+  "task_success": true,
+  "wall_clock_s": 547.8,
+  "routing": {
+   "local": 47,
+   "gemini": 2,
+   "nvidia": 4
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 682,
+    "output_tokens": 186,
+    "total_tokens": 868,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 118
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 4,
+    "prompt_tokens": 842,
+    "output_tokens": 35,
+    "total_tokens": 877,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 4
+    },
+    "remaining_today": 796
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "detail": [
+   {
+    "event": "e0003",
+    "agent": "acq1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -336,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0007",
+    "agent": "acq2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -336,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 165,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0011",
+    "agent": "acq3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0015",
+    "agent": "acq4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0019",
+    "agent": "acq5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 171,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0023",
+    "agent": "acq6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 167,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0027",
+    "agent": "acq7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 168,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0031",
+    "agent": "acq8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 167,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0035",
+    "agent": "acq9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0039",
+    "agent": "acq10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 170,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0043",
+    "agent": "acq11",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0047",
+    "agent": "acq12",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 171,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0050",
+    "agent": "norm1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 194,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0053",
+    "agent": "norm2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 198,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0056",
+    "agent": "norm3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 12,
+    "new_out_chars": 12,
+    "tokens": 176,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0059",
+    "agent": "norm4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 172,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0062",
+    "agent": "norm5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -345,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0065",
+    "agent": "norm6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 172,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0068",
+    "agent": "norm7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -345,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0071",
+    "agent": "norm8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -347,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0074",
+    "agent": "norm9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -347,
+    "orig_out_chars": 43,
+    "new_out_chars": 14,
+    "tokens": 132,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0077",
+    "agent": "norm10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -352,
+    "orig_out_chars": 46,
+    "new_out_chars": 16,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0079",
+    "agent": "hub",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 14,
+    "orig_out_chars": 162,
+    "new_out_chars": 176,
+    "tokens": 449,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0081",
+    "agent": "spec1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 161,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 264,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0083",
+    "agent": "spec2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 161,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 223,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0085",
+    "agent": "spec3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 147,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 265,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0087",
+    "agent": "spec4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 147,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 229,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0089",
+    "agent": "spec5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 147,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 224,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0091",
+    "agent": "spec6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 147,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 219,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0093",
+    "agent": "spec7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 147,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 221,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0095",
+    "agent": "spec8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 147,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 219,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0097",
+    "agent": "spec9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 147,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 222,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0099",
+    "agent": "spec10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 147,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 223,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0101",
+    "agent": "spec11",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 147,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 222,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0103",
+    "agent": "spec12",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 147,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 225,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0105",
+    "agent": "ver1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 188,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0107",
+    "agent": "ver2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 176,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0109",
+    "agent": "ver3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 12,
+    "new_out_chars": 12,
+    "tokens": 154,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0111",
+    "agent": "ver4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 150,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0113",
+    "agent": "ver5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -405,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0115",
+    "agent": "ver6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 150,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0117",
+    "agent": "ver7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 154,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0119",
+    "agent": "ver8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 154,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0121",
+    "agent": "ver9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -409,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 132,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0123",
+    "agent": "ver10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 16,
+    "new_out_chars": 16,
+    "tokens": 154,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0125",
+    "agent": "rev1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 59,
+    "new_out_chars": 59,
+    "tokens": 194,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0127",
+    "agent": "rev2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 26,
+    "new_out_chars": 26,
+    "tokens": 170,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0129",
+    "agent": "rev3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 19,
+    "new_out_chars": 20,
+    "tokens": 154,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0131",
+    "agent": "rev4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 51,
+    "new_out_chars": 51,
+    "tokens": 156,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0133",
+    "agent": "rev5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 50,
+    "new_out_chars": 50,
+    "tokens": 160,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0135",
+    "agent": "rev6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 51,
+    "new_out_chars": 14,
+    "tokens": 150,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0137",
+    "agent": "rev7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 148,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0139",
+    "agent": "rev8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 16,
+    "new_out_chars": 16,
+    "tokens": 160,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0141",
+    "agent": "synth",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 44,
+    "orig_out_chars": 132,
+    "new_out_chars": 176,
+    "tokens": 419,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0143",
+    "agent": "audit",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 147,
+    "orig_out_chars": 29,
+    "new_out_chars": 176,
+    "tokens": 286,
+    "outcome": "changed"
+   }
+  ],
+  "trace_out": "data\\runs\\irec-live\\irec-20260917-large.jsonl",
+  "discarded": 102,
+  "work_preserved": 0.29655172413793107,
+  "unsafe_preservations": 0,
+  "unsafe_ids": [],
+  "survived_bytes": [],
+  "escapes": 0,
+  "recall": 1.0
+ },
+ {
+  "seed": 20260917,
+  "regime": "medium",
+  "mode": "irec_live",
+  "local_only": false,
+  "file": "seed20260917-medium.json",
+  "events": 145,
+  "model_events": 55,
+  "flagged": [
+   "S14",
+   "S23",
+   "S4",
+   "S9"
+  ],
+  "flagged_true": [
+   "S14",
+   "S23",
+   "S4",
+   "S9"
+  ],
+  "payload_landed": false,
+  "events_with_token": [],
+  "truth_events": 0,
+  "b2_closure": 95,
+  "b0_set": 145,
+  "spliced": 51,
+  "reexecuted": 4,
+  "unchanged": 4,
+  "changed": 0,
+  "cutoff_yield": 1.0,
+  "calls": 4,
+  "prompt_tokens": 659,
+  "output_tokens": 12,
+  "replay_tokens": 671,
+  "divergence": null,
+  "failure": null,
+  "task_success": true,
+  "wall_clock_s": 49.5,
+  "routing": {
+   "local": 4
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": 120
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": 800
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "detail": [
+   {
+    "event": "e0003",
+    "agent": "acq1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0007",
+    "agent": "acq2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -336,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 165,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0011",
+    "agent": "acq3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0015",
+    "agent": "acq4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -336,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0019",
+    "agent": "acq5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0023",
+    "agent": "acq6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 167,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0027",
+    "agent": "acq7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0031",
+    "agent": "acq8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0035",
+    "agent": "acq9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0039",
+    "agent": "acq10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 170,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0043",
+    "agent": "acq11",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0047",
+    "agent": "acq12",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0050",
+    "agent": "norm1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0053",
+    "agent": "norm2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0056",
+    "agent": "norm3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0059",
+    "agent": "norm4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0062",
+    "agent": "norm5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0065",
+    "agent": "norm6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0068",
+    "agent": "norm7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0071",
+    "agent": "norm8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0074",
+    "agent": "norm9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0077",
+    "agent": "norm10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0079",
+    "agent": "hub",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0081",
+    "agent": "spec1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0083",
+    "agent": "spec2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0085",
+    "agent": "spec3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0087",
+    "agent": "spec4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0089",
+    "agent": "spec5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0091",
+    "agent": "spec6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0093",
+    "agent": "spec7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0095",
+    "agent": "spec8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0097",
+    "agent": "spec9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0099",
+    "agent": "spec10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0101",
+    "agent": "spec11",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0103",
+    "agent": "spec12",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0105",
+    "agent": "ver1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0107",
+    "agent": "ver2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0109",
+    "agent": "ver3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0111",
+    "agent": "ver4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0113",
+    "agent": "ver5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0115",
+    "agent": "ver6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0117",
+    "agent": "ver7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0119",
+    "agent": "ver8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0121",
+    "agent": "ver9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0123",
+    "agent": "ver10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0125",
+    "agent": "rev1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0127",
+    "agent": "rev2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0129",
+    "agent": "rev3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0131",
+    "agent": "rev4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0133",
+    "agent": "rev5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0135",
+    "agent": "rev6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0137",
+    "agent": "rev7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0139",
+    "agent": "rev8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0141",
+    "agent": "synth",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0143",
+    "agent": "audit",
+    "outcome": "spliced",
+    "calls": 0
+   }
+  ],
+  "trace_out": "data\\runs\\irec-live\\irec-20260917-medium.jsonl",
+  "discarded": 0,
+  "work_preserved": 1.0,
+  "unsafe_preservations": 0,
+  "unsafe_ids": [],
+  "survived_bytes": [],
+  "escapes": 0,
+  "recall": 1.0
+ },
+ {
+  "seed": 20260918,
+  "regime": "large",
+  "mode": "irec_live",
+  "local_only": false,
+  "file": "seed20260918-large.json",
+  "events": 145,
+  "model_events": 55,
+  "flagged": [
+   "S11",
+   "S14",
+   "S17",
+   "S2",
+   "S22",
+   "S29",
+   "S33",
+   "S35",
+   "S41",
+   "S45",
+   "S47",
+   "S49",
+   "S5",
+   "S51",
+   "S68",
+   "S72",
+   "S75",
+   "S8"
+  ],
+  "flagged_true": [
+   "S11",
+   "S14",
+   "S17",
+   "S2",
+   "S22",
+   "S29",
+   "S33",
+   "S35",
+   "S41",
+   "S45",
+   "S47",
+   "S49",
+   "S5",
+   "S51",
+   "S68",
+   "S72",
+   "S75",
+   "S8"
+  ],
+  "payload_landed": true,
+  "events_with_token": [
+   "e0003",
+   "e0007",
+   "e0015",
+   "e0019",
+   "e0023",
+   "e0031",
+   "e0043",
+   "e0050",
+   "e0053",
+   "e0056",
+   "e0059",
+   "e0062",
+   "e0065",
+   "e0068",
+   "e0071",
+   "e0074",
+   "e0077",
+   "e0079",
+   "e0081",
+   "e0087",
+   "e0089",
+   "e0091",
+   "e0093",
+   "e0095",
+   "e0097",
+   "e0099",
+   "e0101",
+   "e0103",
+   "e0105",
+   "e0107",
+   "e0109",
+   "e0111",
+   "e0113",
+   "e0115",
+   "e0117",
+   "e0119",
+   "e0121",
+   "e0123",
+   "e0125",
+   "e0127",
+   "e0129",
+   "e0131",
+   "e0133",
+   "e0135",
+   "e0137",
+   "e0141",
+   "e0143"
+  ],
+  "truth_events": 98,
+  "b2_closure": 129,
+  "b0_set": 145,
+  "spliced": 4,
+  "reexecuted": 51,
+  "unchanged": 1,
+  "changed": 50,
+  "cutoff_yield": 0.0196078431372549,
+  "calls": 51,
+  "prompt_tokens": 8983,
+  "output_tokens": 591,
+  "replay_tokens": 9574,
+  "divergence": null,
+  "failure": null,
+  "task_success": true,
+  "wall_clock_s": 518.8,
+  "routing": {
+   "local": 45,
+   "gemini": 2,
+   "nvidia": 4
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 682,
+    "output_tokens": 186,
+    "total_tokens": 868,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 118
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 4,
+    "prompt_tokens": 842,
+    "output_tokens": 35,
+    "total_tokens": 877,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 4
+    },
+    "remaining_today": 796
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "detail": [
+   {
+    "event": "e0003",
+    "agent": "acq1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -336,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0007",
+    "agent": "acq2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -336,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 165,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0011",
+    "agent": "acq3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -336,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 167,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0015",
+    "agent": "acq4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0019",
+    "agent": "acq5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 171,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0023",
+    "agent": "acq6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 167,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0027",
+    "agent": "acq7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0031",
+    "agent": "acq8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 167,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0035",
+    "agent": "acq9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0039",
+    "agent": "acq10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0043",
+    "agent": "acq11",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0047",
+    "agent": "acq12",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0050",
+    "agent": "norm1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -349,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 152,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0053",
+    "agent": "norm2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -345,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 156,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0056",
+    "agent": "norm3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 12,
+    "new_out_chars": 12,
+    "tokens": 176,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0059",
+    "agent": "norm4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 172,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0062",
+    "agent": "norm5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -345,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0065",
+    "agent": "norm6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 172,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0068",
+    "agent": "norm7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -345,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0071",
+    "agent": "norm8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -347,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0074",
+    "agent": "norm9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -347,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 132,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0077",
+    "agent": "norm10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -352,
+    "orig_out_chars": 46,
+    "new_out_chars": 16,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0079",
+    "agent": "hub",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 28,
+    "orig_out_chars": 148,
+    "new_out_chars": 176,
+    "tokens": 449,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0081",
+    "agent": "spec1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 175,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 264,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0083",
+    "agent": "spec2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 175,
+    "orig_out_chars": 2,
+    "new_out_chars": 5,
+    "tokens": 223,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0085",
+    "agent": "spec3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 175,
+    "orig_out_chars": 7,
+    "new_out_chars": 5,
+    "tokens": 265,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0087",
+    "agent": "spec4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 175,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 229,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0089",
+    "agent": "spec5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 161,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 224,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0091",
+    "agent": "spec6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 161,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 219,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0093",
+    "agent": "spec7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 161,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 221,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0095",
+    "agent": "spec8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 161,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 219,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0097",
+    "agent": "spec9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 161,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 222,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0099",
+    "agent": "spec10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 161,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 223,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0101",
+    "agent": "spec11",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 161,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 222,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0103",
+    "agent": "spec12",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 161,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 225,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0105",
+    "agent": "ver1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 5,
+    "orig_out_chars": 23,
+    "new_out_chars": 29,
+    "tokens": 188,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0107",
+    "agent": "ver2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 5,
+    "orig_out_chars": 23,
+    "new_out_chars": 29,
+    "tokens": 176,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0109",
+    "agent": "ver3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -401,
+    "orig_out_chars": 12,
+    "new_out_chars": 12,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0111",
+    "agent": "ver4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 150,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0113",
+    "agent": "ver5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 154,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0115",
+    "agent": "ver6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -409,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 130,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0117",
+    "agent": "ver7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 154,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0119",
+    "agent": "ver8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -409,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0121",
+    "agent": "ver9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 152,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0123",
+    "agent": "ver10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 16,
+    "new_out_chars": 16,
+    "tokens": 154,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0125",
+    "agent": "rev1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 28,
+    "orig_out_chars": 31,
+    "new_out_chars": 59,
+    "tokens": 194,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0127",
+    "agent": "rev2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 26,
+    "new_out_chars": 26,
+    "tokens": 170,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0129",
+    "agent": "rev3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 13,
+    "new_out_chars": 50,
+    "tokens": 160,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0131",
+    "agent": "rev4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 51,
+    "new_out_chars": 51,
+    "tokens": 156,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0133",
+    "agent": "rev5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 50,
+    "new_out_chars": 50,
+    "tokens": 160,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0135",
+    "agent": "rev6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 51,
+    "new_out_chars": 14,
+    "tokens": 150,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0137",
+    "agent": "rev7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 148,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0139",
+    "agent": "rev8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 15,
+    "new_out_chars": 16,
+    "tokens": 160,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0141",
+    "agent": "synth",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 74,
+    "orig_out_chars": 101,
+    "new_out_chars": 176,
+    "tokens": 419,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0143",
+    "agent": "audit",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 161,
+    "orig_out_chars": 52,
+    "new_out_chars": 176,
+    "tokens": 286,
+    "outcome": "changed"
+   }
+  ],
+  "trace_out": "data\\runs\\irec-live\\irec-20260918-large.jsonl",
+  "discarded": 108,
+  "work_preserved": 0.2551724137931034,
+  "unsafe_preservations": 0,
+  "unsafe_ids": [],
+  "survived_bytes": [],
+  "escapes": 0,
+  "recall": 1.0
+ },
+ {
+  "seed": 20260918,
+  "regime": "small",
+  "mode": "irec_live",
+  "local_only": false,
+  "file": "seed20260918-small.json",
+  "events": 145,
+  "model_events": 55,
+  "flagged": [
+   "S59",
+   "S61"
+  ],
+  "flagged_true": [
+   "S59",
+   "S61"
+  ],
+  "payload_landed": true,
+  "events_with_token": [
+   "e0107",
+   "e0109",
+   "e0125",
+   "e0127",
+   "e0141",
+   "e0143"
+  ],
+  "truth_events": 13,
+  "b2_closure": 17,
+  "b0_set": 145,
+  "spliced": 49,
+  "reexecuted": 6,
+  "unchanged": 0,
+  "changed": 6,
+  "cutoff_yield": 0.0,
+  "calls": 6,
+  "prompt_tokens": 1135,
+  "output_tokens": 224,
+  "replay_tokens": 1359,
+  "divergence": null,
+  "failure": null,
+  "task_success": true,
+  "wall_clock_s": 69.4,
+  "routing": {
+   "local": 5,
+   "gemini": 1
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 1,
+    "prompt_tokens": 326,
+    "output_tokens": 93,
+    "total_tokens": 419,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 1
+    },
+    "remaining_today": 119
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": 800
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "detail": [
+   {
+    "event": "e0003",
+    "agent": "acq1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0007",
+    "agent": "acq2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0011",
+    "agent": "acq3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0015",
+    "agent": "acq4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0019",
+    "agent": "acq5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0023",
+    "agent": "acq6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0027",
+    "agent": "acq7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0031",
+    "agent": "acq8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0035",
+    "agent": "acq9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0039",
+    "agent": "acq10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0043",
+    "agent": "acq11",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0047",
+    "agent": "acq12",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0050",
+    "agent": "norm1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0053",
+    "agent": "norm2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0056",
+    "agent": "norm3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0059",
+    "agent": "norm4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0062",
+    "agent": "norm5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0065",
+    "agent": "norm6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0068",
+    "agent": "norm7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0071",
+    "agent": "norm8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0074",
+    "agent": "norm9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0077",
+    "agent": "norm10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0079",
+    "agent": "hub",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0081",
+    "agent": "spec1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0083",
+    "agent": "spec2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0085",
+    "agent": "spec3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0087",
+    "agent": "spec4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0089",
+    "agent": "spec5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0091",
+    "agent": "spec6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0093",
+    "agent": "spec7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0095",
+    "agent": "spec8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0097",
+    "agent": "spec9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0099",
+    "agent": "spec10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0101",
+    "agent": "spec11",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0103",
+    "agent": "spec12",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0105",
+    "agent": "ver1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0107",
+    "agent": "ver2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -405,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 156,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0109",
+    "agent": "ver3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -401,
+    "orig_out_chars": 12,
+    "new_out_chars": 12,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0111",
+    "agent": "ver4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0113",
+    "agent": "ver5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0115",
+    "agent": "ver6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0117",
+    "agent": "ver7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0119",
+    "agent": "ver8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0121",
+    "agent": "ver9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0123",
+    "agent": "ver10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0125",
+    "agent": "rev1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 59,
+    "new_out_chars": 59,
+    "tokens": 194,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0127",
+    "agent": "rev2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 26,
+    "new_out_chars": 26,
+    "tokens": 170,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0129",
+    "agent": "rev3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0131",
+    "agent": "rev4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0133",
+    "agent": "rev5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0135",
+    "agent": "rev6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0137",
+    "agent": "rev7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0139",
+    "agent": "rev8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0141",
+    "agent": "synth",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 176,
+    "new_out_chars": 176,
+    "tokens": 419,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0143",
+    "agent": "audit",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 13,
+    "orig_out_chars": 163,
+    "new_out_chars": 176,
+    "tokens": 286,
+    "outcome": "changed"
+   }
+  ],
+  "trace_out": "data\\runs\\irec-live\\irec-20260918-small.jsonl",
+  "discarded": 13,
+  "work_preserved": 0.9103448275862069,
+  "unsafe_preservations": 0,
+  "unsafe_ids": [],
+  "survived_bytes": [],
+  "escapes": 0,
+  "recall": 1.0
+ },
+ {
+  "seed": 20260919,
+  "regime": "large",
+  "mode": "irec_live",
+  "local_only": false,
+  "file": "seed20260919-large.json",
+  "events": 145,
+  "model_events": 55,
+  "flagged": [
+   "S10",
+   "S13",
+   "S16",
+   "S19",
+   "S2",
+   "S24",
+   "S27",
+   "S30",
+   "S33",
+   "S37",
+   "S39",
+   "S41",
+   "S47",
+   "S49",
+   "S51",
+   "S53",
+   "S7",
+   "S71",
+   "S73"
+  ],
+  "flagged_true": [
+   "S10",
+   "S13",
+   "S16",
+   "S19",
+   "S2",
+   "S24",
+   "S27",
+   "S30",
+   "S33",
+   "S37",
+   "S39",
+   "S41",
+   "S47",
+   "S49",
+   "S51",
+   "S53",
+   "S7",
+   "S71",
+   "S73"
+  ],
+  "payload_landed": true,
+  "events_with_token": [
+   "e0003",
+   "e0011",
+   "e0015",
+   "e0019",
+   "e0023",
+   "e0050",
+   "e0053",
+   "e0056",
+   "e0059",
+   "e0068",
+   "e0071",
+   "e0074",
+   "e0077",
+   "e0079",
+   "e0081",
+   "e0085",
+   "e0087",
+   "e0089",
+   "e0091",
+   "e0097",
+   "e0099",
+   "e0101",
+   "e0103",
+   "e0105",
+   "e0107",
+   "e0109",
+   "e0111",
+   "e0113",
+   "e0117",
+   "e0119",
+   "e0121",
+   "e0123",
+   "e0125",
+   "e0127",
+   "e0129",
+   "e0133",
+   "e0135",
+   "e0137",
+   "e0141",
+   "e0143"
+  ],
+  "truth_events": 84,
+  "b2_closure": 134,
+  "b0_set": 145,
+  "spliced": 6,
+  "reexecuted": 49,
+  "unchanged": 8,
+  "changed": 41,
+  "cutoff_yield": 0.16326530612244897,
+  "calls": 49,
+  "prompt_tokens": 8720,
+  "output_tokens": 560,
+  "replay_tokens": 9280,
+  "divergence": null,
+  "failure": null,
+  "task_success": true,
+  "wall_clock_s": 508.2,
+  "routing": {
+   "local": 43,
+   "gemini": 2,
+   "nvidia": 4
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 682,
+    "output_tokens": 186,
+    "total_tokens": 868,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 118
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 4,
+    "prompt_tokens": 842,
+    "output_tokens": 35,
+    "total_tokens": 877,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 4
+    },
+    "remaining_today": 796
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "detail": [
+   {
+    "event": "e0003",
+    "agent": "acq1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -336,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0007",
+    "agent": "acq2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0011",
+    "agent": "acq3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -336,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 167,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0015",
+    "agent": "acq4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0019",
+    "agent": "acq5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 171,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0023",
+    "agent": "acq6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 167,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0027",
+    "agent": "acq7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 168,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0031",
+    "agent": "acq8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0035",
+    "agent": "acq9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0039",
+    "agent": "acq10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 170,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0043",
+    "agent": "acq11",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0047",
+    "agent": "acq12",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 171,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0050",
+    "agent": "norm1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 194,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0053",
+    "agent": "norm2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -345,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 156,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0056",
+    "agent": "norm3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -343,
+    "orig_out_chars": 12,
+    "new_out_chars": 12,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0059",
+    "agent": "norm4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -345,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 130,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0062",
+    "agent": "norm5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0065",
+    "agent": "norm6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0068",
+    "agent": "norm7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -345,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0071",
+    "agent": "norm8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -347,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0074",
+    "agent": "norm9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -347,
+    "orig_out_chars": 43,
+    "new_out_chars": 14,
+    "tokens": 132,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0077",
+    "agent": "norm10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -352,
+    "orig_out_chars": 46,
+    "new_out_chars": 16,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0079",
+    "agent": "hub",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 16,
+    "orig_out_chars": 98,
+    "new_out_chars": 176,
+    "tokens": 449,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0081",
+    "agent": "spec1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 133,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 264,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0083",
+    "agent": "spec2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 133,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 223,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0085",
+    "agent": "spec3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 149,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 265,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0087",
+    "agent": "spec4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 149,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 229,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0089",
+    "agent": "spec5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 133,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 224,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0091",
+    "agent": "spec6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 133,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 219,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0093",
+    "agent": "spec7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 133,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 221,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0095",
+    "agent": "spec8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 133,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 219,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0097",
+    "agent": "spec9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 133,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 222,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0099",
+    "agent": "spec10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 133,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 223,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0101",
+    "agent": "spec11",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 133,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 222,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0103",
+    "agent": "spec12",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 133,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 225,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0105",
+    "agent": "ver1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 188,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0107",
+    "agent": "ver2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 176,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0109",
+    "agent": "ver3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 12,
+    "new_out_chars": 12,
+    "tokens": 154,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0111",
+    "agent": "ver4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -405,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 130,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0113",
+    "agent": "ver5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -405,
+    "orig_out_chars": 53,
+    "new_out_chars": 13,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0115",
+    "agent": "ver6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0117",
+    "agent": "ver7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 154,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0119",
+    "agent": "ver8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 154,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0121",
+    "agent": "ver9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 152,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0123",
+    "agent": "ver10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 16,
+    "new_out_chars": 16,
+    "tokens": 154,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0125",
+    "agent": "rev1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 16,
+    "orig_out_chars": 43,
+    "new_out_chars": 59,
+    "tokens": 194,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0127",
+    "agent": "rev2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 26,
+    "new_out_chars": 26,
+    "tokens": 170,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0129",
+    "agent": "rev3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 19,
+    "new_out_chars": 20,
+    "tokens": 154,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0131",
+    "agent": "rev4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0133",
+    "agent": "rev5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 50,
+    "new_out_chars": 50,
+    "tokens": 160,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0135",
+    "agent": "rev6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 51,
+    "new_out_chars": 14,
+    "tokens": 150,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0137",
+    "agent": "rev7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 148,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0139",
+    "agent": "rev8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 15,
+    "new_out_chars": 16,
+    "tokens": 160,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0141",
+    "agent": "synth",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 60,
+    "orig_out_chars": 115,
+    "new_out_chars": 176,
+    "tokens": 419,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0143",
+    "agent": "audit",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 132,
+    "orig_out_chars": 44,
+    "new_out_chars": 176,
+    "tokens": 286,
+    "outcome": "changed"
+   }
+  ],
+  "trace_out": "data\\runs\\irec-live\\irec-20260919-large.jsonl",
+  "discarded": 90,
+  "work_preserved": 0.3793103448275862,
+  "unsafe_preservations": 0,
+  "unsafe_ids": [],
+  "survived_bytes": [],
+  "escapes": 0,
+  "recall": 1.0
+ },
+ {
+  "seed": 20260919,
+  "regime": "medium",
+  "mode": "irec_live",
+  "local_only": false,
+  "file": "seed20260919-medium.json",
+  "events": 145,
+  "model_events": 55,
+  "flagged": [
+   "S14",
+   "S17",
+   "S4",
+   "S7"
+  ],
+  "flagged_true": [
+   "S14",
+   "S17",
+   "S4",
+   "S7"
+  ],
+  "payload_landed": true,
+  "events_with_token": [
+   "e0011",
+   "e0053",
+   "e0079",
+   "e0085",
+   "e0107",
+   "e0125",
+   "e0141",
+   "e0143"
+  ],
+  "truth_events": 17,
+  "b2_closure": 95,
+  "b0_set": 145,
+  "spliced": 33,
+  "reexecuted": 22,
+  "unchanged": 14,
+  "changed": 8,
+  "cutoff_yield": 0.6363636363636364,
+  "calls": 22,
+  "prompt_tokens": 4779,
+  "output_tokens": 366,
+  "replay_tokens": 5239,
+  "divergence": null,
+  "failure": null,
+  "task_success": true,
+  "wall_clock_s": 305.1,
+  "routing": {
+   "local": 18,
+   "gemini": 2,
+   "nvidia": 2
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 682,
+    "output_tokens": 280,
+    "total_tokens": 962,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 118
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 518,
+    "output_tokens": 11,
+    "total_tokens": 529,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 798
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "detail": [
+   {
+    "event": "e0003",
+    "agent": "acq1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0007",
+    "agent": "acq2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -336,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 165,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0011",
+    "agent": "acq3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -336,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 167,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0015",
+    "agent": "acq4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0019",
+    "agent": "acq5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0023",
+    "agent": "acq6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 167,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0027",
+    "agent": "acq7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 168,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0031",
+    "agent": "acq8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0035",
+    "agent": "acq9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0039",
+    "agent": "acq10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0043",
+    "agent": "acq11",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0047",
+    "agent": "acq12",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0050",
+    "agent": "norm1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0053",
+    "agent": "norm2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 198,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0056",
+    "agent": "norm3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0059",
+    "agent": "norm4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0062",
+    "agent": "norm5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0065",
+    "agent": "norm6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0068",
+    "agent": "norm7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0071",
+    "agent": "norm8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0074",
+    "agent": "norm9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0077",
+    "agent": "norm10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0079",
+    "agent": "hub",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 176,
+    "new_out_chars": 176,
+    "tokens": 543,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0081",
+    "agent": "spec1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 264,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0083",
+    "agent": "spec2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 223,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0085",
+    "agent": "spec3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 265,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0087",
+    "agent": "spec4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 229,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0089",
+    "agent": "spec5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 224,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0091",
+    "agent": "spec6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 219,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0093",
+    "agent": "spec7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 221,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0095",
+    "agent": "spec8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 219,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0097",
+    "agent": "spec9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 222,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0099",
+    "agent": "spec10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 223,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0101",
+    "agent": "spec11",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 222,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0103",
+    "agent": "spec12",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 225,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0105",
+    "agent": "ver1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0107",
+    "agent": "ver2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 176,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0109",
+    "agent": "ver3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0111",
+    "agent": "ver4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0113",
+    "agent": "ver5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0115",
+    "agent": "ver6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0117",
+    "agent": "ver7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0119",
+    "agent": "ver8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0121",
+    "agent": "ver9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0123",
+    "agent": "ver10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0125",
+    "agent": "rev1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 59,
+    "new_out_chars": 59,
+    "tokens": 194,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0127",
+    "agent": "rev2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0129",
+    "agent": "rev3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0131",
+    "agent": "rev4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0133",
+    "agent": "rev5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0135",
+    "agent": "rev6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0137",
+    "agent": "rev7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0139",
+    "agent": "rev8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0141",
+    "agent": "synth",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 176,
+    "new_out_chars": 176,
+    "tokens": 419,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0143",
+    "agent": "audit",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 176,
+    "new_out_chars": 176,
+    "tokens": 286,
+    "outcome": "changed"
+   }
+  ],
+  "trace_out": "data\\runs\\irec-live\\irec-20260919-medium.jsonl",
+  "discarded": 17,
+  "work_preserved": 0.8827586206896552,
+  "unsafe_preservations": 0,
+  "unsafe_ids": [],
+  "survived_bytes": [],
+  "escapes": 0,
+  "recall": 1.0
+ },
+ {
+  "seed": 20260919,
+  "regime": "small",
+  "mode": "irec_live",
+  "local_only": false,
+  "file": "seed20260919-small.json",
+  "events": 145,
+  "model_events": 55,
+  "flagged": [
+   "S59",
+   "S64"
+  ],
+  "flagged_true": [
+   "S59",
+   "S64"
+  ],
+  "payload_landed": true,
+  "events_with_token": [
+   "e0107",
+   "e0115",
+   "e0125",
+   "e0131",
+   "e0141",
+   "e0143"
+  ],
+  "truth_events": 13,
+  "b2_closure": 17,
+  "b0_set": 145,
+  "spliced": 49,
+  "reexecuted": 6,
+  "unchanged": 0,
+  "changed": 6,
+  "cutoff_yield": 0.0,
+  "calls": 6,
+  "prompt_tokens": 1116,
+  "output_tokens": 225,
+  "replay_tokens": 1341,
+  "divergence": null,
+  "failure": null,
+  "task_success": true,
+  "wall_clock_s": 67.1,
+  "routing": {
+   "local": 5,
+   "gemini": 1
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 1,
+    "prompt_tokens": 326,
+    "output_tokens": 93,
+    "total_tokens": 419,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 1
+    },
+    "remaining_today": 119
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": 800
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "detail": [
+   {
+    "event": "e0003",
+    "agent": "acq1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0007",
+    "agent": "acq2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0011",
+    "agent": "acq3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0015",
+    "agent": "acq4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0019",
+    "agent": "acq5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0023",
+    "agent": "acq6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0027",
+    "agent": "acq7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0031",
+    "agent": "acq8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0035",
+    "agent": "acq9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0039",
+    "agent": "acq10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0043",
+    "agent": "acq11",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0047",
+    "agent": "acq12",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0050",
+    "agent": "norm1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0053",
+    "agent": "norm2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0056",
+    "agent": "norm3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0059",
+    "agent": "norm4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0062",
+    "agent": "norm5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0065",
+    "agent": "norm6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0068",
+    "agent": "norm7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0071",
+    "agent": "norm8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0074",
+    "agent": "norm9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0077",
+    "agent": "norm10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0079",
+    "agent": "hub",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0081",
+    "agent": "spec1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0083",
+    "agent": "spec2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0085",
+    "agent": "spec3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0087",
+    "agent": "spec4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0089",
+    "agent": "spec5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0091",
+    "agent": "spec6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0093",
+    "agent": "spec7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0095",
+    "agent": "spec8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0097",
+    "agent": "spec9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0099",
+    "agent": "spec10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0101",
+    "agent": "spec11",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0103",
+    "agent": "spec12",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0105",
+    "agent": "ver1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0107",
+    "agent": "ver2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -405,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 156,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0109",
+    "agent": "ver3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0111",
+    "agent": "ver4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0113",
+    "agent": "ver5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0115",
+    "agent": "ver6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -409,
+    "orig_out_chars": 350,
+    "new_out_chars": 14,
+    "tokens": 130,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0117",
+    "agent": "ver7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0119",
+    "agent": "ver8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0121",
+    "agent": "ver9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0123",
+    "agent": "ver10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0125",
+    "agent": "rev1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 59,
+    "new_out_chars": 59,
+    "tokens": 194,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0127",
+    "agent": "rev2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0129",
+    "agent": "rev3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0131",
+    "agent": "rev4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 51,
+    "new_out_chars": 51,
+    "tokens": 156,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0133",
+    "agent": "rev5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0135",
+    "agent": "rev6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0137",
+    "agent": "rev7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0139",
+    "agent": "rev8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0141",
+    "agent": "synth",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 176,
+    "new_out_chars": 176,
+    "tokens": 419,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0143",
+    "agent": "audit",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 15,
+    "orig_out_chars": 161,
+    "new_out_chars": 176,
+    "tokens": 286,
+    "outcome": "changed"
+   }
+  ],
+  "trace_out": "data\\runs\\irec-live\\irec-20260919-small.jsonl",
+  "discarded": 13,
+  "work_preserved": 0.9103448275862069,
+  "unsafe_preservations": 0,
+  "unsafe_ids": [],
+  "survived_bytes": [],
+  "escapes": 0,
+  "recall": 1.0
+ },
+ {
+  "seed": 20260920,
+  "regime": "medium",
+  "mode": "irec_live",
+  "local_only": false,
+  "file": "seed20260920-medium.json",
+  "events": 145,
+  "model_events": 55,
+  "flagged": [
+   "S12",
+   "S19",
+   "S26"
+  ],
+  "flagged_true": [
+   "S12",
+   "S19",
+   "S26"
+  ],
+  "payload_landed": false,
+  "events_with_token": [],
+  "truth_events": 0,
+  "b2_closure": 88,
+  "b0_set": 145,
+  "spliced": 52,
+  "reexecuted": 3,
+  "unchanged": 3,
+  "changed": 0,
+  "cutoff_yield": 1.0,
+  "calls": 3,
+  "prompt_tokens": 497,
+  "output_tokens": 10,
+  "replay_tokens": 507,
+  "divergence": null,
+  "failure": null,
+  "task_success": true,
+  "wall_clock_s": 39.3,
+  "routing": {
+   "local": 3
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": 120
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": 800
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "detail": [
+   {
+    "event": "e0003",
+    "agent": "acq1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0007",
+    "agent": "acq2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0011",
+    "agent": "acq3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0015",
+    "agent": "acq4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0019",
+    "agent": "acq5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0023",
+    "agent": "acq6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 167,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0027",
+    "agent": "acq7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0031",
+    "agent": "acq8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0035",
+    "agent": "acq9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0039",
+    "agent": "acq10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0043",
+    "agent": "acq11",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0047",
+    "agent": "acq12",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 171,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0050",
+    "agent": "norm1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0053",
+    "agent": "norm2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0056",
+    "agent": "norm3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0059",
+    "agent": "norm4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0062",
+    "agent": "norm5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0065",
+    "agent": "norm6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0068",
+    "agent": "norm7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0071",
+    "agent": "norm8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0074",
+    "agent": "norm9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0077",
+    "agent": "norm10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0079",
+    "agent": "hub",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0081",
+    "agent": "spec1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0083",
+    "agent": "spec2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0085",
+    "agent": "spec3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0087",
+    "agent": "spec4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0089",
+    "agent": "spec5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0091",
+    "agent": "spec6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0093",
+    "agent": "spec7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0095",
+    "agent": "spec8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0097",
+    "agent": "spec9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0099",
+    "agent": "spec10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0101",
+    "agent": "spec11",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0103",
+    "agent": "spec12",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0105",
+    "agent": "ver1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0107",
+    "agent": "ver2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0109",
+    "agent": "ver3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0111",
+    "agent": "ver4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0113",
+    "agent": "ver5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0115",
+    "agent": "ver6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0117",
+    "agent": "ver7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0119",
+    "agent": "ver8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0121",
+    "agent": "ver9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0123",
+    "agent": "ver10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0125",
+    "agent": "rev1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0127",
+    "agent": "rev2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0129",
+    "agent": "rev3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0131",
+    "agent": "rev4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0133",
+    "agent": "rev5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0135",
+    "agent": "rev6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0137",
+    "agent": "rev7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0139",
+    "agent": "rev8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0141",
+    "agent": "synth",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0143",
+    "agent": "audit",
+    "outcome": "spliced",
+    "calls": 0
+   }
+  ],
+  "trace_out": "data\\runs\\irec-live\\irec-20260920-medium.jsonl",
+  "discarded": 0,
+  "work_preserved": 1.0,
+  "unsafe_preservations": 0,
+  "unsafe_ids": [],
+  "survived_bytes": [],
+  "escapes": 0,
+  "recall": 1.0
+ },
+ {
+  "seed": 20260920,
+  "regime": "small",
+  "mode": "irec_live",
+  "local_only": false,
+  "file": "seed20260920-small.json",
+  "events": 145,
+  "model_events": 55,
+  "flagged": [
+   "S58",
+   "S64"
+  ],
+  "flagged_true": [
+   "S58",
+   "S64"
+  ],
+  "payload_landed": true,
+  "events_with_token": [
+   "e0105",
+   "e0115",
+   "e0125",
+   "e0131",
+   "e0141",
+   "e0143"
+  ],
+  "truth_events": 13,
+  "b2_closure": 17,
+  "b0_set": 145,
+  "spliced": 49,
+  "reexecuted": 6,
+  "unchanged": 0,
+  "changed": 6,
+  "cutoff_yield": 0.0,
+  "calls": 6,
+  "prompt_tokens": 1125,
+  "output_tokens": 227,
+  "replay_tokens": 1352,
+  "divergence": null,
+  "failure": null,
+  "task_success": true,
+  "wall_clock_s": 70.3,
+  "routing": {
+   "nvidia": 1,
+   "local": 4,
+   "gemini": 1
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 1,
+    "prompt_tokens": 326,
+    "output_tokens": 93,
+    "total_tokens": 419,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 1
+    },
+    "remaining_today": 119
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 1,
+    "prompt_tokens": 152,
+    "output_tokens": 15,
+    "total_tokens": 167,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 1
+    },
+    "remaining_today": 799
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "detail": [
+   {
+    "event": "e0003",
+    "agent": "acq1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0007",
+    "agent": "acq2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0011",
+    "agent": "acq3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0015",
+    "agent": "acq4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0019",
+    "agent": "acq5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0023",
+    "agent": "acq6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0027",
+    "agent": "acq7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0031",
+    "agent": "acq8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0035",
+    "agent": "acq9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0039",
+    "agent": "acq10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0043",
+    "agent": "acq11",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0047",
+    "agent": "acq12",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0050",
+    "agent": "norm1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0053",
+    "agent": "norm2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0056",
+    "agent": "norm3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0059",
+    "agent": "norm4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0062",
+    "agent": "norm5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0065",
+    "agent": "norm6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0068",
+    "agent": "norm7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0071",
+    "agent": "norm8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0074",
+    "agent": "norm9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0077",
+    "agent": "norm10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0079",
+    "agent": "hub",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0081",
+    "agent": "spec1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0083",
+    "agent": "spec2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0085",
+    "agent": "spec3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0087",
+    "agent": "spec4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0089",
+    "agent": "spec5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0091",
+    "agent": "spec6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0093",
+    "agent": "spec7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0095",
+    "agent": "spec8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0097",
+    "agent": "spec9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0099",
+    "agent": "spec10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0101",
+    "agent": "spec11",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0103",
+    "agent": "spec12",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0105",
+    "agent": "ver1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -413,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 167,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0107",
+    "agent": "ver2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0109",
+    "agent": "ver3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0111",
+    "agent": "ver4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0113",
+    "agent": "ver5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0115",
+    "agent": "ver6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -409,
+    "orig_out_chars": 350,
+    "new_out_chars": 14,
+    "tokens": 130,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0117",
+    "agent": "ver7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0119",
+    "agent": "ver8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0121",
+    "agent": "ver9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0123",
+    "agent": "ver10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0125",
+    "agent": "rev1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 59,
+    "new_out_chars": 59,
+    "tokens": 194,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0127",
+    "agent": "rev2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0129",
+    "agent": "rev3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0131",
+    "agent": "rev4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 51,
+    "new_out_chars": 51,
+    "tokens": 156,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0133",
+    "agent": "rev5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0135",
+    "agent": "rev6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0137",
+    "agent": "rev7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0139",
+    "agent": "rev8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0141",
+    "agent": "synth",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 176,
+    "new_out_chars": 176,
+    "tokens": 419,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0143",
+    "agent": "audit",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 15,
+    "orig_out_chars": 161,
+    "new_out_chars": 176,
+    "tokens": 286,
+    "outcome": "changed"
+   }
+  ],
+  "trace_out": "data\\runs\\irec-live\\irec-20260920-small.jsonl",
+  "discarded": 13,
+  "work_preserved": 0.9103448275862069,
+  "unsafe_preservations": 0,
+  "unsafe_ids": [],
+  "survived_bytes": [],
+  "escapes": 0,
+  "recall": 1.0
+ },
+ {
+  "seed": 20260921,
+  "regime": "large",
+  "mode": "irec_live",
+  "local_only": false,
+  "file": "seed20260921-large.json",
+  "events": 145,
+  "model_events": 55,
+  "flagged": [
+   "S10",
+   "S13",
+   "S18",
+   "S21",
+   "S24",
+   "S29",
+   "S32",
+   "S34",
+   "S38",
+   "S4",
+   "S44",
+   "S46",
+   "S48",
+   "S52",
+   "S7",
+   "S72",
+   "S74"
+  ],
+  "flagged_true": [
+   "S10",
+   "S13",
+   "S18",
+   "S21",
+   "S24",
+   "S29",
+   "S32",
+   "S34",
+   "S38",
+   "S4",
+   "S44",
+   "S46",
+   "S48",
+   "S52",
+   "S7",
+   "S72",
+   "S74"
+  ],
+  "payload_landed": true,
+  "events_with_token": [
+   "e0011",
+   "e0015",
+   "e0019",
+   "e0031",
+   "e0043",
+   "e0050",
+   "e0053",
+   "e0056",
+   "e0065",
+   "e0068",
+   "e0071",
+   "e0074",
+   "e0077",
+   "e0079",
+   "e0081",
+   "e0085",
+   "e0087",
+   "e0089",
+   "e0095",
+   "e0097",
+   "e0099",
+   "e0101",
+   "e0103",
+   "e0105",
+   "e0107",
+   "e0109",
+   "e0115",
+   "e0117",
+   "e0119",
+   "e0121",
+   "e0123",
+   "e0125",
+   "e0127",
+   "e0131",
+   "e0133",
+   "e0135",
+   "e0137",
+   "e0139",
+   "e0141",
+   "e0143"
+  ],
+  "truth_events": 83,
+  "b2_closure": 130,
+  "b0_set": 145,
+  "spliced": 8,
+  "reexecuted": 47,
+  "unchanged": 7,
+  "changed": 40,
+  "cutoff_yield": 0.14893617021276595,
+  "calls": 47,
+  "prompt_tokens": 8443,
+  "output_tokens": 553,
+  "replay_tokens": 8996,
+  "divergence": null,
+  "failure": null,
+  "task_success": true,
+  "wall_clock_s": 282.3,
+  "routing": {
+   "local": 41,
+   "gemini": 2,
+   "nvidia": 4
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 682,
+    "output_tokens": 186,
+    "total_tokens": 868,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 118
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 4,
+    "prompt_tokens": 842,
+    "output_tokens": 35,
+    "total_tokens": 877,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 4
+    },
+    "remaining_today": 796
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "detail": [
+   {
+    "event": "e0003",
+    "agent": "acq1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0007",
+    "agent": "acq2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -336,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 165,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0011",
+    "agent": "acq3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -336,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 167,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0015",
+    "agent": "acq4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0019",
+    "agent": "acq5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 171,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0023",
+    "agent": "acq6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0027",
+    "agent": "acq7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 168,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0031",
+    "agent": "acq8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 167,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0035",
+    "agent": "acq9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0039",
+    "agent": "acq10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0043",
+    "agent": "acq11",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0047",
+    "agent": "acq12",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 171,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0050",
+    "agent": "norm1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -349,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 152,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0053",
+    "agent": "norm2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 198,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0056",
+    "agent": "norm3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -343,
+    "orig_out_chars": 12,
+    "new_out_chars": 12,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0059",
+    "agent": "norm4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0062",
+    "agent": "norm5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0065",
+    "agent": "norm6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -347,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 130,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0068",
+    "agent": "norm7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -345,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0071",
+    "agent": "norm8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -347,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0074",
+    "agent": "norm9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 174,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0077",
+    "agent": "norm10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -352,
+    "orig_out_chars": 83,
+    "new_out_chars": 16,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0079",
+    "agent": "hub",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 16,
+    "orig_out_chars": 160,
+    "new_out_chars": 176,
+    "tokens": 449,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0081",
+    "agent": "spec1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 119,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 264,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0083",
+    "agent": "spec2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 119,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 223,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0085",
+    "agent": "spec3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 135,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 265,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0087",
+    "agent": "spec4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 135,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 229,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0089",
+    "agent": "spec5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 119,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 224,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0091",
+    "agent": "spec6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 119,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 219,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0093",
+    "agent": "spec7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 119,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 221,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0095",
+    "agent": "spec8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 119,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 219,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0097",
+    "agent": "spec9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 119,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 222,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0099",
+    "agent": "spec10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 119,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 223,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0101",
+    "agent": "spec11",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 119,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 222,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0103",
+    "agent": "spec12",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 119,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 225,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0105",
+    "agent": "ver1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 188,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0107",
+    "agent": "ver2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 29,
+    "new_out_chars": 29,
+    "tokens": 176,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0109",
+    "agent": "ver3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 12,
+    "new_out_chars": 12,
+    "tokens": 154,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0111",
+    "agent": "ver4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0113",
+    "agent": "ver5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0115",
+    "agent": "ver6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -409,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 130,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0117",
+    "agent": "ver7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -405,
+    "orig_out_chars": 13,
+    "new_out_chars": 13,
+    "tokens": 134,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0119",
+    "agent": "ver8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 154,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0121",
+    "agent": "ver9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 152,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0123",
+    "agent": "ver10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 16,
+    "new_out_chars": 16,
+    "tokens": 154,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0125",
+    "agent": "rev1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 16,
+    "orig_out_chars": 43,
+    "new_out_chars": 59,
+    "tokens": 194,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0127",
+    "agent": "rev2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 26,
+    "new_out_chars": 26,
+    "tokens": 170,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0129",
+    "agent": "rev3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0131",
+    "agent": "rev4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 51,
+    "new_out_chars": 51,
+    "tokens": 156,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0133",
+    "agent": "rev5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 50,
+    "new_out_chars": 50,
+    "tokens": 160,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0135",
+    "agent": "rev6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 51,
+    "new_out_chars": 14,
+    "tokens": 150,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0137",
+    "agent": "rev7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 148,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0139",
+    "agent": "rev8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 16,
+    "new_out_chars": 16,
+    "tokens": 160,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0141",
+    "agent": "synth",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 30,
+    "orig_out_chars": 146,
+    "new_out_chars": 176,
+    "tokens": 419,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0143",
+    "agent": "audit",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 119,
+    "orig_out_chars": 57,
+    "new_out_chars": 176,
+    "tokens": 286,
+    "outcome": "changed"
+   }
+  ],
+  "trace_out": "data\\runs\\irec-live\\irec-20260921-large.jsonl",
+  "discarded": 87,
+  "work_preserved": 0.4,
+  "unsafe_preservations": 0,
+  "unsafe_ids": [],
+  "survived_bytes": [],
+  "escapes": 0,
+  "recall": 1.0
+ },
+ {
+  "seed": 20260921,
+  "regime": "medium",
+  "mode": "irec_live",
+  "local_only": false,
+  "file": "seed20260921-medium.json",
+  "events": 145,
+  "model_events": 55,
+  "flagged": [
+   "S14",
+   "S19",
+   "S4",
+   "S9"
+  ],
+  "flagged_true": [
+   "S14",
+   "S19",
+   "S4",
+   "S9"
+  ],
+  "payload_landed": true,
+  "events_with_token": [
+   "e0031",
+   "e0065",
+   "e0079",
+   "e0095",
+   "e0115",
+   "e0131",
+   "e0141",
+   "e0143"
+  ],
+  "truth_events": 17,
+  "b2_closure": 95,
+  "b0_set": 145,
+  "spliced": 33,
+  "reexecuted": 22,
+  "unchanged": 14,
+  "changed": 8,
+  "cutoff_yield": 0.6363636363636364,
+  "calls": 22,
+  "prompt_tokens": 4715,
+  "output_tokens": 341,
+  "replay_tokens": 5056,
+  "divergence": null,
+  "failure": null,
+  "task_success": true,
+  "wall_clock_s": 19.9,
+  "routing": {
+   "local": 18,
+   "gemini": 2,
+   "nvidia": 2
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 682,
+    "output_tokens": 186,
+    "total_tokens": 868,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 118
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 518,
+    "output_tokens": 11,
+    "total_tokens": 529,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 798
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "detail": [
+   {
+    "event": "e0003",
+    "agent": "acq1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0007",
+    "agent": "acq2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -336,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 165,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0011",
+    "agent": "acq3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0015",
+    "agent": "acq4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -336,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0019",
+    "agent": "acq5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0023",
+    "agent": "acq6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 167,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0027",
+    "agent": "acq7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0031",
+    "agent": "acq8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 167,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0035",
+    "agent": "acq9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0039",
+    "agent": "acq10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0043",
+    "agent": "acq11",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0047",
+    "agent": "acq12",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0050",
+    "agent": "norm1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0053",
+    "agent": "norm2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0056",
+    "agent": "norm3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0059",
+    "agent": "norm4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0062",
+    "agent": "norm5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0065",
+    "agent": "norm6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 172,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0068",
+    "agent": "norm7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0071",
+    "agent": "norm8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0074",
+    "agent": "norm9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0077",
+    "agent": "norm10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0079",
+    "agent": "hub",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 176,
+    "new_out_chars": 176,
+    "tokens": 449,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0081",
+    "agent": "spec1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 264,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0083",
+    "agent": "spec2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 223,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0085",
+    "agent": "spec3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 265,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0087",
+    "agent": "spec4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 229,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0089",
+    "agent": "spec5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 224,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0091",
+    "agent": "spec6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 219,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0093",
+    "agent": "spec7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 221,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0095",
+    "agent": "spec8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 219,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0097",
+    "agent": "spec9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 222,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0099",
+    "agent": "spec10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 223,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0101",
+    "agent": "spec11",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 222,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0103",
+    "agent": "spec12",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 225,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0105",
+    "agent": "ver1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0107",
+    "agent": "ver2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0109",
+    "agent": "ver3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0111",
+    "agent": "ver4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0113",
+    "agent": "ver5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0115",
+    "agent": "ver6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 150,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0117",
+    "agent": "ver7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0119",
+    "agent": "ver8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0121",
+    "agent": "ver9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0123",
+    "agent": "ver10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0125",
+    "agent": "rev1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0127",
+    "agent": "rev2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0129",
+    "agent": "rev3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0131",
+    "agent": "rev4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 51,
+    "new_out_chars": 51,
+    "tokens": 156,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0133",
+    "agent": "rev5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0135",
+    "agent": "rev6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0137",
+    "agent": "rev7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0139",
+    "agent": "rev8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0141",
+    "agent": "synth",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 176,
+    "new_out_chars": 176,
+    "tokens": 419,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0143",
+    "agent": "audit",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 176,
+    "new_out_chars": 176,
+    "tokens": 286,
+    "outcome": "changed"
+   }
+  ],
+  "trace_out": "data\\runs\\irec-live\\irec-20260921-medium.jsonl",
+  "discarded": 17,
+  "work_preserved": 0.8827586206896552,
+  "unsafe_preservations": 0,
+  "unsafe_ids": [],
+  "survived_bytes": [],
+  "escapes": 0,
+  "recall": 1.0
+ },
+ {
+  "seed": 20260921,
+  "regime": "small",
+  "mode": "irec_live",
+  "local_only": false,
+  "file": "seed20260921-small.json",
+  "events": 145,
+  "model_events": 55,
+  "flagged": [
+   "S66"
+  ],
+  "flagged_true": [
+   "S66"
+  ],
+  "payload_landed": true,
+  "events_with_token": [
+   "e0121",
+   "e0137",
+   "e0141",
+   "e0143"
+  ],
+  "truth_events": 9,
+  "b2_closure": 11,
+  "b0_set": 145,
+  "spliced": 51,
+  "reexecuted": 4,
+  "unchanged": 0,
+  "changed": 4,
+  "cutoff_yield": 0.0,
+  "calls": 4,
+  "prompt_tokens": 805,
+  "output_tokens": 180,
+  "replay_tokens": 985,
+  "divergence": null,
+  "failure": null,
+  "task_success": true,
+  "wall_clock_s": 7.1,
+  "routing": {
+   "local": 3,
+   "gemini": 1
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 1,
+    "prompt_tokens": 326,
+    "output_tokens": 93,
+    "total_tokens": 419,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 1
+    },
+    "remaining_today": 119
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": 800
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "detail": [
+   {
+    "event": "e0003",
+    "agent": "acq1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0007",
+    "agent": "acq2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0011",
+    "agent": "acq3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0015",
+    "agent": "acq4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0019",
+    "agent": "acq5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0023",
+    "agent": "acq6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0027",
+    "agent": "acq7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0031",
+    "agent": "acq8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0035",
+    "agent": "acq9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0039",
+    "agent": "acq10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0043",
+    "agent": "acq11",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0047",
+    "agent": "acq12",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0050",
+    "agent": "norm1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0053",
+    "agent": "norm2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0056",
+    "agent": "norm3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0059",
+    "agent": "norm4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0062",
+    "agent": "norm5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0065",
+    "agent": "norm6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0068",
+    "agent": "norm7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0071",
+    "agent": "norm8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0074",
+    "agent": "norm9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0077",
+    "agent": "norm10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0079",
+    "agent": "hub",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0081",
+    "agent": "spec1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0083",
+    "agent": "spec2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0085",
+    "agent": "spec3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0087",
+    "agent": "spec4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0089",
+    "agent": "spec5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0091",
+    "agent": "spec6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0093",
+    "agent": "spec7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0095",
+    "agent": "spec8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0097",
+    "agent": "spec9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0099",
+    "agent": "spec10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0101",
+    "agent": "spec11",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0103",
+    "agent": "spec12",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0105",
+    "agent": "ver1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0107",
+    "agent": "ver2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0109",
+    "agent": "ver3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0111",
+    "agent": "ver4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0113",
+    "agent": "ver5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0115",
+    "agent": "ver6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0117",
+    "agent": "ver7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0119",
+    "agent": "ver8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0121",
+    "agent": "ver9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -409,
+    "orig_out_chars": 350,
+    "new_out_chars": 14,
+    "tokens": 132,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0123",
+    "agent": "ver10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0125",
+    "agent": "rev1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0127",
+    "agent": "rev2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0129",
+    "agent": "rev3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0131",
+    "agent": "rev4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0133",
+    "agent": "rev5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0135",
+    "agent": "rev6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0137",
+    "agent": "rev7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 148,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0139",
+    "agent": "rev8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0141",
+    "agent": "synth",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 176,
+    "new_out_chars": 176,
+    "tokens": 419,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0143",
+    "agent": "audit",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 176,
+    "new_out_chars": 176,
+    "tokens": 286,
+    "outcome": "changed"
+   }
+  ],
+  "trace_out": "data\\runs\\irec-live\\irec-20260921-small.jsonl",
+  "discarded": 9,
+  "work_preserved": 0.9379310344827586,
+  "unsafe_preservations": 0,
+  "unsafe_ids": [],
+  "survived_bytes": [],
+  "escapes": 0,
+  "recall": 1.0
+ }
+]

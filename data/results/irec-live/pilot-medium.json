@@ -1,0 +1,543 @@
+[
+ {
+  "seed": 20260918,
+  "regime": "medium",
+  "mode": "irec_live",
+  "local_only": false,
+  "file": "seed20260918-medium.json",
+  "events": 145,
+  "model_events": 55,
+  "flagged": [
+   "S16",
+   "S23"
+  ],
+  "flagged_true": [
+   "S16",
+   "S23"
+  ],
+  "payload_landed": true,
+  "events_with_token": [
+   "e0031",
+   "e0065",
+   "e0079",
+   "e0095",
+   "e0115",
+   "e0131",
+   "e0141",
+   "e0143"
+  ],
+  "truth_events": 17,
+  "b2_closure": 81,
+  "b0_set": 145,
+  "spliced": 35,
+  "reexecuted": 20,
+  "unchanged": 12,
+  "changed": 8,
+  "cutoff_yield": 0.6,
+  "calls": 20,
+  "prompt_tokens": 4389,
+  "output_tokens": 335,
+  "replay_tokens": 4724,
+  "divergence": null,
+  "failure": null,
+  "task_success": true,
+  "wall_clock_s": 209.0,
+  "routing": {
+   "local": 16,
+   "gemini": 2,
+   "nvidia": 2
+  },
+  "degraded": [],
+  "ledgers": {
+   "gemini": {
+    "provider": "gemini",
+    "limit_rpm": null,
+    "limit_rpd": 120,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 682,
+    "output_tokens": 186,
+    "total_tokens": 868,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 118
+   },
+   "nvidia": {
+    "provider": "nvidia",
+    "limit_rpm": null,
+    "limit_rpd": 800,
+    "limit_tpm": null,
+    "limit_source": "self-imposed experiment budget; verified 17-09-2026 that neither provider returns a quota or rate-limit header, so no ceiling here was read from an API",
+    "requests": 2,
+    "prompt_tokens": 518,
+    "output_tokens": 11,
+    "total_tokens": 529,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {
+     "ok": 2
+    },
+    "remaining_today": 798
+   },
+   "local": {
+    "provider": "local",
+    "limit_rpm": null,
+    "limit_rpd": null,
+    "limit_tpm": null,
+    "limit_source": "no external quota; local Ollama on this machine",
+    "requests": 0,
+    "prompt_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "failures": 0,
+    "skipped_quota": 0,
+    "statuses": {},
+    "remaining_today": null
+   }
+  },
+  "detail": [
+   {
+    "event": "e0003",
+    "agent": "acq1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0007",
+    "agent": "acq2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0011",
+    "agent": "acq3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0015",
+    "agent": "acq4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0019",
+    "agent": "acq5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0023",
+    "agent": "acq6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0027",
+    "agent": "acq7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0031",
+    "agent": "acq8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 167,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0035",
+    "agent": "acq9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0039",
+    "agent": "acq10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0043",
+    "agent": "acq11",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": -337,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 169,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0047",
+    "agent": "acq12",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0050",
+    "agent": "norm1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0053",
+    "agent": "norm2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0056",
+    "agent": "norm3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0059",
+    "agent": "norm4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0062",
+    "agent": "norm5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0065",
+    "agent": "norm6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 172,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0068",
+    "agent": "norm7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0071",
+    "agent": "norm8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0074",
+    "agent": "norm9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0077",
+    "agent": "norm10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0079",
+    "agent": "hub",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 176,
+    "new_out_chars": 176,
+    "tokens": 449,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0081",
+    "agent": "spec1",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 264,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0083",
+    "agent": "spec2",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 223,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0085",
+    "agent": "spec3",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 265,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0087",
+    "agent": "spec4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 229,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0089",
+    "agent": "spec5",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 224,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0091",
+    "agent": "spec6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 219,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0093",
+    "agent": "spec7",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 221,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0095",
+    "agent": "spec8",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 219,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0097",
+    "agent": "spec9",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 222,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0099",
+    "agent": "spec10",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 223,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0101",
+    "agent": "spec11",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 222,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0103",
+    "agent": "spec12",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 5,
+    "new_out_chars": 5,
+    "tokens": 225,
+    "outcome": "unchanged"
+   },
+   {
+    "event": "e0105",
+    "agent": "ver1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0107",
+    "agent": "ver2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0109",
+    "agent": "ver3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0111",
+    "agent": "ver4",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0113",
+    "agent": "ver5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0115",
+    "agent": "ver6",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 14,
+    "new_out_chars": 14,
+    "tokens": 150,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0117",
+    "agent": "ver7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0119",
+    "agent": "ver8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0121",
+    "agent": "ver9",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0123",
+    "agent": "ver10",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0125",
+    "agent": "rev1",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0127",
+    "agent": "rev2",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0129",
+    "agent": "rev3",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0131",
+    "agent": "rev4",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 51,
+    "new_out_chars": 51,
+    "tokens": 156,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0133",
+    "agent": "rev5",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0135",
+    "agent": "rev6",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0137",
+    "agent": "rev7",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0139",
+    "agent": "rev8",
+    "outcome": "spliced",
+    "calls": 0
+   },
+   {
+    "event": "e0141",
+    "agent": "synth",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 176,
+    "new_out_chars": 176,
+    "tokens": 419,
+    "outcome": "changed"
+   },
+   {
+    "event": "e0143",
+    "agent": "audit",
+    "calls": 1,
+    "prompt_identical": false,
+    "prompt_delta_chars": 0,
+    "orig_out_chars": 176,
+    "new_out_chars": 176,
+    "tokens": 286,
+    "outcome": "changed"
+   }
+  ],
+  "trace_out": "data\\runs\\irec-live\\irec-20260918-medium.jsonl",
+  "discarded": 17,
+  "work_preserved": 0.8827586206896552,
+  "unsafe_preservations": 0,
+  "unsafe_ids": [],
+  "survived_bytes": [],
+  "escapes": 0,
+  "recall": 1.0
+ }
+]

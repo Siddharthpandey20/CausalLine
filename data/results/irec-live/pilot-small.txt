@@ -1,0 +1,5 @@
+seed      regime  mode           spliced re-exec  unchg  chg  yield   tokens unsafe  recall  task  wall s
+20260917  small   irec_live           51       4      0    4     0%      991      0    100%    ok      62
+
+  budget: 4 model calls, 803 prompt + 188 output = 991 tokens
+  calls by provider: {'local': 3, 'gemini': 1}

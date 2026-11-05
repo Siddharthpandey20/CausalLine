@@ -1,0 +1,7 @@
+seed      regime  mode           spliced re-exec  unchg  chg  yield   tokens unsafe  recall  task  wall s
+20260917  small   fidelity_gate       55       0      0    0      -        0      8     11%  FAIL       0
+20260917  medium  fidelity_gate       55       0      0    0      -        0      0    100%    ok       0
+20260917  large   fidelity_gate       55       0      0    0      -        0     95      0%  FAIL       0
+
+  budget: 0 model calls, 0 prompt + 0 output = 0 tokens
+  calls by provider: {}

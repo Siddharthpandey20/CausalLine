@@ -1,0 +1,5 @@
+seed      regime  mode           spliced re-exec  unchg  chg  yield   tokens unsafe  recall  task  wall s
+20260918  medium  irec_live           35      20     12    8    60%     4724      0    100%    ok     209
+
+  budget: 20 model calls, 4389 prompt + 335 output = 4724 tokens
+  calls by provider: {'local': 16, 'gemini': 2, 'nvidia': 2}
