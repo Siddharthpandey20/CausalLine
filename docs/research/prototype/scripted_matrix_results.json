@@ -1,0 +1,2060 @@
+[
+ {
+  "cm": "flat",
+  "wf": "short",
+  "sc": "A",
+  "var": "influencing",
+  "cp": {
+   "scenario": "A",
+   "variant": "influencing",
+   "workflow": "short",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 19,
+   "model_events": 6,
+   "truth": 4,
+   "flagged": [
+    "S3"
+   ],
+   "cp_tokens": 500,
+   "cp_calls": 5,
+   "spliced": 1,
+   "unchanged": 0,
+   "changed": 5,
+   "cp_discarded": 11,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 7,
+   "cp_task": true,
+   "pipeline_tokens": 600,
+   "base": {
+    "B0": {
+     "tokens": 600,
+     "calls": 6,
+     "discarded": 19,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 500,
+     "calls": 5,
+     "discarded": 16,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 800,
+    "replay": 400,
+    "total": 1200,
+    "discarded": 11,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 600,
+     "self_report": 600,
+     "counterfactual": 200
+    },
+    "truth": 4
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 600,
+    "replay": 400,
+    "total": 1000,
+    "discarded": 11,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 600,
+     "self_report": 500,
+     "counterfactual": 100
+    },
+    "truth": 4
+   }
+  }
+ },
+ {
+  "cm": "flat",
+  "wf": "short",
+  "sc": "A",
+  "var": "exposed_only",
+  "cp": {
+   "scenario": "A",
+   "variant": "exposed_only",
+   "workflow": "short",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 19,
+   "model_events": 6,
+   "truth": 0,
+   "flagged": [
+    "S3"
+   ],
+   "cp_tokens": 500,
+   "cp_calls": 5,
+   "spliced": 1,
+   "unchanged": 0,
+   "changed": 5,
+   "cp_discarded": 9,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 9,
+   "cp_task": true,
+   "pipeline_tokens": 600,
+   "base": {
+    "B0": {
+     "tokens": 600,
+     "calls": 6,
+     "discarded": 19,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 500,
+     "calls": 5,
+     "discarded": 16,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.03
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 900,
+    "replay": 0,
+    "total": 900,
+    "discarded": 1,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 600,
+     "self_report": 600,
+     "counterfactual": 300
+    },
+    "truth": 0
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 600,
+    "replay": 0,
+    "total": 600,
+    "discarded": 1,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 600,
+     "self_report": 300,
+     "counterfactual": 300
+    },
+    "truth": 0
+   }
+  }
+ },
+ {
+  "cm": "flat",
+  "wf": "short",
+  "sc": "B",
+  "var": "influencing",
+  "cp": {
+   "scenario": "B",
+   "variant": "influencing",
+   "workflow": "short",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 19,
+   "model_events": 6,
+   "truth": 2,
+   "flagged": [
+    "S14"
+   ],
+   "cp_tokens": 200,
+   "cp_calls": 2,
+   "spliced": 4,
+   "unchanged": 0,
+   "changed": 2,
+   "cp_discarded": 7,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 5,
+   "cp_task": true,
+   "pipeline_tokens": 600,
+   "base": {
+    "B0": {
+     "tokens": 600,
+     "calls": 6,
+     "discarded": 19,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 200,
+     "calls": 2,
+     "discarded": 8,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.03
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 600,
+    "replay": 200,
+    "total": 800,
+    "discarded": 8,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 600,
+     "self_report": 600
+    },
+    "truth": 2
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 300,
+    "replay": 200,
+    "total": 500,
+    "discarded": 8,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 600,
+     "self_report": 200,
+     "counterfactual": 100
+    },
+    "truth": 2
+   }
+  }
+ },
+ {
+  "cm": "flat",
+  "wf": "short",
+  "sc": "B",
+  "var": "exposed_only",
+  "cp": {
+   "scenario": "B",
+   "variant": "exposed_only",
+   "workflow": "short",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 19,
+   "model_events": 6,
+   "truth": 0,
+   "flagged": [
+    "S13"
+   ],
+   "cp_tokens": 200,
+   "cp_calls": 2,
+   "spliced": 4,
+   "unchanged": 0,
+   "changed": 2,
+   "cp_discarded": 5,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 5,
+   "cp_task": true,
+   "pipeline_tokens": 600,
+   "base": {
+    "B0": {
+     "tokens": 600,
+     "calls": 6,
+     "discarded": 19,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 200,
+     "calls": 2,
+     "discarded": 8,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.03
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 800,
+    "replay": 0,
+    "total": 800,
+    "discarded": 1,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 600,
+     "self_report": 600,
+     "counterfactual": 200
+    },
+    "truth": 0
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 300,
+    "replay": 100,
+    "total": 400,
+    "discarded": 3,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 600,
+     "self_report": 200,
+     "counterfactual": 100
+    },
+    "truth": 0
+   }
+  }
+ },
+ {
+  "cm": "flat",
+  "wf": "short",
+  "sc": "C",
+  "var": "influencing",
+  "cp": {
+   "scenario": "C",
+   "variant": "influencing",
+   "workflow": "short",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 19,
+   "model_events": 6,
+   "truth": 2,
+   "flagged": [
+    "S13"
+   ],
+   "cp_tokens": 200,
+   "cp_calls": 2,
+   "spliced": 4,
+   "unchanged": 0,
+   "changed": 2,
+   "cp_discarded": 7,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 5,
+   "cp_task": true,
+   "pipeline_tokens": 600,
+   "base": {
+    "B0": {
+     "tokens": 600,
+     "calls": 6,
+     "discarded": 19,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 500,
+     "calls": 5,
+     "discarded": 16,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.03
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 600,
+    "replay": 200,
+    "total": 800,
+    "discarded": 8,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 600,
+     "self_report": 600
+    },
+    "truth": 2
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 400,
+    "replay": 200,
+    "total": 600,
+    "discarded": 8,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 600,
+     "self_report": 200,
+     "counterfactual": 200
+    },
+    "truth": 2
+   }
+  }
+ },
+ {
+  "cm": "flat",
+  "wf": "short",
+  "sc": "C",
+  "var": "exposed_only",
+  "cp": {
+   "scenario": "C",
+   "variant": "exposed_only",
+   "workflow": "short",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 19,
+   "model_events": 6,
+   "truth": 0,
+   "flagged": [
+    "S13"
+   ],
+   "cp_tokens": 200,
+   "cp_calls": 2,
+   "spliced": 4,
+   "unchanged": 0,
+   "changed": 2,
+   "cp_discarded": 5,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 5,
+   "cp_task": true,
+   "pipeline_tokens": 600,
+   "base": {
+    "B0": {
+     "tokens": 600,
+     "calls": 6,
+     "discarded": 19,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 500,
+     "calls": 5,
+     "discarded": 16,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.03
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 800,
+    "replay": 0,
+    "total": 800,
+    "discarded": 1,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 600,
+     "self_report": 600,
+     "counterfactual": 200
+    },
+    "truth": 0
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 300,
+    "replay": 100,
+    "total": 400,
+    "discarded": 3,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 600,
+     "self_report": 200,
+     "counterfactual": 100
+    },
+    "truth": 0
+   }
+  }
+ },
+ {
+  "cm": "flat",
+  "wf": "long",
+  "sc": "A",
+  "var": "influencing",
+  "cp": {
+   "scenario": "A",
+   "variant": "influencing",
+   "workflow": "long",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 27,
+   "model_events": 9,
+   "truth": 5,
+   "flagged": [
+    "S4"
+   ],
+   "cp_tokens": 800,
+   "cp_calls": 8,
+   "spliced": 1,
+   "unchanged": 0,
+   "changed": 8,
+   "cp_discarded": 16,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 11,
+   "cp_task": true,
+   "pipeline_tokens": 900,
+   "base": {
+    "B0": {
+     "tokens": 900,
+     "calls": 9,
+     "discarded": 27,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 800,
+     "calls": 8,
+     "discarded": 24,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 1200,
+    "replay": 700,
+    "total": 1900,
+    "discarded": 19,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 900,
+     "self_report": 900,
+     "counterfactual": 300
+    },
+    "truth": 5
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 800,
+    "replay": 700,
+    "total": 1500,
+    "discarded": 19,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 900,
+     "self_report": 600,
+     "counterfactual": 200
+    },
+    "truth": 5
+   }
+  }
+ },
+ {
+  "cm": "flat",
+  "wf": "long",
+  "sc": "A",
+  "var": "exposed_only",
+  "cp": {
+   "scenario": "A",
+   "variant": "exposed_only",
+   "workflow": "long",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 27,
+   "model_events": 9,
+   "truth": 0,
+   "flagged": [
+    "S4"
+   ],
+   "cp_tokens": 800,
+   "cp_calls": 8,
+   "spliced": 1,
+   "unchanged": 0,
+   "changed": 8,
+   "cp_discarded": 13,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 13,
+   "cp_task": true,
+   "pipeline_tokens": 900,
+   "base": {
+    "B0": {
+     "tokens": 900,
+     "calls": 9,
+     "discarded": 27,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 800,
+     "calls": 8,
+     "discarded": 24,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 1500,
+    "replay": 400,
+    "total": 1900,
+    "discarded": 12,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 900,
+     "self_report": 900,
+     "counterfactual": 600
+    },
+    "truth": 0
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 1000,
+    "replay": 0,
+    "total": 1000,
+    "discarded": 1,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 900,
+     "self_report": 500,
+     "counterfactual": 500
+    },
+    "truth": 0
+   }
+  }
+ },
+ {
+  "cm": "flat",
+  "wf": "long",
+  "sc": "B",
+  "var": "influencing",
+  "cp": {
+   "scenario": "B",
+   "variant": "influencing",
+   "workflow": "long",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 27,
+   "model_events": 9,
+   "truth": 3,
+   "flagged": [
+    "S20"
+   ],
+   "cp_tokens": 300,
+   "cp_calls": 3,
+   "spliced": 6,
+   "unchanged": 0,
+   "changed": 3,
+   "cp_discarded": 9,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 6,
+   "cp_task": true,
+   "pipeline_tokens": 900,
+   "base": {
+    "B0": {
+     "tokens": 900,
+     "calls": 9,
+     "discarded": 27,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 300,
+     "calls": 3,
+     "discarded": 10,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 1000,
+    "replay": 300,
+    "total": 1300,
+    "discarded": 10,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 900,
+     "self_report": 900,
+     "counterfactual": 100
+    },
+    "truth": 3
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 400,
+    "replay": 300,
+    "total": 700,
+    "discarded": 10,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 900,
+     "self_report": 300,
+     "counterfactual": 100
+    },
+    "truth": 3
+   }
+  }
+ },
+ {
+  "cm": "flat",
+  "wf": "long",
+  "sc": "B",
+  "var": "exposed_only",
+  "cp": {
+   "scenario": "B",
+   "variant": "exposed_only",
+   "workflow": "long",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 27,
+   "model_events": 9,
+   "truth": 0,
+   "flagged": [
+    "S19"
+   ],
+   "cp_tokens": 300,
+   "cp_calls": 3,
+   "spliced": 6,
+   "unchanged": 0,
+   "changed": 3,
+   "cp_discarded": 7,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 7,
+   "cp_task": true,
+   "pipeline_tokens": 900,
+   "base": {
+    "B0": {
+     "tokens": 900,
+     "calls": 9,
+     "discarded": 27,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 300,
+     "calls": 3,
+     "discarded": 10,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 1100,
+    "replay": 200,
+    "total": 1300,
+    "discarded": 8,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 900,
+     "self_report": 900,
+     "counterfactual": 200
+    },
+    "truth": 0
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 500,
+    "replay": 200,
+    "total": 700,
+    "discarded": 8,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 900,
+     "self_report": 300,
+     "counterfactual": 200
+    },
+    "truth": 0
+   }
+  }
+ },
+ {
+  "cm": "flat",
+  "wf": "long",
+  "sc": "C",
+  "var": "influencing",
+  "cp": {
+   "scenario": "C",
+   "variant": "influencing",
+   "workflow": "long",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 27,
+   "model_events": 9,
+   "truth": 3,
+   "flagged": [
+    "S19"
+   ],
+   "cp_tokens": 300,
+   "cp_calls": 3,
+   "spliced": 6,
+   "unchanged": 0,
+   "changed": 3,
+   "cp_discarded": 9,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 6,
+   "cp_task": true,
+   "pipeline_tokens": 900,
+   "base": {
+    "B0": {
+     "tokens": 900,
+     "calls": 9,
+     "discarded": 27,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 800,
+     "calls": 8,
+     "discarded": 24,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 900,
+    "replay": 300,
+    "total": 1200,
+    "discarded": 10,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 900,
+     "self_report": 900
+    },
+    "truth": 3
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 400,
+    "replay": 300,
+    "total": 700,
+    "discarded": 10,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 900,
+     "self_report": 300,
+     "counterfactual": 100
+    },
+    "truth": 3
+   }
+  }
+ },
+ {
+  "cm": "flat",
+  "wf": "long",
+  "sc": "C",
+  "var": "exposed_only",
+  "cp": {
+   "scenario": "C",
+   "variant": "exposed_only",
+   "workflow": "long",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 27,
+   "model_events": 9,
+   "truth": 0,
+   "flagged": [
+    "S19"
+   ],
+   "cp_tokens": 300,
+   "cp_calls": 3,
+   "spliced": 6,
+   "unchanged": 0,
+   "changed": 3,
+   "cp_discarded": 7,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 7,
+   "cp_task": true,
+   "pipeline_tokens": 900,
+   "base": {
+    "B0": {
+     "tokens": 900,
+     "calls": 9,
+     "discarded": 27,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 800,
+     "calls": 8,
+     "discarded": 24,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 1100,
+    "replay": 0,
+    "total": 1100,
+    "discarded": 1,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 900,
+     "self_report": 900,
+     "counterfactual": 200
+    },
+    "truth": 0
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 400,
+    "replay": 0,
+    "total": 400,
+    "discarded": 1,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 900,
+     "self_report": 200,
+     "counterfactual": 200
+    },
+    "truth": 0
+   }
+  }
+ },
+ {
+  "cm": "proportional",
+  "wf": "short",
+  "sc": "A",
+  "var": "influencing",
+  "cp": {
+   "scenario": "A",
+   "variant": "influencing",
+   "workflow": "short",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 19,
+   "model_events": 6,
+   "truth": 4,
+   "flagged": [
+    "S3"
+   ],
+   "cp_tokens": 2146,
+   "cp_calls": 5,
+   "spliced": 1,
+   "unchanged": 0,
+   "changed": 5,
+   "cp_discarded": 11,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 7,
+   "cp_task": true,
+   "pipeline_tokens": 2759,
+   "base": {
+    "B0": {
+     "tokens": 2364,
+     "calls": 6,
+     "discarded": 19,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 2146,
+     "calls": 5,
+     "discarded": 16,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 2951,
+    "replay": 1703,
+    "total": 4654,
+    "discarded": 11,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 2759,
+     "self_report": 2138,
+     "counterfactual": 813
+    },
+    "truth": 4
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 2285,
+    "replay": 1703,
+    "total": 3988,
+    "discarded": 11,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 2759,
+     "self_report": 1842,
+     "counterfactual": 443
+    },
+    "truth": 4
+   }
+  }
+ },
+ {
+  "cm": "proportional",
+  "wf": "short",
+  "sc": "A",
+  "var": "exposed_only",
+  "cp": {
+   "scenario": "A",
+   "variant": "exposed_only",
+   "workflow": "short",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 19,
+   "model_events": 6,
+   "truth": 0,
+   "flagged": [
+    "S3"
+   ],
+   "cp_tokens": 2146,
+   "cp_calls": 5,
+   "spliced": 1,
+   "unchanged": 0,
+   "changed": 5,
+   "cp_discarded": 9,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 9,
+   "cp_task": true,
+   "pipeline_tokens": 2714,
+   "base": {
+    "B0": {
+     "tokens": 2364,
+     "calls": 6,
+     "discarded": 19,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 2146,
+     "calls": 5,
+     "discarded": 16,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 3515,
+    "replay": 0,
+    "total": 3515,
+    "discarded": 1,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 2714,
+     "self_report": 2161,
+     "counterfactual": 1354
+    },
+    "truth": 0
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 2510,
+    "replay": 0,
+    "total": 2510,
+    "discarded": 1,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 2714,
+     "self_report": 1156,
+     "counterfactual": 1354
+    },
+    "truth": 0
+   }
+  }
+ },
+ {
+  "cm": "proportional",
+  "wf": "short",
+  "sc": "B",
+  "var": "influencing",
+  "cp": {
+   "scenario": "B",
+   "variant": "influencing",
+   "workflow": "short",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 19,
+   "model_events": 6,
+   "truth": 2,
+   "flagged": [
+    "S14"
+   ],
+   "cp_tokens": 756,
+   "cp_calls": 2,
+   "spliced": 4,
+   "unchanged": 0,
+   "changed": 2,
+   "cp_discarded": 7,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 5,
+   "cp_task": true,
+   "pipeline_tokens": 2601,
+   "base": {
+    "B0": {
+     "tokens": 2524,
+     "calls": 6,
+     "discarded": 19,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 756,
+     "calls": 2,
+     "discarded": 8,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.03
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 2153,
+    "replay": 756,
+    "total": 2909,
+    "discarded": 8,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 2601,
+     "self_report": 2153
+    },
+    "truth": 2
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 1140,
+    "replay": 756,
+    "total": 1896,
+    "discarded": 8,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 2601,
+     "self_report": 706,
+     "counterfactual": 434
+    },
+    "truth": 2
+   }
+  }
+ },
+ {
+  "cm": "proportional",
+  "wf": "short",
+  "sc": "B",
+  "var": "exposed_only",
+  "cp": {
+   "scenario": "B",
+   "variant": "exposed_only",
+   "workflow": "short",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 19,
+   "model_events": 6,
+   "truth": 0,
+   "flagged": [
+    "S13"
+   ],
+   "cp_tokens": 736,
+   "cp_calls": 2,
+   "spliced": 4,
+   "unchanged": 0,
+   "changed": 2,
+   "cp_discarded": 5,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 5,
+   "cp_task": true,
+   "pipeline_tokens": 2563,
+   "base": {
+    "B0": {
+     "tokens": 2504,
+     "calls": 6,
+     "discarded": 19,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 736,
+     "calls": 2,
+     "discarded": 8,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.03
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 2891,
+    "replay": 0,
+    "total": 2891,
+    "discarded": 1,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 2563,
+     "self_report": 2155,
+     "counterfactual": 736
+    },
+    "truth": 0
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 1133,
+    "replay": 310,
+    "total": 1443,
+    "discarded": 3,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 2563,
+     "self_report": 707,
+     "counterfactual": 426
+    },
+    "truth": 0
+   }
+  }
+ },
+ {
+  "cm": "proportional",
+  "wf": "short",
+  "sc": "C",
+  "var": "influencing",
+  "cp": {
+   "scenario": "C",
+   "variant": "influencing",
+   "workflow": "short",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 19,
+   "model_events": 6,
+   "truth": 2,
+   "flagged": [
+    "S13"
+   ],
+   "cp_tokens": 795,
+   "cp_calls": 2,
+   "spliced": 4,
+   "unchanged": 0,
+   "changed": 2,
+   "cp_discarded": 7,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 5,
+   "cp_task": true,
+   "pipeline_tokens": 2661,
+   "base": {
+    "B0": {
+     "tokens": 2563,
+     "calls": 6,
+     "discarded": 19,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 2345,
+     "calls": 5,
+     "discarded": 16,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 2134,
+    "replay": 795,
+    "total": 2929,
+    "discarded": 8,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 2661,
+     "self_report": 2134
+    },
+    "truth": 2
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 1482,
+    "replay": 795,
+    "total": 2277,
+    "discarded": 8,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 2661,
+     "self_report": 688,
+     "counterfactual": 794
+    },
+    "truth": 2
+   }
+  }
+ },
+ {
+  "cm": "proportional",
+  "wf": "short",
+  "sc": "C",
+  "var": "exposed_only",
+  "cp": {
+   "scenario": "C",
+   "variant": "exposed_only",
+   "workflow": "short",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 19,
+   "model_events": 6,
+   "truth": 0,
+   "flagged": [
+    "S13"
+   ],
+   "cp_tokens": 795,
+   "cp_calls": 2,
+   "spliced": 4,
+   "unchanged": 0,
+   "changed": 2,
+   "cp_discarded": 5,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 5,
+   "cp_task": true,
+   "pipeline_tokens": 2653,
+   "base": {
+    "B0": {
+     "tokens": 2563,
+     "calls": 6,
+     "discarded": 19,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 2345,
+     "calls": 5,
+     "discarded": 16,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 2978,
+    "replay": 0,
+    "total": 2978,
+    "discarded": 1,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 2653,
+     "self_report": 2183,
+     "counterfactual": 795
+    },
+    "truth": 0
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 1191,
+    "replay": 340,
+    "total": 1531,
+    "discarded": 3,
+    "events": 19,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 2653,
+     "self_report": 736,
+     "counterfactual": 455
+    },
+    "truth": 0
+   }
+  }
+ },
+ {
+  "cm": "proportional",
+  "wf": "long",
+  "sc": "A",
+  "var": "influencing",
+  "cp": {
+   "scenario": "A",
+   "variant": "influencing",
+   "workflow": "long",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 27,
+   "model_events": 9,
+   "truth": 5,
+   "flagged": [
+    "S4"
+   ],
+   "cp_tokens": 4490,
+   "cp_calls": 8,
+   "spliced": 1,
+   "unchanged": 0,
+   "changed": 8,
+   "cp_discarded": 16,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 11,
+   "cp_task": true,
+   "pipeline_tokens": 5319,
+   "base": {
+    "B0": {
+     "tokens": 4708,
+     "calls": 9,
+     "discarded": 27,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 4490,
+     "calls": 8,
+     "discarded": 24,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 4703,
+    "replay": 4040,
+    "total": 8743,
+    "discarded": 19,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 5319,
+     "self_report": 3481,
+     "counterfactual": 1222
+    },
+    "truth": 5
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 3218,
+    "replay": 4040,
+    "total": 7258,
+    "discarded": 19,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 5319,
+     "self_report": 2514,
+     "counterfactual": 704
+    },
+    "truth": 5
+   }
+  }
+ },
+ {
+  "cm": "proportional",
+  "wf": "long",
+  "sc": "A",
+  "var": "exposed_only",
+  "cp": {
+   "scenario": "A",
+   "variant": "exposed_only",
+   "workflow": "long",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 27,
+   "model_events": 9,
+   "truth": 0,
+   "flagged": [
+    "S4"
+   ],
+   "cp_tokens": 4490,
+   "cp_calls": 8,
+   "spliced": 1,
+   "unchanged": 0,
+   "changed": 8,
+   "cp_discarded": 13,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 13,
+   "cp_task": true,
+   "pipeline_tokens": 5292,
+   "base": {
+    "B0": {
+     "tokens": 4708,
+     "calls": 9,
+     "discarded": 27,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 4490,
+     "calls": 8,
+     "discarded": 24,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 6968,
+    "replay": 1946,
+    "total": 8914,
+    "discarded": 12,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 5292,
+     "self_report": 3523,
+     "counterfactual": 3445
+    },
+    "truth": 0
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 5134,
+    "replay": 0,
+    "total": 5134,
+    "discarded": 1,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 5292,
+     "self_report": 2113,
+     "counterfactual": 3021
+    },
+    "truth": 0
+   }
+  }
+ },
+ {
+  "cm": "proportional",
+  "wf": "long",
+  "sc": "B",
+  "var": "influencing",
+  "cp": {
+   "scenario": "B",
+   "variant": "influencing",
+   "workflow": "long",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 27,
+   "model_events": 9,
+   "truth": 3,
+   "flagged": [
+    "S20"
+   ],
+   "cp_tokens": 1414,
+   "cp_calls": 3,
+   "spliced": 6,
+   "unchanged": 0,
+   "changed": 3,
+   "cp_discarded": 9,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 6,
+   "cp_task": true,
+   "pipeline_tokens": 5223,
+   "base": {
+    "B0": {
+     "tokens": 5104,
+     "calls": 9,
+     "discarded": 27,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 1414,
+     "calls": 3,
+     "discarded": 10,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 3964,
+    "replay": 1414,
+    "total": 5378,
+    "discarded": 10,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 5223,
+     "self_report": 3535,
+     "counterfactual": 429
+    },
+    "truth": 3
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 1656,
+    "replay": 1414,
+    "total": 3070,
+    "discarded": 10,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 5223,
+     "self_report": 1114,
+     "counterfactual": 542
+    },
+    "truth": 3
+   }
+  }
+ },
+ {
+  "cm": "proportional",
+  "wf": "long",
+  "sc": "B",
+  "var": "exposed_only",
+  "cp": {
+   "scenario": "B",
+   "variant": "exposed_only",
+   "workflow": "long",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 27,
+   "model_events": 9,
+   "truth": 0,
+   "flagged": [
+    "S19"
+   ],
+   "cp_tokens": 1384,
+   "cp_calls": 3,
+   "spliced": 6,
+   "unchanged": 0,
+   "changed": 3,
+   "cp_discarded": 7,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 7,
+   "cp_task": true,
+   "pipeline_tokens": 5161,
+   "base": {
+    "B0": {
+     "tokens": 5074,
+     "calls": 9,
+     "discarded": 27,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 1384,
+     "calls": 3,
+     "discarded": 10,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 4385,
+    "replay": 965,
+    "total": 5350,
+    "discarded": 8,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 5161,
+     "self_report": 3535,
+     "counterfactual": 850
+    },
+    "truth": 0
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 1964,
+    "replay": 965,
+    "total": 2929,
+    "discarded": 8,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 5161,
+     "self_report": 1114,
+     "counterfactual": 850
+    },
+    "truth": 0
+   }
+  }
+ },
+ {
+  "cm": "proportional",
+  "wf": "long",
+  "sc": "C",
+  "var": "influencing",
+  "cp": {
+   "scenario": "C",
+   "variant": "influencing",
+   "workflow": "long",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 27,
+   "model_events": 9,
+   "truth": 3,
+   "flagged": [
+    "S19"
+   ],
+   "cp_tokens": 1473,
+   "cp_calls": 3,
+   "spliced": 6,
+   "unchanged": 0,
+   "changed": 3,
+   "cp_discarded": 9,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 6,
+   "cp_task": true,
+   "pipeline_tokens": 5126,
+   "base": {
+    "B0": {
+     "tokens": 5163,
+     "calls": 9,
+     "discarded": 27,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 4945,
+     "calls": 8,
+     "discarded": 24,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 3475,
+    "replay": 1473,
+    "total": 4948,
+    "discarded": 10,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 5126,
+     "self_report": 3475
+    },
+    "truth": 3
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 1617,
+    "replay": 1473,
+    "total": 3090,
+    "discarded": 10,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 5126,
+     "self_report": 1055,
+     "counterfactual": 562
+    },
+    "truth": 3
+   }
+  }
+ },
+ {
+  "cm": "proportional",
+  "wf": "long",
+  "sc": "C",
+  "var": "exposed_only",
+  "cp": {
+   "scenario": "C",
+   "variant": "exposed_only",
+   "workflow": "long",
+   "mode": "exact",
+   "detector": "oracle",
+   "events": 27,
+   "model_events": 9,
+   "truth": 0,
+   "flagged": [
+    "S19"
+   ],
+   "cp_tokens": 1473,
+   "cp_calls": 3,
+   "spliced": 6,
+   "unchanged": 0,
+   "changed": 3,
+   "cp_discarded": 7,
+   "cp_unsafe": 0,
+   "unsafe_ids": [],
+   "survived": [],
+   "cp_false_pos": 7,
+   "cp_task": true,
+   "pipeline_tokens": 5252,
+   "base": {
+    "B0": {
+     "tokens": 5163,
+     "calls": 9,
+     "discarded": 27,
+     "unsafe": 0,
+     "task": true
+    },
+    "B2": {
+     "tokens": 4945,
+     "calls": 8,
+     "discarded": 24,
+     "unsafe": 0,
+     "task": true
+    }
+   },
+   "wall": 0.04
+  },
+  "cl": {
+   "hybrid": {
+    "mode": "hybrid",
+    "analysis": 4576,
+    "replay": 0,
+    "total": 4576,
+    "discarded": 1,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 5252,
+     "self_report": 3564,
+     "counterfactual": 1012
+    },
+    "truth": 0
+   },
+   "lazy": {
+    "mode": "lazy",
+    "analysis": 1805,
+    "replay": 0,
+    "total": 1805,
+    "discarded": 1,
+    "events": 27,
+    "unsafe": 0,
+    "task": true,
+    "scope": "selective",
+    "escalations": 0,
+    "by_purpose": {
+     "pipeline": 5252,
+     "self_report": 793,
+     "counterfactual": 1012
+    },
+    "truth": 0
+   }
+  }
+ }
+]

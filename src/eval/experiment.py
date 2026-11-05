@@ -313,8 +313,16 @@ def run_cell(
         # A new scripted client so replay calls do not share the original
         # usage log (ground truth is already captured).
         replay_client = ScriptedClient(seed=seed + 1)
+        # The SAME fixtures CausalLine replays on, below. Omitting `tools` here
+        # let the default `_fresh_tools(attack, out)` build the *short* fixtures
+        # for every baseline, while CausalLine got the extended ones in a long
+        # workflow -- so a long cell compared the methods on different tool
+        # responses and B2 "failed the task" for that reason alone. Accounting
+        # defect, not a recovery-semantics change: `replay()` is called exactly
+        # as before, on the fixtures the comparison is supposed to share.
         result, report = run_baseline_recovery(
-            method, discard, original, replay_client, flagged, attack, out
+            method, discard, original, replay_client, flagged, attack, out,
+            tools=_fresh_tools(attack, out, extended=(workflow == "long")),
         )
         # Read off the replay report rather than from `discard` directly, so
         # the baselines and CausalLine are scored through the same function on

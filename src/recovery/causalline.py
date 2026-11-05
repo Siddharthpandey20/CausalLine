@@ -285,6 +285,10 @@ def recover(
     last_report: ReplayReport | None = None
     recovered_path: Path | None = None
     task_success = False
+    # Replay tokens summed over EVERY attempt the ladder makes, and the
+    # per-attempt breakdown so the total is auditable from the notes.
+    replay_tokens_spent = 0
+    attempt_costs: list[tuple[str, int]] = []
 
     # `escalations` counts WIDENINGS ACTUALLY REPLAYED, and is bounded by
     # max_escalations. The budget check is at the bottom of the loop, not in
@@ -365,6 +369,13 @@ def recover(
         )
 
         last_report = report
+        # Every attempt is charged, not just the one that succeeded. An
+        # escalated run replays two or three times, and reporting only the last
+        # attempt understated the cost of exactly the runs that cost most (see
+        # `replay_tokens` below). Accounting only: nothing in this loop reads
+        # the figure, so no recovery decision changes.
+        replay_tokens_spent += report.replay_tokens
+        attempt_costs.append((scope, report.replay_tokens))
         recovered_path = result.trace_path
         task_success = result.task_success
 
@@ -403,7 +414,26 @@ def recover(
             f"{sorted(memory_plan)}, {len(kept)} clean write(s) kept {sorted(kept)}"
         )
 
-    replay_tokens = last_report.replay_tokens if last_report else 0
+    # THE COST OF A RECOVERY IS EVERY REPLAY IT RAN, NOT ITS LAST ONE
+    # ----------------------------------------------------------------------
+    # This was `last_report.replay_tokens`, which is the final attempt alone.
+    # A run that tried `selective`, failed verification, tried `agent_restart`
+    # and failed again before `restart_all` paid for three replays and was
+    # reported as paying for one -- so the most expensive recoveries in the
+    # corpus were the ones whose cost was most understated, and
+    # `docs/14`'s escalated runs undercharged CausalLine against baselines
+    # that never escalate at all.
+    #
+    # Accounting only. `replay_tokens` is written here and read only by the
+    # returned record; no scope, plan or verdict depends on it.
+    replay_tokens = replay_tokens_spent
+    if len(attempt_costs) > 1:
+        notes.append(
+            "replay cost by attempt: "
+            + ", ".join(f"{s}={t}" for s, t in attempt_costs)
+            + f" (total {replay_tokens}; the final attempt alone was "
+            f"{attempt_costs[-1][1]})"
+        )
     # What was actually recomputed: the set handed to the last replay attempt,
     # which after an escalation is the widened scope rather than the original
     # selective plan.
