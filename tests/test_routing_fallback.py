@@ -348,6 +348,46 @@ class TestBudgetAndSpendCaps(unittest.TestCase):
         self.assertEqual(totals["total_attempts"], 3)
 
 
+class TestTheRouterIsFoundThroughAReplayWrapper(unittest.TestCase):
+    """The failure this guards against was silent and scientifically fatal.
+
+    During a recovery the pipeline's client is a `SplicingClient` wrapping the
+    router. `src/tracing/mixed.py:_find_router` identifies a router by having
+    BOTH `routing` and `clients`; `FallbackRouter` had `clients` and `route`,
+    so it was invisible, `active_agent` was never set, and every replayed
+    invocation fell to the default provider. Measured in a dry run: the
+    original stage routed 50/40/10 and EVERY recovery stage routed 100% local
+    -- so all five methods replayed Gemini and NVIDIA agents on the local
+    model, which is the silent provider substitution the campaign forbids.
+    """
+
+    def test_find_router_locates_it_through_nested_wrappers(self) -> None:
+        from src.tracing.mixed import _find_router
+
+        class Wrapper:
+            def __init__(self, inner):
+                self.inner = inner
+
+        router = FallbackRouter(clients={"local": Fake("local")},
+                                route={"a": "local"})
+        self.assertIs(_find_router(Wrapper(Wrapper(router))), router)
+        self.assertIs(_find_router(router), router)
+
+    def test_it_exposes_both_attributes_the_lookup_requires(self) -> None:
+        router = FallbackRouter(clients={"local": Fake("local")},
+                                route={"a": "gemini"})
+        self.assertTrue(hasattr(router, "routing"))
+        self.assertTrue(hasattr(router, "clients"))
+        self.assertEqual(router.routing, router.route)
+
+    def test_an_unset_active_agent_still_has_a_defined_provider(self) -> None:
+        """Belt and braces: if the lookup ever breaks again, the fallback must
+        at least be recorded as a fallback rather than look like an
+        assignment."""
+        router = FallbackRouter(clients={"local": Fake("local")}, route={})
+        self.assertEqual(router.provider_for(""), "local")
+
+
 class TestTheReproducibilityRecord(unittest.TestCase):
     def test_every_field_the_audit_needs_is_present(self) -> None:
         gem = Fake("gemini", Retryable("429"), fail_times=99)

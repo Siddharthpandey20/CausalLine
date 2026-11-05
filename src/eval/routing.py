@@ -448,6 +448,23 @@ class FallbackRouter:
 
     # --- helpers -----------------------------------------------------------
 
+    @property
+    def routing(self) -> dict[str, str]:
+        """Alias of `route`, under the name `_find_router` looks for.
+
+        `src/tracing/mixed.py:_find_router` identifies a router by having BOTH
+        `routing` and `clients`, and walks `.inner` to reach it through a
+        `SplicingClient`. Without this alias the router was invisible during
+        every recovery replay, `active_agent` was never set, and every
+        invocation fell to the default provider -- so all five methods replayed
+        a Gemini or NVIDIA agent on the LOCAL model. That is the silent
+        provider substitution the campaign forbids, and it is precisely the
+        failure `_find_router`'s own docstring warns about. Measured in a dry
+        run: the original stage was 50/40/10 and every recovery stage was
+        100% local.
+        """
+        return self.route
+
     def provider_for(self, agent: str) -> str:
         return self.route.get(agent, self.default)
 
