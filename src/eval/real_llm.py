@@ -741,6 +741,13 @@ def run_generated(
     # default: `investigation_mode="self_report"` is what every caller gets.
     investigation_mode: str = "self_report",
     gate1_enabled: bool = True,
+    # FEATURE FLAG -- the recovery strategy to score alongside the baselines.
+    # "causalline" is the production strategy and the default; "irec" adds an
+    # Interventional Replay with Early Cutoff row WITHOUT removing the
+    # CausalLine one, so the two are always comparable on the same trace.
+    # Nothing is reached in src/recovery/irec.py unless a caller asks for it.
+    # See docs/research/IREC_FINAL_DECISION.md.
+    recovery_strategies: tuple[str, ...] = ("causalline",),
     **detector_kwargs: Any,
 ) -> RealRunResult:
     """One generated scenario, end to end, on a real model.
@@ -1019,6 +1026,50 @@ def run_generated(
     except (SpliceError, RuntimeError) as exc:
         result.notes.append(f"CausalLine: recovery failed: {type(exc).__name__}: {exc}")
         recovered = None
+
+    if "irec" in recovery_strategies:
+        # An independent strategy scored on the same trace, same flagged set,
+        # same fixtures and the same `score_row` as every other method. Added
+        # as an extra row; the CausalLine row above is untouched.
+        from src.recovery.irec import recover_irec
+
+        irec_out = workdir / f"{stem}-IREC.jsonl"
+        try:
+            irec = recover_irec(
+                trace, flagged, replay_client_factory(), irec_out,
+                task=scenario.task,
+                tools=_tools_for(scenario, irec_out),
+                handoff_hook=scenario.handoff_hook(),
+                workflow_kwargs=scenario.workflow_kwargs,
+            )
+        except (SpliceError, RuntimeError) as exc:
+            result.notes.append(f"IREC: recovery failed: {type(exc).__name__}: {exc}")
+            irec = None
+        if irec is not None:
+            result.notes.extend(f"IREC: {n}" for n in irec.notes)
+            result.rows.append(
+                score_row(
+                    scenario=scenario.test_id,
+                    variant=scenario.design.intent,
+                    method="IREC",
+                    detector=verdict.detector,
+                    trace=trace,
+                    discarded=discarded_events(irec.report, irec.invalidated),
+                    truth_events=truth_events,
+                    recovery_tokens=irec.recovery_tokens,
+                    analysis_tokens=0,
+                    replay_tokens=irec.replay_tokens,
+                    task_success=irec.task_success,
+                    wall_clock_s=irec.wall_clock_s,
+                    storage_bytes=store["total_bytes"],
+                    blast_events=irec.blast_radius_events,
+                    blast_agents=irec.blast_radius_agents,
+                    notes=f"scope={irec.scope}",
+                    pair_unsafe_rate=result.pairs.unsafe_rate,
+                    pair_false_negatives=result.pairs.unsafe,
+                    pair_scored=result.pairs.scored,
+                )
+            )
 
     if recovered is not None:
         discarded = discarded_events(recovered.report, recovered.invalidated)
