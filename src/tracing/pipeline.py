@@ -141,6 +141,18 @@ class GeminiPipeline:
         checkpoints: CheckpointStore | None = None,
         attributor: Attributor | None = None,
         handoff_hook: Any = None,
+        # TYPED HANDOFF (research, default off). When set, the text a producer
+        # hands to a consumer is passed through this callable instead of being
+        # forwarded verbatim, so the consumer reads a PROJECTION of the
+        # producer's reply rather than the whole reply. `None` is the shipped
+        # free-text interface, and every existing trace and measurement was
+        # produced by it. Used by the IREC typed-interface ablation; see
+        # docs/research/IREC_PROMOTION_CONDITIONS.md section 2.
+        #
+        # Applied ONLY to model-produced findings, never to a planted
+        # inter-agent message: the ablation manipulates the interface between
+        # honest agents and must not also alter the attack.
+        handoff_projection: Any = None,
         research_rounds: int = 1,
         reviewer: bool = False,
         checkpoint_interval: float | None = None,
@@ -192,6 +204,7 @@ class GeminiPipeline:
         # message. Called with (from_agent, to_agent, texts) and returns extra
         # message strings to append. None means no injection.
         self.handoff_hook = handoff_hook
+        self.handoff_projection = handoff_projection
         # Establishes influence edges for model-written events. Defaults to
         # NullAttributor, which is what the pipeline did before it had one:
         # exposure recorded, influence never established. That default is the
@@ -788,13 +801,19 @@ class GeminiPipeline:
                 or []
             )
 
+        # The typed handoff, if one is installed. Applied to the findings only;
+        # `extra_messages` (a planted injection) is forwarded untouched.
+        project = self.handoff_projection or (lambda text: text)
+        handed_findings = [(event, project(text)) for event, text in findings]
+
         to_coder = self.log.log_event(
             "researcher",
             "message",
             parents=[e.id for e, _ in findings],
             exposures=self.context.get("researcher", []),
             output_ref=self.log.put_content(
-                json.dumps([text for _, text in findings] + extra_messages, sort_keys=True),
+                json.dumps([text for _, text in handed_findings] + extra_messages,
+                           sort_keys=True),
                 kind="output",
                 meta={"agent": "researcher"},
             ),
@@ -814,7 +833,7 @@ class GeminiPipeline:
             upstream_verdict=self._verdict_on(*[e.id for e, _ in findings]),
         )
         handed_on: list[str] = []
-        for event, text in findings:
+        for event, text in handed_findings:
             source = remember(
                 self.log.log_source(
                     "agent_message",
@@ -1293,6 +1312,7 @@ def run_pipeline(
     client: Any = None,
     attributor: Attributor | None = None,
     handoff_hook: Any = None,
+    handoff_projection: Any = None,
     research_rounds: int = 1,
     reviewer: bool = False,
     checkpoint_interval: float | None = None,
@@ -1416,6 +1436,7 @@ def run_pipeline(
                 checkpoints=store,
                 attributor=attributor,
                 handoff_hook=handoff_hook,
+                handoff_projection=handoff_projection,
                 research_rounds=research_rounds,
                 reviewer=reviewer,
                 checkpoint_interval=checkpoint_interval,

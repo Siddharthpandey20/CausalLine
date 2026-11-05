@@ -249,6 +249,11 @@ def recover_irec(
     task: str | None = None,
     tools: Any = None,
     handoff_hook: Any = None,
+    # Must match the ORIGINAL run's interface. A typed workload replayed with a
+    # free-text handoff recomposes every consumer prompt differently, so every
+    # event would be re-executed and the replay would measure the mismatch
+    # rather than the recovery.
+    handoff_projection: Any = None,
     workflow_kwargs: dict[str, Any] | None = None,
     verify_result: bool = True,
 ) -> IRECResult:
@@ -278,6 +283,7 @@ def recover_irec(
         tools=tools,
         attributor=None,
         handoff_hook=handoff_hook,
+        handoff_projection=handoff_projection,
         **(workflow_kwargs or {}),
     )
     task_success = bool(getattr(outcome, "task_success", False))

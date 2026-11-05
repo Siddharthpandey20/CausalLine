@@ -99,6 +99,10 @@ def _original_run(
     cost_model: str = "flat",
     repeats: int = 1,
     control_run: bool = False,
+    # Research only, default off: the typed-handoff projection (see
+    # src/tracing/pipeline.py). Threaded through so the IREC typed-interface
+    # ablation can produce a typed ORIGINAL run, not just a typed replay.
+    handoff_projection: Any = None,
 ) -> tuple[Any, ScriptedClient, set[tuple[str, str]]]:
     attack = build(scenario, influencing)
     tools = _fresh_tools(attack, path, extended=(workflow == "long"))
@@ -134,6 +138,7 @@ def _original_run(
         tools=tools,
         attributor=attributor,
         handoff_hook=attack.handoff_hook,
+        handoff_projection=handoff_projection,
         **WORKFLOWS[workflow],
     )
     marked = label_malicious(path, attack.marker)

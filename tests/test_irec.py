@@ -310,6 +310,103 @@ class TestNondeterminismIsConservative(unittest.TestCase):
             self.assertEqual(client.unchanged, [])
 
 
+class TestTheTypedHandoffIsOptionalAndDoesNotTouchTheAttack(unittest.TestCase):
+    """The C2 ablation's manipulation, pinned.
+
+    `handoff_projection` makes a consumer read a projection of the producer's
+    reply instead of the whole reply. It is a WORKLOAD property, default off,
+    and it must not alter the attack: a planted inter-agent message is
+    forwarded verbatim, or the ablation would be manipulating two things at
+    once. See docs/research/IREC_PROMOTION_CONDITIONS.md section 2.
+    """
+
+    def test_it_is_off_by_default(self) -> None:
+        from src.tracing.pipeline import run_pipeline
+
+        self.assertIsNone(
+            inspect.signature(run_pipeline).parameters[
+                "handoff_projection"].default,
+            "the shipped interface is free text; every existing trace was "
+            "produced by it",
+        )
+
+    def test_off_and_identity_produce_the_same_trace(self) -> None:
+        """`None` must mean exactly "no projection", not "a projection that
+        happens to be the identity by luck"."""
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            texts = {}
+            for label, projection in (("off", None), ("identity", lambda s: s)):
+                path = tmp / f"hp-{label}.jsonl"
+                _original_run("A", True, path, SEED, "none",
+                              handoff_projection=projection)
+                trace = read_trace(path)
+                texts[label] = [s.content for s in trace.sources
+                                if s.kind == "agent_message"]
+            self.assertEqual(texts["off"], texts["identity"])
+
+    def test_a_projection_reaches_the_findings_but_not_a_planted_message(self) -> None:
+        import re
+
+        marker = build("C", True).marker
+        strip = re.compile(r"\s*\[ref [0-9a-f]+\]\s*$")
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            path = tmp / "hp-typed.jsonl"
+            # Scenario C plants an inter-agent message at this exact boundary.
+            _original_run("C", True, path, SEED, "none",
+                          handoff_projection=lambda s: strip.sub("", s))
+            trace = read_trace(path)
+            handed = [s for s in trace.sources if s.kind == "agent_message"]
+            self.assertTrue(handed, "no agent_message sources were handed on")
+            for source in handed:
+                if marker and marker in source.content:
+                    continue          # the planted message, forwarded verbatim
+                self.assertIsNone(
+                    strip.search(source.content),
+                    f"the projection did not reach {source.id}",
+                )
+            planted = [s for s in handed if marker and marker in s.content]
+            self.assertTrue(
+                planted,
+                "the planted message is gone -- the projection altered the "
+                "attack, so the ablation would be manipulating two things",
+            )
+
+    def test_the_projection_changes_no_safety_outcome(self) -> None:
+        """Measured in the ablation across 24 cells; pinned on two of them."""
+        import re
+
+        strip = re.compile(r"\s*\[ref [0-9a-f]+\]\s*$")
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            for influencing in (True, False):
+                with self.subTest(influencing=influencing):
+                    variant = "inf" if influencing else "exp"
+                    path = tmp / f"hp-safe-{variant}.jsonl"
+                    _res, _c, true_inf = _original_run(
+                        "A", influencing, path, SEED, "none",
+                        handoff_projection=lambda s: strip.sub("", s))
+                    original = read_trace(path)
+                    attack = build("A", influencing)
+                    flagged = set(
+                        build_detector("oracle").flag(original).sources())
+                    truth = ground_truth_events(original,
+                                                true_influence=true_inf)
+                    out = tmp / f"hp-safe-{variant}-IREC.jsonl"
+                    result = recover_irec(
+                        original, flagged, ScriptedClient(seed=SEED + 1), out,
+                        task=original.meta.get("task"),
+                        tools=_fresh_tools(attack, out),
+                        handoff_hook=attack.handoff_hook,
+                        handoff_projection=lambda s: strip.sub("", s),
+                        workflow_kwargs=dict(WORKFLOWS["short"]))
+                    kept = truth - set(
+                        discarded_events(result.report, result.invalidated))
+                    self.assertFalse(kept, f"unsafe under a typed handoff: {kept}")
+                    self.assertTrue(result.task_success)
+
+
 class TestTheProductionDefaultDoesNotMove(unittest.TestCase):
     """Property 7. IREC is additive and off by default."""
 
