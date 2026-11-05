@@ -234,8 +234,11 @@ def check_python(report: Report) -> None:
 
 def check_architectures(report: Report, config: dict) -> None:
     from src.eval.arch_scenarios import ArchScenario
-    from src.tracing.architectures import architecture
+    from src.tracing.architectures import architecture, use_shares
 
+    shares = config.get("provider_shares") or {}
+    use_shares((int(shares.get("local", 9)), int(shares.get("gemini", 8)),
+                int(shares.get("nvidia", 3))))
     problems: list[str] = []
     for key in config["architectures"]:
         spec = architecture(key)

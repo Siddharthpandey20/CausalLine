@@ -11,9 +11,33 @@ Where a source is silent, the choice is ours and is recorded in `notes`.
 
 from __future__ import annotations
 
-from src.tracing.archspec import AgentSpec, ArchitectureSpec, assign
+from src.tracing.archspec import (
+    SHARES,
+    AgentSpec,
+    ArchitectureSpec,
+    assign,
+)
 
-__all__ = ["ARCHITECTURES", "architecture", "names"]
+__all__ = ["ARCHITECTURES", "architecture", "current_shares",
+           "names", "use_shares"]
+
+
+# The provider share the next build will use. Set by `use_shares()`, which the
+# campaign runner calls with the configured `provider_shares` -- without it the
+# config value was decorative and every spec was built with the module default.
+_SHARES: tuple[int, int, int] = SHARES["target"]
+
+
+def use_shares(shares: tuple[int, int, int]) -> None:
+    """Choose the provider share and drop the cache so it takes effect."""
+    global _SHARES
+    if tuple(shares) != tuple(_SHARES):
+        _SHARES = tuple(shares)   # type: ignore[assignment]
+        ARCHITECTURES.clear()
+
+
+def current_shares() -> tuple[int, int, int]:
+    return _SHARES
 
 
 def _a(aid: str, role: str, stage: str, index: int, *, kind: str = "think",
@@ -22,7 +46,7 @@ def _a(aid: str, role: str, stage: str, index: int, *, kind: str = "think",
        emits: tuple[str, ...] = (), writes: str | None = None,
        loop: int = 1) -> AgentSpec:
     return AgentSpec(id=aid, role=role, stage=stage, kind=kind,
-                     provider=assign(index, 0, heavy=heavy),
+                     provider=assign(index, 0, heavy=heavy, shares=_SHARES),
                      reads_docs=docs, reads_memory=memory, reads_from=reads,
                      emits_to=emits, writes_memory=writes, loop=loop)
 

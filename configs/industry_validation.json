@@ -31,8 +31,8 @@
   "detector": "oracle",
   "stub": false,
   "provider_shares": {
-    "local": 10,
-    "gemini": 8,
+    "local": 13,
+    "gemini": 6,
     "nvidia": 2
   },
   "fallback_chain": [

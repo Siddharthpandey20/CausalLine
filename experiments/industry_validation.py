@@ -70,7 +70,12 @@ from src.eval.routing import (
 from src.recovery.causalline import recover
 from src.recovery.irec import recover_irec
 from src.recovery.replay import pipeline_model_events
-from src.tracing.architectures import architecture, names
+from src.tracing.architectures import (
+    architecture,
+    current_shares,
+    names,
+    use_shares,
+)
 from src.tracing.checkpoints import CheckpointStore, checkpoint_path_for
 from src.tracing.logger import read_trace
 from src.tracing.pipeline import run_pipeline
@@ -94,7 +99,14 @@ DEFAULTS: dict[str, Any] = {
     "methods": list(METHODS),
     "detector": "oracle",
     "stub": False,
-    "provider_shares": {"local": 10, "gemini": 8, "nvidia": 2},
+    # WEIGHTS, not percentages, and the realised mix is what matters.
+    # These weights apply to the ordinary agent stream; synthesis, review and
+    # gate roles prefer the hosted providers deliberately, so the realised mix
+    # is not the weight ratio. 13/6/2 measures as local 50% / Gemini 40% /
+    # NVIDIA 10% across all seven architectures -- the configured target --
+    # whereas the naive 10/8/2 measures as 40/49/10. The applied weights and
+    # the realised mix are both written into the run manifest.
+    "provider_shares": {"local": 13, "gemini": 6, "nvidia": 2},
     "fallback_chain": ["local", "nvidia", "gemini"],
     "providers": {
         "gemini": {"rpm": 10, "rpd": 1500, "tpm": 250000, "attempts": 3,
@@ -240,6 +252,8 @@ class Progress:
     method: str = ""
     method_state: dict[str, str] = field(default_factory=dict)
     placements_done: int = 0
+    # How many ledger records have already been written to calls.jsonl.
+    call_cursor: int = 0
 
     def render(self, router: FallbackRouter | None, config: dict) -> str:
         elapsed = time.time() - self.started
@@ -398,6 +412,8 @@ def run_placement(config: dict, run: RunDir, arch_key: str, level: str,
         run.write_atomic(manifest, original_result)
     progress.agents = (f"{original_result['agents_executed']}"
                        f"/{original_result['agents_configured']}")
+    cursor = flush_calls(run, ledger, progress.call_cursor)
+    progress.call_cursor = cursor
 
     flagged = sorted({s.id for s in original.sources if s.malicious})
     if not flagged:
@@ -420,6 +436,8 @@ def run_placement(config: dict, run: RunDir, arch_key: str, level: str,
                                   truth_events, truth, closure, method,
                                   placement_id, ledger)
             record["wall_clock_s"] = round(time.time() - started, 2)
+            progress.call_cursor = flush_calls(run, ledger,
+                                               progress.call_cursor)
             run.write_atomic(run.result(placement_id, method), record)
             run.append(run.units, {"placement": placement_id, "method": method,
                                    "status": "ok",
@@ -433,6 +451,8 @@ def run_placement(config: dict, run: RunDir, arch_key: str, level: str,
             run.append(run.errors, {"placement": placement_id, "method": method,
                                     "stage": "recovery", "deferred": str(exc)[:600],
                                     "record": exc.record.to_dict()})
+            progress.call_cursor = flush_calls(
+                run, ledger, progress.call_cursor)
             progress.method_state[method] = "DEFERRED"
             raise
         except Exception as exc:  # noqa: BLE001
@@ -444,6 +464,8 @@ def run_placement(config: dict, run: RunDir, arch_key: str, level: str,
                                     "stage": "recovery",
                                     "error": f"{type(exc).__name__}: {exc}",
                                     "traceback": traceback.format_exc()[-2000:]})
+            progress.call_cursor = flush_calls(
+                run, ledger, progress.call_cursor)
             progress.method_state[method] = f"FAILED ({type(exc).__name__})"
     progress.placements_done += 1
     return original_result
@@ -541,10 +563,20 @@ def _recover_one(config: dict, run: RunDir, scenario: ArchScenario, original,
         "providers": router.budget_state(),
         "usd": round(sum(s.usd for s in router.states.values()), 6),
     })
-    for record in ledger.records:
-        if record.key.startswith(f"{placement_id}/{method}/"):
-            run.append(run.calls, record.to_dict())
     return base
+
+
+def flush_calls(run: RunDir, ledger: CallLedger, cursor: int) -> int:
+    """Persist every invocation the ledger has gained since `cursor`.
+
+    Cursor-based rather than filtered by key prefix: the prefix filter missed
+    the ORIGINAL run's invocations entirely -- 434 of 1,240 in the first dry
+    run, including every Gemini and NVIDIA call -- and rescanned the whole
+    ledger once per method besides. Returns the new cursor.
+    """
+    for record in ledger.records[cursor:]:
+        run.append(run.calls, record.to_dict())
+    return len(ledger.records)
 
 
 # --------------------------------------------------------------------------
@@ -571,6 +603,18 @@ def cmd_setup(args: argparse.Namespace) -> int:
     return 0
 
 
+def _realised_mix(keys: list[str]) -> dict[str, Any]:
+    """The mix the configured weights actually produce, over one clean run of
+    each architecture. Recorded because the weights are not the mix."""
+    totals = {"local": 0, "gemini": 0, "nvidia": 0}
+    for key in keys:
+        for provider, count in architecture(key).provider_mix().items():
+            totals[provider] += count
+    grand = sum(totals.values()) or 1
+    return {"calls": totals,
+            "fraction": {p: round(c / grand, 4) for p, c in totals.items()}}
+
+
 def plan(config: dict) -> list[tuple[str, str, int]]:
     seeds = config["seeds"][:config["trials"]]
     if len(seeds) < config["trials"]:
@@ -591,6 +635,12 @@ def cmd_run(args: argparse.Namespace) -> int:
     if args.levels:
         config["levels"] = list(args.levels)
 
+    # Apply the configured provider share BEFORE any spec is built, or the
+    # config's `provider_shares` is decorative and every agent keeps the
+    # module default.
+    shares = config.get("provider_shares") or {}
+    use_shares((int(shares.get("local", 9)), int(shares.get("gemini", 8)),
+                int(shares.get("nvidia", 3))))
     for key in config["architectures"]:
         problems = architecture(key).problems()
         if problems:
@@ -610,6 +660,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         "platform": platform.platform(),
         "started_at": datetime.now(timezone.utc).isoformat(),
         "stub": bool(config.get("stub")),
+        "provider_shares_applied": list(current_shares()),
+        "provider_mix_realised": _realised_mix(config["architectures"]),
         "architectures": {k: architecture(k).to_dict()
                           for k in config["architectures"]},
         "note": ("STUB RUN -- infrastructure exercise only, not a measurement"
